@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>CAP Margin Capture — Detailed Design</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --accent: #0b6bcb;
+    --accent-soft: #e6f0fa;
+    --good: #1b7a3f;
+    --bad: #b3251b;
+    --warn: #b06a00;
+    --grid: #e5e5e5;
+    --card: #fff;
+    --code-bg: #f4f4f4;
+    --highlight: #fff5d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.55; }
+  .wrapper { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto;
+    padding: 24px 16px; border-right: 1px solid var(--grid); background: #fff;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 12px; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: section; }
+  nav.toc ol li { counter-increment: section; margin: 4px 0; font-size: 14px; }
+  nav.toc ol li::before { content: counter(section) ". "; color: var(--muted); }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  main { padding: 40px 56px; max-width: 980px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  h3 { font-size: 18px; margin: 24px 0 10px; }
+  h4 { font-size: 15px; margin: 16px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 8px 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: 14px 18px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .callout.warn { background: #fff6e8; border-left-color: var(--warn); }
+  .callout.bad  { background: #fdeae8; border-left-color: var(--bad); }
+  .callout.good { background: #e8f5ec; border-left-color: var(--good); }
+  .callout h4 { margin-top: 0; color: var(--fg); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--grid); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .pill.good { background: #e8f5ec; color: var(--good); }
+  .pill.bad  { background: #fdeae8; color: var(--bad); }
+  .pill.warn { background: #fff6e8; color: var(--warn); }
+  .pill.info { background: var(--accent-soft); color: var(--accent); }
+  .scenario { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 18px 22px; margin: 18px 0; }
+  .scenario h4 { margin-top: 0; }
+  .scenario .ledger { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 10px 14px; border-radius: 5px; margin: 8px 0; white-space: pre; overflow-x: auto; }
+
+  /* Scenario calc layout — clean tables instead of monoblob */
+  .calc { margin: 14px 0; }
+  .calc-section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+  table.calc-table { width: 100%; font-size: 13px; margin: 4px 0 10px; border-collapse: separate; border-spacing: 0; }
+  table.calc-table th, table.calc-table td { padding: 6px 10px; border: none; border-bottom: 1px solid var(--grid); text-align: left; vertical-align: top; }
+  table.calc-table th { background: transparent; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  table.calc-table td.formula { font-family: "SF Mono", Menlo, Consolas, monospace; color: var(--muted); }
+  table.calc-table td.value { font-family: "SF Mono", Menlo, Consolas, monospace; text-align: right; white-space: nowrap; }
+  table.calc-table tr.subtotal td { font-weight: 600; border-bottom: 2px solid #1a1a1a; }
+  table.calc-table tr.highlight td { background: var(--highlight); }
+  table.calc-table tr.highlight td.value { font-weight: 600; }
+  .outcome { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 10px 0 4px; }
+  .outcome .box { background: #f7f7f7; border-radius: 6px; padding: 10px 14px; }
+  .outcome .box .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+  .outcome .box .amount { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; }
+  .outcome .box.margin { background: #e8f5ec; }
+  .outcome .box.margin .amount { color: var(--good); }
+  .outcome .box.loss   { background: #fdeae8; }
+  .outcome .box.loss   .amount { color: var(--bad); }
+  .figure { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 16px; margin: 18px 0; text-align: center; }
+  .figure svg { max-width: 100%; height: auto; }
+  .figure .caption { color: var(--muted); font-size: 13px; margin-top: 10px; font-style: italic; }
+  hr { border: none; border-top: 1px solid var(--grid); margin: 32px 0; }
+  .term { font-weight: 600; color: var(--accent); }
+  .formula { font-family: "SF Mono", Menlo, Consolas, monospace; background: var(--highlight); padding: 8px 14px; border-radius: 5px; display: inline-block; margin: 6px 0; }
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 4px 16px; margin: 8px 0; }
+  .kv dt { font-weight: 600; color: var(--muted); }
+  .kv dd { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#intro">TL;DR</a></li>
+    <li><a href="#background">Caching today</a></li>
+    <li><a href="#cap-today">CAP today</a></li>
+    <li><a href="#problem">The margin leak</a></li>
+    <li><a href="#solution">The decoupling idea</a></li>
+    <li><a href="#vocab">Vocabulary</a></li>
+    <li><a href="#attribution">Attribution rule</a></li>
+    <li><a href="#dryruns">Dry runs</a></li>
+    <li><a href="#dataflow">Data flow</a></li>
+    <li><a href="#schema">Storage model</a></li>
+    <li><a href="#code">Code changes</a></li>
+    <li><a href="#failure">Failure modes</a></li>
+    <li><a href="#reporting">Reporting</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header>
+  <h1>CAP Margin Capture via Billing Decoupling</h1>
+</header>
+
+<!-- ============================================================ -->
+<section id="intro">
+<h2>1. TL;DR (for the impatient)</h2>
+
+<p>
+Right now, our Cache Anchor Point (CAP) system saves Anthropic money by keeping the prompt cache warm.
+But the way we bill users today means <strong>those savings flow through to the user</strong> — meanwhile, CAP itself costs us money in background "ping" requests. Net result: Emergent loses margin on every CAP-active user.
+</p>
+
+<p>This work makes one targeted change: <strong>when CAP is the reason the cache survived, charge the user as if the cache had naturally died, but pay Anthropic the actually-lower bill</strong>. The user's bill is unchanged from a CAP-free world — they pay exactly what they would have paid if CAP didn't exist. The savings become Emergent margin.</p>
+
+<div class="callout good">
+<h4>What this is NOT</h4>
+<ul>
+  <li>Not a price increase for users. Users pay the same as before CAP existed.</li>
+  <li>Not a new line item on bills. No SKU change. No UI change.</li>
+  <li>Not a CAP rework. CAP behavior, intervals, models — all unchanged.</li>
+</ul>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="background">
+<h2>2. Zoom-out: how prompt caching works (today, without CAP)</h2>
+
+<p>Anthropic has a feature called <em>prompt caching</em>. The idea: if you send the same long prompt prefix many times in a short window, Anthropic caches it on their side and charges a lower rate when you re-send it.</p>
+
+<h3>Three price tiers</h3>
+
+<table>
+  <thead><tr><th>Tier</th><th>Rate (relative)</th><th>When you pay it</th></tr></thead>
+  <tbody>
+    <tr><td>Uncached input</td><td>1.00&times;</td><td>Tokens that are not covered by a cache breakpoint (rare in our system — we always set breakpoints).</td></tr>
+    <tr><td>Cache <strong>write</strong></td><td>1.25&times;</td><td>The first time a cached prefix is sent, OR after the cache has expired and you send the same prefix again.</td></tr>
+    <tr><td>Cache <strong>read</strong></td><td>0.10&times;</td><td>When the prefix is already in Anthropic's cache and you send the same prefix again within the TTL window.</td></tr>
+  </tbody>
+</table>
+
+<p>So cache reads are <strong>12.5&times; cheaper</strong> than cache writes. That's the entire reason caching matters.</p>
+
+<h3>The 5-minute TTL</h3>
+
+<p>Anthropic's prompt cache has a Time-To-Live of <strong>5 minutes</strong>. If you wait more than 5 minutes between requests with the same prefix, the cache is gone — your next request becomes a cache <em>write</em> again (1.25&times;).</p>
+
+<div class="figure">
+<svg viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- Timeline axis -->
+  <line x1="40" y1="120" x2="680" y2="120" stroke="#666" stroke-width="1.5"/>
+  <polygon points="680,120 672,116 672,124" fill="#666"/>
+  <text x="40" y="155" fill="#666">t=0</text>
+  <text x="200" y="155" fill="#666">t=2 min</text>
+  <text x="360" y="155" fill="#666">t=4 min</text>
+  <text x="525" y="155" fill="#666">t=5 min (TTL)</text>
+  <text x="640" y="155" fill="#666">t=10 min</text>
+
+  <!-- Cache alive zone -->
+  <rect x="40" y="60" width="490" height="40" fill="#e8f5ec" stroke="#1b7a3f" stroke-dasharray="3,2"/>
+  <text x="190" y="50" fill="#1b7a3f" font-weight="600">Cache alive (read = 0.10&times;)</text>
+
+  <!-- Cache dead zone -->
+  <rect x="530" y="60" width="150" height="40" fill="#fdeae8" stroke="#b3251b" stroke-dasharray="3,2"/>
+  <text x="555" y="50" fill="#b3251b" font-weight="600">Cache dead (write = 1.25&times;)</text>
+
+  <!-- Call markers -->
+  <circle cx="60" cy="120" r="6" fill="#0b6bcb"/>
+  <text x="50" y="100" fill="#0b6bcb">Call 1</text>
+  <text x="50" y="180" fill="#0b6bcb" font-size="11">write</text>
+
+  <circle cx="200" cy="120" r="6" fill="#0b6bcb"/>
+  <text x="190" y="100" fill="#0b6bcb">Call 2</text>
+  <text x="195" y="180" fill="#0b6bcb" font-size="11">read</text>
+
+  <circle cx="360" cy="120" r="6" fill="#0b6bcb"/>
+  <text x="350" y="100" fill="#0b6bcb">Call 3</text>
+  <text x="355" y="180" fill="#0b6bcb" font-size="11">read</text>
+
+  <circle cx="640" cy="120" r="6" fill="#b3251b"/>
+  <text x="625" y="100" fill="#b3251b">Call 4</text>
+  <text x="625" y="180" fill="#b3251b" font-size="11">write again</text>
+</svg>
+<div class="caption">Calls 1, 2, 3 land inside the 5-minute window so calls 2 and 3 are cheap cache reads. Call 4 arrives after the TTL — cache is gone, Anthropic charges full cache-write again.</div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="cap-today">
+<h2>3. Zoom-out: what CAP does (today)</h2>
+
+<p>Users are humans. Humans pause to read, to think, to take a coffee break. When a user pauses for 10 minutes between agent turns, the 5-minute TTL expires and the next agent turn pays 1.25&times; on the entire prefix again.</p>
+
+<p>CAP (<strong>C</strong>ache <strong>A</strong>nchor <strong>P</strong>oint) is our trick to prevent that. Every ~4 minutes 50 seconds, CAP fires a small background LLM call (a "ping") with the same prompt prefix. That ping <strong>resets the cache TTL</strong> on Anthropic's side. When the user comes back 10 minutes later, the prefix is still cached and the user's call pays 0.10&times; instead of 1.25&times;.</p>
+
+<div class="figure">
+<svg viewBox="0 0 720 240" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <!-- Timeline axis -->
+  <line x1="40" y1="150" x2="680" y2="150" stroke="#666" stroke-width="1.5"/>
+  <polygon points="680,150 672,146 672,154" fill="#666"/>
+  <text x="40" y="185" fill="#666">t=0</text>
+  <text x="200" y="185" fill="#666">t=5 min</text>
+  <text x="350" y="185" fill="#666">t=8 min</text>
+  <text x="500" y="185" fill="#666">t=10 min</text>
+
+  <!-- Without CAP -->
+  <text x="40" y="35" fill="#b3251b" font-weight="600">Without CAP:</text>
+  <rect x="40" y="60" width="180" height="30" fill="#e8f5ec" stroke="#1b7a3f" stroke-dasharray="3,2"/>
+  <text x="60" y="80" font-size="11">cache alive</text>
+  <rect x="220" y="60" width="460" height="30" fill="#fdeae8" stroke="#b3251b" stroke-dasharray="3,2"/>
+  <text x="380" y="80" font-size="11" fill="#b3251b">cache dead — user pays 1.25&times; on resume</text>
+
+  <!-- With CAP -->
+  <text x="40" y="115" fill="#1b7a3f" font-weight="600">With CAP:</text>
+  <rect x="40" y="125" width="640" height="20" fill="#e8f5ec" stroke="#1b7a3f" stroke-dasharray="3,2"/>
+  <text x="280" y="140" font-size="11">cache alive throughout — user pays 0.10&times; on resume</text>
+
+  <!-- Call markers -->
+  <circle cx="60" cy="150" r="6" fill="#0b6bcb"/>
+  <text x="50" y="210" fill="#0b6bcb" font-size="11">User call 1</text>
+
+  <circle cx="500" cy="150" r="6" fill="#0b6bcb"/>
+  <text x="475" y="210" fill="#0b6bcb" font-size="11">User call 2</text>
+
+  <!-- CAP pings (only on second timeline) -->
+  <circle cx="225" cy="135" r="4" fill="#b06a00"/>
+  <text x="215" y="125" font-size="10" fill="#b06a00">ping</text>
+  <circle cx="380" cy="135" r="4" fill="#b06a00"/>
+  <text x="370" y="125" font-size="10" fill="#b06a00">ping</text>
+</svg>
+<div class="caption">Without CAP, a 10-minute user pause kills the cache. With CAP, two pings ~4m50s apart keep the cache continuously alive.</div>
+</div>
+
+<h3>Two flavors of CAP</h3>
+
+<table>
+  <thead><tr><th>Flavor</th><th>When it runs</th><th>Where it lives in code</th></tr></thead>
+  <tbody>
+    <tr><td>In-loop refresh</td><td>During a long-running agent iteration (e.g., a tool call that takes 8 minutes)</td><td><code>capRefreshLoop</code> coroutine in <code>elite/cap.go</code></td></tr>
+    <tr><td>Post-exit refresh</td><td>After the agent finishes its turn (e.g., asked the user a question and is waiting)</td><td><code>CAPRefreshWorkflow</code> child workflow in <code>workflows/cap/</code></td></tr>
+  </tbody>
+</table>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="problem">
+<h2>4. The margin leak (the problem we're solving)</h2>
+
+<p>Here is exactly what happens today on a single CAP-protected call. Numbers are illustrative.</p>
+
+<div class="scenario">
+  <h4>Today's accounting on a CAP-saved user call</h4>
+  <p>Imagine a user with a 50,000-token prompt prefix. They pause for 10 minutes, CAP fires two pings, then the user resumes.</p>
+
+  <div class="calc-section-title">What Anthropic charges Emergent</div>
+  <table class="calc-table">
+    <thead><tr><th>Line item</th><th>Formula</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>User's resume call</td><td class="formula">cache-read on 50k tokens</td><td class="value">$0.50 &nbsp;<em>(this is <strong>y</strong>)</em></td></tr>
+      <tr><td>Ping 1 at t+4m50s</td><td class="formula">background CAP ping</td><td class="value">$0.80</td></tr>
+      <tr><td>Ping 2 at t+9m40s</td><td class="formula">background CAP ping</td><td class="value">$0.80</td></tr>
+      <tr class="subtotal"><td>Total Anthropic bill</td><td></td><td class="value">$2.10</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">What Emergent charges the user (today)</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>User's resume call</td><td class="formula">billed at actual cost (y)</td><td class="value">$0.50</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays</div><div class="amount">$0.50</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic</div><div class="amount">$2.10</div></div>
+    <div class="box loss"><div class="label">Emergent margin</div><div class="amount">&minus;$1.60</div></div>
+  </div>
+
+  <p class="meta">Now imagine the same scenario in a world where CAP doesn't exist:</p>
+
+  <div class="calc-section-title">What Anthropic charges Emergent (no-CAP world)</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>User's resume call</td><td class="formula">cache-write on 50k tokens (cache died naturally)</td><td class="value">$6.25 &nbsp;<em>(this is <strong>z</strong>)</em></td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">What Emergent charges the user</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>User's resume call</td><td class="formula">billed at actual cost</td><td class="value">$6.25</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays</div><div class="amount">$6.25</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic</div><div class="amount">$6.25</div></div>
+    <div class="box"><div class="label">Emergent margin</div><div class="amount">$0.00</div></div>
+  </div>
+
+  <p class="meta">
+  CAP makes Anthropic charge us less ($2.10 vs $6.25 — a real saving of $4.15). But because we pass the saving through to the user (they pay $0.50 vs $6.25), <strong>Emergent ends up worse off by $1.60</strong> compared to the no-CAP world.
+  </p>
+</div>
+
+<div class="callout bad">
+<h4>The leak in one sentence</h4>
+<p>CAP saves us money on Anthropic, but we hand the savings to the user for free, and we eat the ping cost on top. Net margin from CAP ≤ 0.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="solution">
+<h2>5. The decoupling idea (the fix)</h2>
+
+<p>We change one thing: <strong>when CAP is the reason the cache survived, we charge the user as if the cache had died naturally</strong>.</p>
+
+<p>In the example above:</p>
+
+<div class="scenario">
+  <h4>The new accounting</h4>
+
+  <div class="calc-section-title">What Anthropic charges Emergent (unchanged)</div>
+  <table class="calc-table">
+    <thead><tr><th>Line item</th><th>Formula</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>User's resume call</td><td class="formula">cache-read on 50k tokens</td><td class="value">$0.50 &nbsp;<em>(<strong>y</strong>)</em></td></tr>
+      <tr><td>Ping 1 at t+4m50s</td><td class="formula">background CAP ping</td><td class="value">$0.80</td></tr>
+      <tr><td>Ping 2 at t+9m40s &nbsp;<em>(most recent qualifying)</em></td><td class="formula">background CAP ping</td><td class="value">$0.80 &nbsp;<em>(<strong>x</strong>)</em></td></tr>
+      <tr class="subtotal"><td>Total Anthropic bill</td><td></td><td class="value">$2.10</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">What Emergent charges the user (new)</div>
+  <table class="calc-table">
+    <tbody>
+      <tr class="highlight"><td>User's resume call</td><td class="formula">billed at <strong>z</strong> — "what it would have cost if cache died"</td><td class="value">$6.25</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays (= no-CAP world)</div><div class="amount">$6.25</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic</div><div class="amount">$2.10</div></div>
+    <div class="box margin"><div class="label">Emergent margin</div><div class="amount">+$4.15</div></div>
+  </div>
+
+  <p class="meta">The user pays exactly what they would have paid in a CAP-free world ($6.25). They cannot tell the difference. Emergent captures $4.15 of margin = <span class="formula">z &minus; y &minus; x = 6.25 &minus; 0.50 &minus; 0.80</span>.</p>
+</div>
+
+<p>The user's invariant: <strong>"My bill is identical to what it would be if CAP didn't exist."</strong> That's the core promise. Everything in this design is built around protecting that invariant.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="vocab">
+<h2>6. Vocabulary (the y / z / x triad)</h2>
+
+<p>From the PRD and from <a href="../../CONTEXT.md">CONTEXT.md</a>. These three names show up in every diagram, every audit row, every report. Learn them once and the rest of the doc is easier to read.</p>
+
+<dl class="kv">
+  <dt><span class="term">y</span> — actual-cost</dt>
+  <dd>What Anthropic actually charged us for this user call. Computed by the xllm pricing calculator from the call's real <code>Usage</code> (with whatever cache reads and writes it actually had).</dd>
+
+  <dt><span class="term">z</span> — as-if-cold-cache</dt>
+  <dd>What this call <em>would</em> have cost if the cache had naturally invalidated before it. Computed by taking the same <code>Usage</code>, swapping all <code>cache_read_tokens</code> into <code>cache_creation_tokens</code>, and re-running the pricing calculator. <strong>z &ge; y, always.</strong></dd>
+
+  <dt><span class="term">x</span> — ping-cost</dt>
+  <dd>The full cost of the most-recent CAP ping that returned <code>cache_hit=true</code> between the previous user call and this one. Computed per-ping inside the CAP activity.</dd>
+
+  <dt><span class="term">cap-decoupled call</span></dt>
+  <dd>A user LLM call where billing is decoupled — user pays <strong>z</strong>, Emergent pays Anthropic <strong>y</strong>, Emergent absorbs <strong>x</strong>, and the margin captured is <strong>z &minus; y &minus; x</strong>.</dd>
+
+  <dt><span class="term">natural-cache-ttl</span></dt>
+  <dd>Anthropic's prompt cache TTL: <strong>5 minutes</strong>. Lives in code as <code>cap.CacheTTL</code> in <code>core/cap/config.go</code>.</dd>
+</dl>
+
+<p class="formula">margin = z &minus; y &minus; x</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="attribution">
+<h2>7. The attribution rule (when do we decouple?)</h2>
+
+<p>We do <strong>not</strong> decouple every CAP-active call. We have to be careful: if we charge the user at <strong>z</strong> on a call where the cache would have lived naturally anyway, we'd be overcharging the user.</p>
+
+<p>So we use a strict rule. A call is cap-decoupled <strong>if and only if both</strong> of these are true:</p>
+
+<ol>
+  <li><strong>Elapsed since the user's last LLM call &gt; 5 minutes.</strong> If they came back within 5 minutes, the cache would still be alive naturally — no decoupling.</li>
+  <li><strong>At least one CAP ping fired in that gap returned <code>cache_hit=true</code>.</strong> "In that gap" is the half-open interval <code>(last_non_ping_llm_call_at, this_call's_llm_return_time]</code> — bounded on both ends so pings that fire <em>after</em> this LLM responded (in-loop refresh during a long tool execution) don't get misattributed to the call that preceded them.</li>
+</ol>
+
+<div class="callout">
+<p><strong>Why so strict?</strong> Because false positives are visible to users (overcharging), but false negatives are invisible (we just don't capture margin we could have). When in doubt, bill at <strong>y</strong>.</p>
+</div>
+
+<h3>State diagram — the attribution decision</h3>
+
+<div class="figure">
+<svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="12">
+  <!-- Start -->
+  <circle cx="40" cy="160" r="10" fill="#1a1a1a"/>
+
+  <!-- Decision 1: first call? -->
+  <polygon points="180,160 240,130 300,160 240,190" fill="#fff" stroke="#0b6bcb" stroke-width="1.5"/>
+  <text x="240" y="158" text-anchor="middle">First call?</text>
+  <text x="240" y="172" text-anchor="middle" font-size="10">(no last_non_ping_llm_call_at)</text>
+  <line x1="50" y1="160" x2="180" y2="160" stroke="#666" stroke-width="1.2"/>
+  <polygon points="180,160 172,156 172,164" fill="#666"/>
+
+  <!-- Decision 2: elapsed > 5min? -->
+  <polygon points="380,160 440,130 500,160 440,190" fill="#fff" stroke="#0b6bcb" stroke-width="1.5"/>
+  <text x="440" y="158" text-anchor="middle">Elapsed &gt; 5 min?</text>
+  <line x1="300" y1="160" x2="380" y2="160" stroke="#666" stroke-width="1.2"/>
+  <polygon points="380,160 372,156 372,164" fill="#666"/>
+  <text x="320" y="155" font-size="11" fill="#1b7a3f">no</text>
+
+  <!-- Decision 3: ping cache_hit exists? -->
+  <polygon points="580,160 640,130 700,160 640,190" fill="#fff" stroke="#0b6bcb" stroke-width="1.5"/>
+  <text x="640" y="155" text-anchor="middle">Qualifying</text>
+  <text x="640" y="170" text-anchor="middle">ping exists?</text>
+  <line x1="500" y1="160" x2="580" y2="160" stroke="#666" stroke-width="1.2"/>
+  <polygon points="580,160 572,156 572,164" fill="#666"/>
+  <text x="525" y="155" font-size="11" fill="#1b7a3f">yes</text>
+
+  <!-- Outcome boxes -->
+  <rect x="200" y="240" width="180" height="48" fill="#fdeae8" stroke="#b3251b"/>
+  <text x="290" y="260" text-anchor="middle" font-weight="600">bill at y</text>
+  <text x="290" y="278" text-anchor="middle" font-size="11">first_call_in_session</text>
+  <line x1="240" y1="190" x2="240" y2="240" stroke="#666"/>
+  <polygon points="240,240 236,232 244,232" fill="#666"/>
+  <text x="245" y="215" font-size="11" fill="#b3251b">yes</text>
+
+  <rect x="400" y="240" width="180" height="48" fill="#fdeae8" stroke="#b3251b"/>
+  <text x="490" y="260" text-anchor="middle" font-weight="600">bill at y</text>
+  <text x="490" y="278" text-anchor="middle" font-size="11">elapsed_under_ttl</text>
+  <line x1="440" y1="190" x2="440" y2="240" stroke="#666"/>
+  <polygon points="440,240 436,232 444,232" fill="#666"/>
+  <text x="412" y="215" font-size="11" fill="#b3251b">no</text>
+
+  <rect x="600" y="240" width="180" height="48" fill="#fdeae8" stroke="#b3251b"/>
+  <text x="690" y="260" text-anchor="middle" font-weight="600">bill at y</text>
+  <text x="690" y="278" text-anchor="middle" font-size="11">no_qualifying_ping</text>
+  <line x1="640" y1="190" x2="640" y2="240" stroke="#666"/>
+  <polygon points="640,240 636,232 644,232" fill="#666"/>
+  <text x="615" y="215" font-size="11" fill="#b3251b">no</text>
+
+  <rect x="600" y="40" width="180" height="48" fill="#e8f5ec" stroke="#1b7a3f"/>
+  <text x="690" y="60" text-anchor="middle" font-weight="600">bill at z (DECOUPLED)</text>
+  <text x="690" y="78" text-anchor="middle" font-size="11">absorb x as overhead</text>
+  <line x1="640" y1="130" x2="640" y2="88" stroke="#666"/>
+  <polygon points="640,88 636,96 644,96" fill="#666"/>
+  <text x="645" y="115" font-size="11" fill="#1b7a3f">yes</text>
+</svg>
+<div class="caption">Three sequential gates. Only the "yes / no / yes" path leads to a decoupled call.</div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="dryruns">
+<h2>8. Dry runs (four concrete scenarios)</h2>
+
+<p>For each scenario, assume:</p>
+<ul>
+  <li>Model: Claude Sonnet 4. Input rate: $3 per 1M tokens. So cache-write = $3.75/1M, cache-read = $0.30/1M.</li>
+  <li>User's prompt prefix is 50,000 tokens. Output is 1,000 tokens at $15/1M = $0.015 per call.</li>
+</ul>
+
+<div class="scenario">
+  <h4>Scenario A — User returns inside 5 minutes <span class="pill good">not decoupled</span></h4>
+  <p><strong>Timeline:</strong> User sends call at t=0. User replies at t=2 min. Cache is naturally alive.</p>
+
+  <div class="calc-section-title">Anthropic charges</div>
+  <table class="calc-table">
+    <thead><tr><th>Event</th><th>Formula</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>Call 1 (t=0) — input</td><td class="formula">50,000 &times; $3.75/1M &nbsp;<em>(cache write, first time)</em></td><td class="value">$0.1875</td></tr>
+      <tr><td>Call 1 — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>y<sub>1</sub></td><td></td><td class="value">$0.2025</td></tr>
+      <tr><td>Call 2 (t=2m) — input</td><td class="formula">50,000 &times; $0.30/1M &nbsp;<em>(cache read — cache still alive)</em></td><td class="value">$0.0150</td></tr>
+      <tr><td>Call 2 — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>y<sub>2</sub></td><td></td><td class="value">$0.0300</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">Attribution for call 2</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>elapsed = 2 min ≤ 5 min</td><td class="formula">→ eligibility = <code>elapsed_under_ttl</code></td><td class="value">not decoupled</td></tr>
+      <tr class="highlight"><td>billable = y</td><td class="formula">user charged at actual cost</td><td class="value">$0.0300</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays (call 2)</div><div class="amount">$0.0300</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic</div><div class="amount">$0.0300</div></div>
+    <div class="box"><div class="label">Emergent margin</div><div class="amount">$0.00</div></div>
+  </div>
+
+  <p class="meta">No CAP pings ran. User got the natural cache benefit, as they should. No overhead, no decoupling, no margin to capture.</p>
+</div>
+
+<div class="scenario">
+  <h4>Scenario B — User returns after 8 minutes, CAP kept cache alive <span class="pill info">DECOUPLED</span></h4>
+  <p><strong>Timeline:</strong> User sends call at t=0. Agent finishes, asks user a question (end_turn). Post-exit CAP fires ping at t=4m50s with <code>cache_hit=true</code>. User replies at t=8 min.</p>
+
+  <div class="calc-section-title">Anthropic charges</div>
+  <table class="calc-table">
+    <thead><tr><th>Event</th><th>Formula</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>Call 1 (t=0)</td><td class="formula">cache write + output</td><td class="value">$0.2025 &nbsp;<em>(y<sub>1</sub>)</em></td></tr>
+      <tr><td>Ping (t=4m50s) — input</td><td class="formula">50,000 &times; $0.30/1M &nbsp;<em>(cache read)</em></td><td class="value">$0.0150</td></tr>
+      <tr><td>Ping — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>Ping cost &nbsp;<em>(recorded in cap_pings)</em></td><td></td><td class="value">$0.0300 &nbsp;<em>(<strong>x</strong>)</em></td></tr>
+      <tr><td>Call 2 (t=8m) — input</td><td class="formula">50,000 &times; $0.30/1M &nbsp;<em>(cache read — ping kept it alive)</em></td><td class="value">$0.0150</td></tr>
+      <tr><td>Call 2 — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>y<sub>2</sub></td><td></td><td class="value">$0.0300</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">Attribution for call 2</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>elapsed = 8 min &gt; 5 min</td><td class="formula">first condition</td><td class="value">✓</td></tr>
+      <tr><td>cap_pings query</td><td class="formula">ping at t=4m50s, cache_hit=true</td><td class="value">✓</td></tr>
+      <tr><td>eligibility</td><td class="formula"><code>decoupled</code></td><td class="value">DECOUPLED</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">Compute <strong>z<sub>2</sub></strong> (what it would have cost if cache had died)</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>Call 2 — input</td><td class="formula">50,000 &times; $3.75/1M &nbsp;<em>(cache write rate)</em></td><td class="value">$0.1875</td></tr>
+      <tr><td>Call 2 — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>z<sub>2</sub></td><td></td><td class="value">$0.2025</td></tr>
+      <tr class="highlight"><td>billable</td><td class="formula">= z<sub>2</sub></td><td class="value">$0.2025</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays (call 2)</div><div class="amount">$0.2025</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic (y + x)</div><div class="amount">$0.0600</div></div>
+    <div class="box margin"><div class="label">Emergent margin (z − y − x)</div><div class="amount">+$0.1425</div></div>
+  </div>
+
+  <p class="meta">This is the happy path. CAP did its job, the strict rule fired, margin captured. The user's bill is identical to a no-CAP world — same $0.2025 they'd have paid if CAP didn't exist.</p>
+</div>
+
+<div class="scenario">
+  <h4>Scenario C — User returns after 8 minutes, CAP ping failed <span class="pill warn">not decoupled (fail-safe)</span></h4>
+  <p><strong>Timeline:</strong> Same as B, but the ping at t=4m50s returned <code>cache_hit=false</code> (prefix mismatch, transient Anthropic error, etc.). User replies at t=8 min — by then cache is genuinely cold.</p>
+
+  <div class="calc-section-title">Anthropic charges</div>
+  <table class="calc-table">
+    <thead><tr><th>Event</th><th>Formula</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>Ping (t=4m50s)</td><td class="formula">cache_hit=false, but Anthropic still bills</td><td class="value">$0.0300 &nbsp;<em>(orphan)</em></td></tr>
+      <tr><td>Call 2 (t=8m) — input</td><td class="formula">50,000 &times; $3.75/1M &nbsp;<em>(genuine cache miss — cache write)</em></td><td class="value">$0.1875</td></tr>
+      <tr><td>Call 2 — output</td><td class="formula">1,000 &times; $15/1M</td><td class="value">$0.0150</td></tr>
+      <tr class="subtotal"><td>y<sub>2</sub></td><td></td><td class="value">$0.2025</td></tr>
+    </tbody>
+  </table>
+
+  <div class="calc-section-title">Attribution for call 2</div>
+  <table class="calc-table">
+    <tbody>
+      <tr><td>elapsed = 8 min &gt; 5 min</td><td class="formula">first condition</td><td class="value">✓</td></tr>
+      <tr><td>cap_pings query</td><td class="formula">only row has cache_hit=false</td><td class="value">✗</td></tr>
+      <tr><td>eligibility</td><td class="formula"><code>no_qualifying_ping</code></td><td class="value">NOT decoupled</td></tr>
+      <tr class="highlight"><td>billable = y<sub>2</sub></td><td class="formula">user charged at actual cost</td><td class="value">$0.2025</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays (call 2)</div><div class="amount">$0.2025</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic (y + orphan)</div><div class="amount">$0.2325</div></div>
+    <div class="box loss"><div class="label">Emergent margin</div><div class="amount">&minus;$0.0300</div></div>
+  </div>
+
+  <p class="meta">This is correct behavior. We didn't try to decouple because the ping didn't help. User is billed exactly what they'd have paid in a no-CAP world. The orphan ping cost is acknowledged separately in reporting.</p>
+</div>
+
+<div class="scenario">
+  <h4>Scenario D — User never returns (orphan pings) <span class="pill bad">no margin, just overhead</span></h4>
+  <p><strong>Timeline:</strong> Call 1 at t=0. Agent asks a question. Post-exit CAP fires 3 pings at t+4m50s, t+9m40s, t+14m30s. User abandons the session.</p>
+
+  <div class="calc-section-title">Anthropic charges</div>
+  <table class="calc-table">
+    <thead><tr><th>Event</th><th>Status</th><th style="text-align:right;">Cost</th></tr></thead>
+    <tbody>
+      <tr><td>Call 1</td><td class="formula">user call</td><td class="value">$0.2025</td></tr>
+      <tr><td>Ping 1</td><td class="formula">cache_hit=true, recorded in cap_pings</td><td class="value">$0.0300</td></tr>
+      <tr><td>Ping 2</td><td class="formula">cache_hit=true, recorded</td><td class="value">$0.0300</td></tr>
+      <tr><td>Ping 3</td><td class="formula">cache_hit=true, recorded</td><td class="value">$0.0300</td></tr>
+      <tr class="subtotal"><td>Total Anthropic bill</td><td></td><td class="value">$0.2925</td></tr>
+    </tbody>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User pays (call 1 only)</div><div class="amount">$0.2025</div></div>
+    <div class="box"><div class="label">Emergent pays Anthropic</div><div class="amount">$0.2925</div></div>
+    <div class="box loss"><div class="label">Margin on this session</div><div class="amount">&minus;$0.0900</div></div>
+  </div>
+
+  <p class="meta">Unavoidable. CAP is best-effort. We track orphan pings in reports so we know the true net margin. If orphan-ping spend gets large, that's a CAP-tuning question (fewer post-exit pings, lower per-ping cost), not a billing-decoupling question.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="dataflow">
+<h2>9. Data flow (sequence diagram)</h2>
+
+<p>Two flows woven together: the <strong>CAP ping flow</strong> (writes <code>cap_ping</code> rows to BigTable's <code>ping_data</code> column family) and the <strong>user-call flow</strong> (loads pings once at <code>activityLoadThread</code>, resolves attribution per iteration in <code>activityPostHook</code>, swaps <code>cost_usd</code> on the existing PostHook payload). The per-call attribution audit lives entirely inside cortex — structured Loki logs (<code>"cap attribution resolved"</code>) plus OTel metrics (<code>cap.attribution.*</code>) — nothing CAP-specific crosses the cortex/emergent boundary other than the swapped <code>cost_usd</code> value.</p>
+
+<div class="figure">
+<svg viewBox="0 0 1280 940" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13" style="width:100%; max-width:1280px;">
+  <!-- 6 lifelines, evenly spaced, plenty of horizontal room for labels -->
+  <g stroke="#bbb" stroke-dasharray="3,3">
+    <line x1="100"  y1="70" x2="100"  y2="900"/>
+    <line x1="290"  y1="70" x2="290"  y2="900"/>
+    <line x1="500"  y1="70" x2="500"  y2="900"/>
+    <line x1="730"  y1="70" x2="730"  y2="900"/>
+    <line x1="960"  y1="70" x2="960"  y2="900"/>
+    <line x1="1170" y1="70" x2="1170" y2="900"/>
+  </g>
+
+  <!-- Lifeline headers -->
+  <g font-weight="600" text-anchor="middle" font-size="14">
+    <rect x="50"   y="35" width="100" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="100"  y="57">User</text>
+    <rect x="220"  y="35" width="140" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="290"  y="57">Elite WF</text>
+    <rect x="430"  y="35" width="140" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="500"  y="57">CAP WF</text>
+    <rect x="650"  y="35" width="160" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="730"  y="57">ResolveAttribution</text>
+    <rect x="880"  y="35" width="160" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="960"  y="57">cortex DB</text>
+    <rect x="1100" y="35" width="140" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="1170" y="57">emergent</text>
+  </g>
+
+  <!-- ============ PHASE 1: User Call 1 (t=0) ============ -->
+  <rect x="40" y="90" width="80" height="20" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="80" y="105" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">t=0: call 1</text>
+
+  <line x1="100" y1="135" x2="285" y2="135" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="285,135 277,131 277,139" fill="#0b6bcb"/>
+  <text x="192" y="129" text-anchor="middle" font-size="12" fill="#0b6bcb">trigger</text>
+
+  <line x1="290" y1="165" x2="1165" y2="165" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="1165,165 1157,161 1157,169" fill="#0b6bcb"/>
+  <text x="725" y="159" text-anchor="middle" font-size="12" fill="#0b6bcb">LLM call (cache write — first call)</text>
+
+  <line x1="290" y1="200" x2="725" y2="200" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="725,200 717,196 717,204" fill="#0b6bcb"/>
+  <text x="505" y="194" text-anchor="middle" font-size="12" fill="#0b6bcb">ResolveAttribution(messageID, usage, callTime=t=0)</text>
+
+  <line x1="730" y1="230" x2="955" y2="230" stroke="#555" stroke-width="1"/>
+  <polygon points="955,230 947,226 947,234" fill="#555"/>
+  <text x="842" y="224" text-anchor="middle" font-size="12" fill="#555">SELECT sessions.last_non_ping_llm_call_at</text>
+
+  <line x1="955" y1="255" x2="730" y2="255" stroke="#555" stroke-dasharray="2,2"/>
+  <polygon points="730,255 738,251 738,259" fill="#555"/>
+  <text x="842" y="249" text-anchor="middle" font-size="12" fill="#555" font-style="italic">NULL (first call ever)</text>
+
+  <line x1="730" y1="295" x2="955" y2="295" stroke="#555"/>
+  <polygon points="955,295 947,291 947,299" fill="#555"/>
+  <text x="842" y="289" text-anchor="middle" font-size="12" fill="#555">UPDATE sessions.last_non_ping_llm_call_at := t=0</text>
+  <text x="842" y="305" text-anchor="middle" font-size="11" fill="#555" font-style="italic">(first call → no candidate ping to claim, so no cap_pings UPDATE)</text>
+
+  <line x1="725" y1="340" x2="295" y2="340" stroke="#0b6bcb" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="295,340 303,336 303,344" fill="#0b6bcb"/>
+  <text x="510" y="334" text-anchor="middle" font-size="12" fill="#0b6bcb" font-style="italic">attribution { billable = y, reason = first_call_in_session, Cap DTO }</text>
+
+  <!-- divider -->
+  <line x1="50" y1="365" x2="1240" y2="365" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- ============ PHASE 2: Elite exits → CAP WF spawned ============ -->
+  <rect x="240" y="380" width="170" height="20" fill="#fff6e8" stroke="#b06a00"/>
+  <text x="325" y="395" text-anchor="middle" font-size="12" font-weight="600" fill="#b06a00">elite exits (end_turn)</text>
+
+  <line x1="290" y1="420" x2="495" y2="420" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="495,420 487,416 487,424" fill="#b06a00"/>
+  <text x="392" y="414" text-anchor="middle" font-size="12" fill="#b06a00">spawn CAP child workflow</text>
+
+  <!-- ============ PHASE 3: CAP ping at t+4:50 ============ -->
+  <rect x="430" y="445" width="150" height="20" fill="#fff6e8" stroke="#b06a00"/>
+  <text x="505" y="460" text-anchor="middle" font-size="12" font-weight="600" fill="#b06a00">t+4m50s: CAP ping</text>
+
+  <line x1="500" y1="485" x2="1165" y2="485" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="1165,485 1157,481 1157,489" fill="#b06a00"/>
+  <text x="830" y="479" text-anchor="middle" font-size="12" fill="#b06a00">ping LLM call → cache_hit = true</text>
+
+  <line x1="500" y1="515" x2="955" y2="515" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="955,515 947,511 947,519" fill="#b06a00"/>
+  <text x="725" y="509" text-anchor="middle" font-size="12" fill="#b06a00">INSERT cap_pings (request_id, cost_usd=$0.030, cache_hit=true, fired_at)</text>
+
+  <!-- divider -->
+  <line x1="50" y1="540" x2="1240" y2="540" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- ============ PHASE 4: User Call 2 (t=8min) ============ -->
+  <rect x="40" y="555" width="90" height="20" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="85" y="570" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">t=8m: call 2</text>
+
+  <line x1="100" y1="600" x2="285" y2="600" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="285,600 277,596 277,604" fill="#0b6bcb"/>
+  <text x="192" y="594" text-anchor="middle" font-size="12" fill="#0b6bcb">trigger (resume)</text>
+
+  <line x1="290" y1="630" x2="1165" y2="630" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="1165,630 1157,626 1157,634" fill="#0b6bcb"/>
+  <text x="725" y="624" text-anchor="middle" font-size="12" fill="#0b6bcb">LLM call → cache_read (CAP ping kept cache alive)</text>
+
+  <line x1="290" y1="665" x2="725" y2="665" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="725,665 717,661 717,669" fill="#0b6bcb"/>
+  <text x="505" y="659" text-anchor="middle" font-size="12" fill="#0b6bcb">ResolveAttribution(messageID, usage, callTime=t+8m)</text>
+
+  <line x1="730" y1="695" x2="955" y2="695" stroke="#555"/>
+  <polygon points="955,695 947,691 947,699" fill="#555"/>
+  <text x="842" y="689" text-anchor="middle" font-size="12" fill="#555">SELECT sessions.last_non_ping_llm_call_at</text>
+
+  <line x1="955" y1="720" x2="730" y2="720" stroke="#555" stroke-dasharray="2,2"/>
+  <polygon points="730,720 738,716 738,724" fill="#555"/>
+  <text x="842" y="714" text-anchor="middle" font-size="12" fill="#555" font-style="italic">t=0 → elapsed = 8m &gt; 5m ✓</text>
+
+  <line x1="730" y1="750" x2="955" y2="750" stroke="#555"/>
+  <polygon points="955,750 947,746 947,754" fill="#555"/>
+  <text x="842" y="744" text-anchor="middle" font-size="12" fill="#555">SELECT cap_pings WHERE session_id=… AND fired_at IN (t=0, t+8m] AND cache_hit=true</text>
+  <text x="842" y="759" text-anchor="middle" font-size="10" fill="#555" font-style="italic">upper bound t+8m = LLM-return time prevents post-call pings from leaking in</text>
+
+  <line x1="955" y1="785" x2="730" y2="785" stroke="#555" stroke-dasharray="2,2"/>
+  <polygon points="730,785 738,781 738,789" fill="#555"/>
+  <text x="842" y="779" text-anchor="middle" font-size="12" fill="#555" font-style="italic">ping at t=4m50s, cost_usd=$0.030 ✓</text>
+
+  <line x1="730" y1="820" x2="955" y2="820" stroke="#1b7a3f"/>
+  <polygon points="955,820 947,816 947,824" fill="#1b7a3f"/>
+  <text x="842" y="814" text-anchor="middle" font-size="12" fill="#1b7a3f" font-weight="600">cortex local persist (single TX)</text>
+  <text x="842" y="830" text-anchor="middle" font-size="11" fill="#1b7a3f" font-style="italic">UPDATE cap_pings SET claimed_by_message_id = $msg WHERE request_id = cap-X-1   +   UPDATE sessions.last_non_ping_llm_call_at := t+8m</text>
+
+  <line x1="725" y1="860" x2="295" y2="860" stroke="#1b7a3f" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <polygon points="295,860 303,856 303,864" fill="#1b7a3f"/>
+  <text x="510" y="854" text-anchor="middle" font-size="13" fill="#1b7a3f" font-weight="600">attribution { billable = z, DECOUPLED }</text>
+
+  <!-- PostHook to emergent (cortex sends z in CostUSD; no CAP-specific payload) -->
+  <line x1="290" y1="895" x2="1165" y2="895" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="1165,895 1157,891 1157,899" fill="#0b6bcb"/>
+  <text x="725" y="889" text-anchor="middle" font-size="12" fill="#0b6bcb">PostHook to emergent: { CostUSD = z, AccumulatedCost += (z − y) }</text>
+  <text x="725" y="908" text-anchor="middle" font-size="11" fill="#0b6bcb" font-style="italic">cortex-side audit emitted as Loki log + OTel metrics; no CAP-specific field on the payload</text>
+</svg>
+<div class="caption">Sequence diagram for Scenario B. <strong>callTime</strong> is the LLM-return time captured in workflow code immediately after <code>ActivityCallLLM</code> completes (not the post-hook wall time). The pre-loaded ping list is filtered in-memory: candidate must be <code>source=post_exit</code>, <code>cache_hit=true</code>, fired in <code>(prevAt, callTime]</code>, and within <code>CacheTTL</code> of <code>callTime</code>. Emergent's billing pipeline is unchanged — it just reads the swapped <code>cost_usd</code> off the existing PostHook payload and bills against credits as usual. No new field crosses the cortex/emergent boundary.</div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="schema">
+<h2>10. Storage model (BigTable column family + cortex telemetry)</h2>
+
+<p>The design adds <strong>no new Postgres tables or columns anywhere</strong>. Two cortex-local storage locations carry the new state:</p>
+
+<ol>
+  <li><strong>Cortex BigTable</strong> (existing <code>cortex-sessions</code> table, <strong>dedicated <code>ping_data</code> column family</strong>) holds each fired CAP ping as one row. Row key <code>cap_ping#&lt;sessionID&gt;#&lt;firedAtMillis_13d&gt;#&lt;requestID&gt;</code> — sorted lexicographically chronological, range-scanned (not full-prefix) by session. The column family has its own GC rule (<code>MaxAge = 7d</code>) so ping retention is bounded independent of session/message data in the same table.</li>
+  <li><strong>Cortex telemetry pipeline</strong> — per-call attribution lands in two places: structured Loki logs (<code>"cap attribution resolved"</code> at <code>elite/activities.go:780</code>) and OTel metrics (<code>cap.attribution.total</code>, <code>cap.attribution.margin_usd</code>, <code>cap.attribution.billable_usd</code>; introduced in <a href="https://github.com/emergentbase/cortex/pull/1465">cortex#1465</a>) flowing through prometheus-prod. No emergent-side schema change.</li>
+</ol>
+
+<div class="figure">
+<svg viewBox="0 0 900 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="12" style="width:100%; max-width:900px;">
+  <text x="190" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#0b6bcb">cortex BigTable (cortex-sessions / ping_data CF)</text>
+  <text x="640" y="22" text-anchor="middle" font-size="13" font-weight="600" fill="#1b7a3f">cortex telemetry (Loki + Prometheus)</text>
+  <line x1="380" y1="32" x2="380" y2="370" stroke="#999" stroke-dasharray="4,3"/>
+
+  <!-- cap_ping row (BigTable, dedicated column family) -->
+  <rect x="20" y="40" width="340" height="320" fill="#fff" stroke="#b06a00" stroke-width="1.5" rx="4"/>
+  <rect x="20" y="40" width="340" height="26" fill="#fff6e8" stroke="#b06a00"/>
+  <text x="190" y="58" text-anchor="middle" font-weight="600">cap_ping#... row (column family: ping_data)</text>
+  <text x="35" y="84"  font-family="monospace" fill="#b3251b">row key:</text>
+  <text x="35" y="100" font-family="monospace" fill="#b3251b">cap_ping#{sessionID}#{ms_13d}#{requestID}</text>
+  <line x1="35" y1="110" x2="345" y2="110" stroke="#b06a00" stroke-dasharray="2,2"/>
+  <text x="35" y="128" font-family="monospace">value (JSON-encoded PingRecord):</text>
+  <text x="35" y="148" font-family="monospace">  job_id, session_id, request_id</text>
+  <text x="35" y="164" font-family="monospace">  source ("post_exit" | "in_loop")</text>
+  <text x="35" y="180" font-family="monospace">  model, cache_hit</text>
+  <text x="35" y="196" font-family="monospace">  input_tokens, output_tokens</text>
+  <text x="35" y="212" font-family="monospace">  cache_read_tokens, cache_creation_tokens</text>
+  <text x="35" y="228" font-family="monospace">  cost_usd  ← summed for "x"</text>
+  <text x="35" y="244" font-family="monospace">  fired_at (timestamp)</text>
+  <line x1="35" y1="254" x2="345" y2="254" stroke="#b06a00" stroke-dasharray="2,2"/>
+  <text x="35" y="272" font-size="11" fill="#555">written by:</text>
+  <text x="35" y="288" font-size="11" fill="#555">  cap.activityRefreshCacheAnchor (post_exit + in_loop)</text>
+  <text x="35" y="306" font-size="11" fill="#555">read by (range scan, not prefix):</text>
+  <text x="35" y="322" font-size="11" fill="#555">  cap.Service.LoadContext (once at workflow setup)</text>
+  <text x="35" y="340" font-size="11" fill="#555">GC: MaxAge 7d on ping_data column family</text>
+
+  <!-- cortex telemetry -->
+  <rect x="400" y="40" width="480" height="320" fill="#fff" stroke="#1b7a3f" stroke-width="1.5" stroke-dasharray="4,3" rx="4"/>
+  <rect x="400" y="40" width="480" height="26" fill="#e8f5ec" stroke="#1b7a3f" stroke-dasharray="4,3"/>
+  <text x="640" y="58" text-anchor="middle" font-weight="600">cortex telemetry — per-call attribution audit</text>
+  <text x="415" y="84"  font-family="monospace" fill="#666">Loki log line "cap attribution resolved":</text>
+  <text x="415" y="100" font-family="monospace">  job_id, session_id, message_id,</text>
+  <text x="415" y="116" font-family="monospace">  decoupled (bool), reason,</text>
+  <text x="415" y="132" font-family="monospace">  y (actual), z (cold-cache), x (ping sum),</text>
+  <text x="415" y="148" font-family="monospace">  billable, global_cache_baseline</text>
+  <line x1="415" y1="160" x2="865" y2="160" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <text x="415" y="180" font-family="monospace" fill="#b3251b" font-weight="600">OTel metrics (cortex#1465):</text>
+  <text x="415" y="198" font-family="monospace" fill="#b3251b">  cap.attribution.total{reason, model, provider}</text>
+  <text x="415" y="216" font-family="monospace" fill="#b3251b">    — counter, every resolution</text>
+  <text x="415" y="234" font-family="monospace" fill="#b3251b">  cap.attribution.margin_usd{model, provider}</text>
+  <text x="415" y="252" font-family="monospace" fill="#b3251b">    — histogram of (z − y − x), decoupled only</text>
+  <text x="415" y="270" font-family="monospace" fill="#b3251b">  cap.attribution.billable_usd{..., reason}</text>
+  <text x="415" y="288" font-family="monospace" fill="#b3251b">    — histogram of stamped CostUSD</text>
+  <line x1="415" y1="300" x2="865" y2="300" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <text x="415" y="320" font-size="11" fill="#555">PostHook to emergent carries only the swapped</text>
+  <text x="415" y="336" font-size="11" fill="#555">cost_usd + accumulated_cost; no CAP-specific field.</text>
+  <text x="415" y="354" font-size="11" fill="#555">No emergent schema change anywhere.</text>
+</svg>
+<div class="caption">Two cortex-local storage locations. <strong>BigTable ping_data column family</strong>: one row per fired ping under <code>cap_ping#&lt;session&gt;#&lt;ms&gt;#&lt;reqID&gt;</code>, GC-bounded to 7 days. <strong>Cortex telemetry</strong>: structured Loki logs + Prometheus histograms/counters carry the per-call audit. The PostHook payload to emergent stays bytewise compatible with pre-CAP — only <code>cost_usd</code> and <code>accumulated_cost</code> shift to z when decoupled.</div>
+</div>
+
+<h3>Why this storage shape</h3>
+
+<ul>
+  <li><strong>BigTable ping_data column family</strong>: writes are append-only key-value puts. Row key is sortable so a single <code>GetByRange(cap_ping#&lt;session&gt;#&lt;startMs&gt;#, cap_ping#&lt;session&gt;$)</code> returns only the rows after the previous user message in chronological order. The end-key uses <code>$</code> (0x24 &gt; <code>#</code> 0x23) to bound the session's range exclusively. No full-prefix scan, no JOINs, no schema migration, no per-call DB round trip during the hot path.</li>
+  <li><strong>Loaded once per workflow at setup, in parallel with the global-cache baseline</strong>: <code>cap.Service.LoadContext</code> issues the BigTable range scan and the head-message baseline SQL query as two goroutines (each wrapped in <code>ego.SafeExec</code> for panic recovery), then caches both on <code>setup.Cap.Pings</code> / <code>setup.Cap.GlobalCacheBaseline</code>. Per-iteration PostHook reads the in-memory cache.</li>
+  <li><strong>Audit lives in cortex telemetry</strong>: structured Loki logs carry full per-call detail (job_id, session_id, decoupled, reason, y, z, x, billable, baseline); OTel metrics emit aggregates suitable for Grafana panels. No emergent-side persistence — joining ping_request_id to trajectories is no longer needed.</li>
+  <li><strong>Dedicated 7-day TTL</strong>: the <code>ping_data</code> column family has its own GC rule (<code>MaxAge = 7d</code>) so ping retention is decoupled from session/message retention on the same table. Reporting windows past 7 days require BigQuery export, not the live store.</li>
+  <li><strong>Failsafe to user</strong>: BigTable read failure → empty ping list → <code>no_qualifying_ping</code> for the session → bills <code>y</code>. Postgres prev-msg-time read failure → <code>attribution_unavailable</code> → bills <code>y</code>. Pricing calculator failure (z = 0) → swap is gated on <code>BillableCostUSD &gt; 0</code> so the user is never billed nothing. No path bills the user more than the no-CAP world.</li>
+</ul>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="code">
+<h2>11. Code changes (cortex-only)</h2>
+
+<h3>11.1 <code>core/cap/service.go</code> — single Service abstraction</h3>
+
+<p>The entire CAP runtime hangs off one struct exposing three methods. <code>Store</code> is the persistence contract; <code>internal/pgsql.CapStore</code> satisfies it by composing the PG store (for prev-msg lookup and head-message usage) with a dedicated BigTable client targeting the <code>ping_data</code> column family.</p>
+
+<pre><code>// core/cap/service.go
+type Store interface {
+    LoadCapPings(ctx context.Context, sessionID string, after time.Time) ([]PingRecord, error)
+    GetPreviousAssistantMessageTime(ctx context.Context, sessionID, excludeMessageID string) (time.Time, error)
+    GetHeadMessageUsage(ctx context.Context, sessionID string) (int, error)
+    SavePing(ctx context.Context, sessionID string, record PingRecord) error
+}
+
+type Service struct{ store Store }
+
+// NewService wires a real store-backed CAP service.
+func NewService(store Store) *Service { return &Service{store: store} }
+
+// NewNoOpService returns a Service whose methods short-circuit to zero values.
+// Used in replayer/tests where CAP must be wired but inert; replaces the
+// previous nil-guard pattern at every call site.
+func NewNoOpService() *Service { return &Service{} }
+</code></pre>
+
+<h3>11.2 <code>cap.Service.LoadContext</code> — parallel BT + baseline at setup</h3>
+
+<p>Pings + global-cache baseline load in parallel; each goroutine is wrapped in <code>ego.SafeExec</code> so a panic in either is recovered, logged, and downgraded to a partial result (empty pings or zero baseline → no decoupling this run, never a workflow crash).</p>
+
+<pre><code>// core/cap/service.go (abridged)
+func (s *Service) LoadContext(ctx context.Context, sessionID string) LoadContextResult {
+    var out LoadContextResult
+    if s.store == nil { return out }
+
+    prevAt, err := s.store.GetPreviousAssistantMessageTime(ctx, sessionID, "")
+    if err != nil {
+        log.Warn(ctx, "cap context: prev-msg-time query failed (non-fatal)",
+            log.Str("session_id", sessionID), log.Err(err))
+        return out
+    }
+
+    var wg sync.WaitGroup
+    wg.Add(2)
+    go func() {
+        defer wg.Done()
+        pings, _ := s.store.LoadCapPings(ctx, sessionID, prevAt)  // bounded range scan
+        out.Pings = pings
+    }()
+    go func() {
+        defer wg.Done()
+        tokens, _ := s.store.GetHeadMessageUsage(ctx, sessionID)
+        if IsValidGlobalCacheBaseline(tokens) { out.GlobalCacheBaseline = tokens }
+    }()
+    wg.Wait()
+    return out
+}
+</code></pre>
+
+<h3>11.3 <code>internal/pgsql/cap_pings.go</code> — BigTable composite store</h3>
+
+<p>The bounded range scan uses <code>$</code> (0x24) as the end-key sentinel, ensuring lexicographic exclusivity over <code>#</code> (0x23). Only <code>source = post_exit</code> rows are returned for attribution; in-loop pings are still persisted (for telemetry) but filtered out here.</p>
+
+<pre><code>// internal/pgsql/cap_pings.go (abridged)
+func capPingRangeAfter(sessionID string, after time.Time) (string, string) {
+    var startMs int64
+    if !after.IsZero() { startMs = after.UnixMilli() + 1 }
+    start := fmt.Sprintf("cap_ping#%s#%013d#", sessionID, startMs)
+    end   := fmt.Sprintf("cap_ping#%s$",       sessionID)
+    return start, end
+}
+
+func (s *CapStore) LoadCapPings(ctx context.Context, sessionID string, after time.Time) ([]cap.PingRecord, error) {
+    if s.bt == nil { return nil, nil }
+    start, end := capPingRangeAfter(sessionID, after)
+    rows, err := s.bt.GetByRange(ctx, start, end)
+    // ... unmarshal each row, drop source!=post_exit, return
+}
+
+func (s *CapStore) SavePing(ctx context.Context, sessionID string, record cap.PingRecord) error {
+    if s.bt == nil { return nil }  // NoOp path — keep callsites uniform
+    return s.bt.Put(ctx, capPingKey(sessionID, record.FiredAt, record.RequestID), record)
+}
+</code></pre>
+
+<h3>11.4 <code>core/cap/attribution.go</code> — pure attribution math</h3>
+
+<p>Pure functions over the in-memory ping list. No I/O, no Temporal activity. <code>Attribution</code> carries everything the structured log and metrics need.</p>
+
+<pre><code>// core/cap/attribution.go (abridged)
+type Attribution struct {
+    Decoupled                      bool
+    BillableCostUSD                float64
+    ActualCostUSD                  float64
+    ColdCacheCostUSD               float64  // renamed from AsIfCostUSD
+    PingCostUSD                    float64
+    PingRequestID                  string
+    EligibilityReason              string
+    ElapsedSinceLastLLMCallSeconds int
+}
+
+const (
+    EligibilityDecoupled              = "decoupled"
+    EligibilityFirstCallInSession     = "first_call_in_session"
+    EligibilityElapsedUnderTTL        = "elapsed_under_ttl"
+    EligibilityNoQualifyingPing       = "no_qualifying_ping"
+    EligibilityAttributionUnavailable = "attribution_unavailable"
+    // Decoupling refused — coldCacheCost would over-claim without a measured baseline.
+    EligibilityNoGlobalCacheBaseline  = "no_global_cache_baseline"
+)
+
+func (s *Service) ResolveAttribution(ctx context.Context, in ResolveInput) Attribution {
+    calc := NewPricingCalculator(ctx)
+    actualCost    := CalculateActualCost(calc, in.Model, in.Usage)
+    coldCacheCost := CalculateColdCacheCost(calc, in.Model, in.Usage, in.GlobalCacheBaseline)
+    failsafe      := Attribution{
+        BillableCostUSD: actualCost, ActualCostUSD: actualCost, ColdCacheCostUSD: coldCacheCost,
+        EligibilityReason: EligibilityAttributionUnavailable,
+    }
+    if s.store == nil { return failsafe }
+
+    prevAt, err := s.store.GetPreviousAssistantMessageTime(ctx, in.SessionID, in.CurrentMessageID)
+    if err != nil { return failsafe }
+
+    candidate   := PickCandidate(in.Pings, prevAt, in.CallTime)
+    pingCostSum := SumPostExitPingCosts(in.Pings, prevAt, in.CallTime)
+    decision    := DecideEligibility(in.CallTime, prevAt, candidate)
+    // Refuse to decouple without a measured baseline.
+    if decision.Reason == EligibilityDecoupled && in.GlobalCacheBaseline == 0 {
+        decision.Reason = EligibilityNoGlobalCacheBaseline
+    }
+    return BuildAttribution(decision, actualCost, coldCacheCost, pingCostSum, candidate)
+}
+</code></pre>
+
+<h3>11.5 <code>core/workflows/elite/activities.go</code> — activityPostHook</h3>
+
+<p>The CAP swap is gated on <code>BillableCostUSD &gt; 0</code> — guards against an unobservable z=0 underbill if the pricing calculator returns nothing on the decoupled path while still succeeding on y. The <code>cap.RecordAttribution</code> call (<a href="https://github.com/emergentbase/cortex/pull/1465">cortex#1465</a>) emits the new OTel histograms alongside the existing structured log.</p>
+
+<pre><code>// core/workflows/elite/activities.go (abridged)
+func (w *Workflow) activityPostHook(ctx context.Context, input PostHookActivityInput) (*PostHookActivityResult, error) {
+    if !input.CapEnabled {
+        resp, err := w.agentSvc.PostHook(ctx, input.Request)
+        return &PostHookActivityResult{Response: resp}, err
+    }
+    attribution := w.capSvc.ResolveAttribution(ctx, cap.ResolveInput{
+        SessionID:           input.Iteration.SessionID,
+        CurrentMessageID:    input.Iteration.CurrentMessageID,
+        Model:               input.Iteration.Model,
+        Usage:               input.Iteration.Usage,
+        CallTime:            input.Iteration.CallTime,
+        GlobalCacheBaseline: input.Iteration.GlobalCacheBaseline,
+        Pings:               input.CapPings,
+    })
+    // Only swap when the chosen path actually priced.
+    var costDiff float64
+    if attribution.BillableCostUSD &gt; 0 {
+        costDiff = attribution.BillableCostUSD - attribution.ActualCostUSD
+        input.Request.CostUSD = attribution.BillableCostUSD
+        input.Request.AccumulatedCost += costDiff
+    }
+    log.Info(ctx, "cap attribution resolved", /* y, z, x, billable, reason, baseline */)
+    cap.RecordAttribution(ctx, input.Iteration.Model, input.Iteration.Provider, attribution)
+    resp, err := w.agentSvc.PostHook(ctx, input.Request)
+    return &PostHookActivityResult{Response: resp, CostDiff: costDiff}, err
+}
+</code></pre>
+
+<h3>11.6 <code>core/workflows/elite/setup.go</code> — CapSetup bundle + V2 reconcile</h3>
+
+<p>Per-workflow CAP state is bundled into a <code>CapSetup</code> struct hung off <code>setup.Cap</code>. Because the <code>ResolveCapConfigV2</code> activity runs <em>after</em> initial setup, <code>setup.Cap.Enabled</code> must be reconciled in <code>flow.go</code> once the V2 config (with provider clamp + Unleash flag) is in hand.</p>
+
+<pre><code>// core/workflows/elite/setup.go
+type CapSetup struct {
+    Enabled             bool
+    Pings               []cap.PingRecord
+    GlobalCacheBaseline int  // renamed from Floor
+}
+
+// SetupResult embeds the bundle:
+type SetupResult struct {
+    // ...existing fields...
+    Cap CapSetup
+}
+
+// core/workflows/elite/flow.go — after V2 cap-config resolution:
+setupResult.Cap.Enabled =
+    req.CapConfig.Enabled &amp;&amp;
+    req.CapConfig.IsProviderAllowed(setupResult.Agent.Config.Model.ProviderName)
+</code></pre>
+
+<p>Unleash now drives enablement directly — the prior <code>elite.force_cap_enabled</code> override has been removed. The provider clamp is unchanged (Anthropic only).</p>
+
+<h3>11.7 <code>pkg/agentsvc/hooks.go</code> — no schema change</h3>
+
+<p><strong>The PostHook payload to emergent does not carry a CAP-specific field</strong>. The audit blob initially planned for <code>traj_payload.cap</code> was dropped in favour of cortex-local telemetry (Loki + Prometheus). The wire contract between cortex and emergent stays bytewise compatible with pre-CAP — only <code>cost_usd</code> and <code>accumulated_cost</code> shift to z when decoupled.</p>
+
+<p>Emergent's billing pipeline (credit_ledger deduction via <code>credit_manager.deduct(scaled_cost)</code>, ECU calc, knob_multiplier) is unchanged — it reads <code>cost_usd</code> off the existing payload exactly as before. No emergent-side change required to ship CAP Margin Capture v2.</p>
+
+<h3>Key architectural properties</h3>
+<ul>
+  <li><strong>Zero new Temporal activities</strong>: attribution logic lives in pure functions on <code>cap.Service</code>, invoked from <code>activityPostHook</code>; ping load lives inside <code>activityLoadThread</code>. Replay determinism is preserved by Temporal's existing activity-result caching.</li>
+  <li><strong>Setup-time load is hot-path-free</strong>: BigTable is range-scanned once per workflow, in parallel with the head-message baseline query; both panic-safe via <code>ego.SafeExec</code>. Per-iteration PostHook reads in-memory state only.</li>
+  <li><strong>Failsafe-to-user on every error path</strong>: pricing calculator failure → swap gated on billable &gt; 0; previous-msg-time read failure → <code>attribution_unavailable</code> → bills <code>y</code>; <code>NoOpService</code> path (replay/tests) → bills <code>y</code>. No path bills more than the no-CAP world.</li>
+  <li><strong>Promo parity</strong>: <code>CalculateActualCost</code> and <code>CalculateColdCacheCost</code> both pipe through <code>applyOpusFastPromoCostUSD</code>, so non-decoupled calls bill identically to the legacy <code>calculateCostUSD</code> path even during promo windows.</li>
+  <li><strong>Shared calculator</strong>: <code>NewPricingCalculator</code> is memoized once per process via <code>sync.Once</code>; reused for every attribution.</li>
+</ul>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="failure">
+<h2>12. Failure modes (fail-safe-to-user)</h2>
+
+<p>If anything in the attribution path errors out — DB unavailable, query timeout, pricing calculator hiccup — we fall back to billing the user at <strong>y</strong>. The user is never overcharged because of a bug.</p>
+
+<table>
+  <thead><tr><th>Failure</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>BigTable <code>SavePing</code> fails after a ping fired</td>
+      <td>Ping cost incurred (Anthropic charged), but no audit row persisted. Next user call won't see the ping → bills at y. Margin opportunity lost on that call. Logged from <code>cap/workflow.go</code> as a non-fatal warning.</td>
+    </tr>
+    <tr>
+      <td>BigTable client nil (NoOp path)</td>
+      <td><code>SavePing</code> early-returns nil; <code>LoadCapPings</code> returns empty. All attributions return <code>no_qualifying_ping</code> → bill y. Hit by replayer/tests, and by misconfigured pods where the <code>CAP_BIGTABLE_*</code> env vars are missing — verify with the "CAP pings BigTable store initialized" startup log line.</td>
+    </tr>
+    <tr>
+      <td><code>LoadCapPings</code> BigTable range scan fails at setup</td>
+      <td><code>cap.Service.LoadContext</code> logs a non-fatal warning, leaves <code>setup.Cap.Pings</code> empty. PostHook sees empty list → <code>no_qualifying_ping</code> for the workflow's lifetime → bill y. Parallel goroutine is panic-safe via <code>ego.SafeExec</code>.</td>
+    </tr>
+    <tr>
+      <td><code>GetPreviousAssistantMessageTime</code> SQL fails</td>
+      <td><code>ResolveAttribution</code> returns failsafe: <code>BillableCostUSD = ActualCostUSD</code>, <code>EligibilityReason = attribution_unavailable</code>. Logged + metric counted under that reason for dashboard visibility.</td>
+    </tr>
+    <tr>
+      <td><code>GetHeadMessageUsage</code> SQL fails (global cache baseline)</td>
+      <td>Baseline stays zero. <code>DecideEligibility</code> downgrades any would-have-decoupled call to <code>no_global_cache_baseline</code> → bills y. Conservative — refuses to decouple without a measured baseline to avoid over-claiming z.</td>
+    </tr>
+    <tr>
+      <td><code>NoOpService</code> wired (no Store)</td>
+      <td>All methods short-circuit cleanly: <code>SavePing</code> noop, <code>LoadContext</code> empty, <code>ResolveAttribution</code> returns failsafe. Replaces the previous nil-guard pattern at every callsite — no defensive checks needed in elite/cap workflow code.</td>
+    </tr>
+    <tr>
+      <td>Pricing calculator init error (z = 0 while y &gt; 0)</td>
+      <td>CAP swap is gated on <code>BillableCostUSD &gt; 0</code> — so a partial pricing failure that produces z = 0 on the decoupled path can no longer underbill. The original (working) y stays on the request. Reported by attribution-metrics counter under <code>reason="decoupled"</code> with <code>margin_usd_sum = 0</code>.</td>
+    </tr>
+    <tr>
+      <td>Temporal activity retry on <code>activityPostHook</code></td>
+      <td>Attribution result replays deterministically from workflow history. User billed exactly once at the resolved value. No double-charge possible.</td>
+    </tr>
+    <tr>
+      <td>Cortex pod missing <code>CAP_BIGTABLE_*</code> env vars (deployment rollover)</td>
+      <td>BT client is nil → <code>SavePing</code> silently noops despite "CAP ping persisted" log firing (known cosmetic issue in current log line). Subsequent <code>LoadCapPings</code> from a healthy pod returns zero rows → bills y. Operational symptom: <code>cap_attribution_total{reason="no_qualifying_ping"}</code> stays high while <code>cap_refresh_total{status="success"}</code> climbs. Mitigation: verify all pods carry the env vars before a rollout.</td>
+    </tr>
+  </tbody>
+</table>
+
+
+</section>
+
+<!-- ============================================================ -->
+<section id="reporting">
+<h2>13. Reporting (Prometheus + Loki)</h2>
+
+<p class="meta">The audit blob originally planned for <code>trajectories.traj_payload.cap</code> was dropped. Reporting now runs entirely off cortex telemetry: <strong>Prometheus</strong> (OTel metrics from <a href="https://github.com/emergentbase/cortex/pull/1465">cortex#1465</a>) for aggregates and dashboards, and <strong>Loki</strong> (structured logs) for per-call drill-downs and ad-hoc forensics.</p>
+
+<h3>13.1 Decoupled rate (headline KPI)</h3>
+<pre><code># PromQL — fraction of attribution calls that decoupled
+sum(rate(cap_attribution_total{reason="decoupled"}[5m]))
+/
+sum(rate(cap_attribution_total[5m]))
+</code></pre>
+
+<h3>13.2 Margin captured (USD per hour / per day)</h3>
+<pre><code># PromQL — margin USD per hour, over a 5-minute rate window
+sum(rate(cap_attribution_margin_usd_sum[5m])) * 3600
+
+# Or instant total over 24h (single-stat panel):
+sum(increase(cap_attribution_margin_usd_sum[24h]))
+</code></pre>
+
+<h3>13.3 Eligibility-reason breakdown</h3>
+<pre><code># PromQL — stacked timeseries by reason, sliced by model
+sum(rate(cap_attribution_total[5m])) by (reason, model)
+</code></pre>
+<p>If <code>no_qualifying_ping</code> rate is high, CAP isn't firing or ping <code>cache_hit_pct</code> is low — that's a CAP-tuning signal, not a billing-decoupling bug. Cross-check with <code>cap_refresh_cache_hit_pct_bucket</code>.</p>
+
+<h3>13.4 Billable distribution by reason</h3>
+<pre><code># PromQL — p50/p99 of stamped CostUSD, per reason
+histogram_quantile(0.5,
+  sum by (le, reason) (rate(cap_attribution_billable_usd_bucket[5m])))
+histogram_quantile(0.99,
+  sum by (le, reason) (rate(cap_attribution_billable_usd_bucket[5m])))
+</code></pre>
+
+<h3>13.5 Ping health (existing cap.refresh.* family)</h3>
+<pre><code># Success rate — alert below 95%
+sum(rate(cap_refresh_total{status="success"}[5m]))
+/
+sum(rate(cap_refresh_total[5m]))
+
+# Cache-hit % distribution per ping
+histogram_quantile(0.5, sum by (le) (rate(cap_refresh_cache_hit_pct_bucket[5m])))
+
+# Errors split by source (post_exit vs in_loop)
+sum(rate(cap_refresh_total{status="error"}[5m])) by (source, model)
+</code></pre>
+
+<h3>13.6 Per-call drill-down (Loki)</h3>
+<pre><code>// LogQL — every decoupled call in the last hour, with full attribution
+{app=~"cortex.*agentsdk"}
+  |= "cap attribution resolved"
+  | json
+  | decoupled = "true"
+
+// LogQL — failure forensics: every attribution_unavailable
+{app=~"cortex.*agentsdk"}
+  |= "cap attribution resolved"
+  | json
+  | reason = "attribution_unavailable"
+
+// LogQL — per-job audit trail
+{app=~"cortex.*agentsdk"}
+  |~ "(CAP ping persisted|cap attribution resolved)"
+  |= "&lt;JOB_ID&gt;"
+</code></pre>
+
+<h3>13.7 Long-horizon analytics (BigQuery export)</h3>
+<p>The <code>ping_data</code> column family has <code>MaxAge = 7d</code>, so 30/90-day analytics need a daily export. Pipe <code>cap_ping#*</code> rows from BigTable into a BigQuery sink (or any object-store snapshot) for retrospective queries — orphan-ping ratios, per-user margin distributions across cycles, etc.</p>
+
+</section>
+
+
+</main>
+</div>
+
+</body>
+</html>

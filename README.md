@@ -24,4 +24,4 @@ design-docs/
 
 ## Index
 
-<!-- Add one line per feature folder as it's created -->
+- [cap-margin-capture](./cap-margin-capture/) — Bill the user at as-if-cold-cache cost when CAP keeps the prompt cache alive past TTL. cortex#1411 (merged), cortex#1465 (attribution metrics, open).
