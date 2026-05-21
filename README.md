@@ -25,3 +25,4 @@ design-docs/
 ## Index
 
 - [cap-margin-capture](./cap-margin-capture/) — Bill the user at as-if-cold-cache cost when CAP keeps the prompt cache alive past TTL. cortex#1411 (merged), cortex#1465 (attribution metrics, open).
+- [range-based-truncation-opus-4-7](./range-based-truncation-opus-4-7/) — Cache-TTL-aware pre-emptive truncation/summarisation for Opus 4.7 farm agents on 1M context. Avoids paying for cache invalidation twice. Works whether CAP is on or off; fully backward compatible with existing context config.
