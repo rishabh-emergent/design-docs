@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Range-Gate Margin Capture — Detailed Design</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --fg: #1a1a1a;
+    --muted: #555;
+    --accent: #0b6bcb;
+    --accent-soft: #e6f0fa;
+    --good: #1b7a3f;
+    --bad: #b3251b;
+    --warn: #b06a00;
+    --grid: #e5e5e5;
+    --card: #fff;
+    --code-bg: #f4f4f4;
+    --highlight: #fff5d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.55; }
+  .wrapper { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  nav.toc {
+    position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto;
+    padding: 24px 16px; border-right: 1px solid var(--grid); background: #fff;
+  }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 12px; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: section; }
+  nav.toc ol li { counter-increment: section; margin: 4px 0; font-size: 14px; }
+  nav.toc ol li::before { content: counter(section) ". "; color: var(--muted); }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  main { padding: 40px 56px; max-width: 980px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  h3 { font-size: 18px; margin: 24px 0 10px; }
+  h4 { font-size: 15px; margin: 16px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 8px 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: 14px 18px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .callout.warn { background: #fff6e8; border-left-color: var(--warn); }
+  .callout.bad  { background: #fdeae8; border-left-color: var(--bad); }
+  .callout.good { background: #e8f5ec; border-left-color: var(--good); }
+  .callout h4 { margin-top: 0; color: var(--fg); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--grid); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .pill.good { background: #e8f5ec; color: var(--good); }
+  .pill.bad  { background: #fdeae8; color: var(--bad); }
+  .pill.warn { background: #fff6e8; color: var(--warn); }
+  .pill.info { background: var(--accent-soft); color: var(--accent); }
+  .scenario { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 18px 22px; margin: 18px 0; }
+  .scenario h4 { margin-top: 0; }
+  .calc-section-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 14px 0 6px; font-weight: 600; }
+  table.calc-table { width: 100%; font-size: 13px; margin: 4px 0 10px; border-collapse: separate; border-spacing: 0; }
+  table.calc-table th, table.calc-table td { padding: 6px 10px; border: none; border-bottom: 1px solid var(--grid); text-align: left; vertical-align: top; }
+  table.calc-table th { background: transparent; font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+  table.calc-table td.formula { font-family: "SF Mono", Menlo, Consolas, monospace; color: var(--muted); }
+  table.calc-table td.value { font-family: "SF Mono", Menlo, Consolas, monospace; text-align: right; white-space: nowrap; }
+  table.calc-table tr.subtotal td { font-weight: 600; border-bottom: 2px solid #1a1a1a; }
+  table.calc-table tr.highlight td { background: var(--highlight); }
+  table.calc-table tr.highlight td.value { font-weight: 600; }
+  .outcome { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin: 10px 0 4px; }
+  .outcome .box { background: #f7f7f7; border-radius: 6px; padding: 10px 14px; }
+  .outcome .box .label { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
+  .outcome .box .amount { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 15px; font-weight: 600; }
+  .outcome .box.margin { background: #e8f5ec; }
+  .outcome .box.margin .amount { color: var(--good); }
+  .outcome .box.loss   { background: #fdeae8; }
+  .outcome .box.loss   .amount { color: var(--bad); }
+  .figure { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 16px; margin: 18px 0; }
+  .figure .caption { color: var(--muted); font-size: 13px; margin-top: 10px; font-style: italic; }
+  hr { border: none; border-top: 1px solid var(--grid); margin: 32px 0; }
+  .term { font-weight: 600; color: var(--accent); }
+  .formula { font-family: "SF Mono", Menlo, Consolas, monospace; background: var(--highlight); padding: 8px 14px; border-radius: 5px; display: inline-block; margin: 6px 0; }
+  .kv { display: grid; grid-template-columns: 200px 1fr; gap: 4px 16px; margin: 8px 0; }
+  .kv dt { font-weight: 600; color: var(--muted); }
+  .kv dd { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#intro">TL;DR</a></li>
+    <li><a href="#prereqs">Prerequisites</a></li>
+    <li><a href="#problem">The margin leak</a></li>
+    <li><a href="#solution">The decoupling idea</a></li>
+    <li><a href="#vocab">Vocabulary</a></li>
+    <li><a href="#attribution">Attribution rule</a></li>
+    <li><a href="#dryruns">Dry runs</a></li>
+    <li><a href="#dataflow">Data flow</a></li>
+    <li><a href="#code">Code changes</a></li>
+    <li><a href="#reuse">No duplication with CAP</a></li>
+    <li><a href="#compose">Composition with CAP</a></li>
+    <li><a href="#failure">Failure modes</a></li>
+    <li><a href="#gate">Experiment gate</a></li>
+    <li><a href="#reporting">Metrics &amp; reporting</a></li>
+    <li><a href="#nonsgoals">Non-goals</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header>
+  <h1>Range-Gate Margin Capture via Billing Decoupling</h1>
+  <p class="meta">Sibling design to <a href="../cap-margin-capture/design.html">CAP Margin Capture</a>. Assumes <a href="https://github.com/emergentbase/cortex/pull/1474">cortex#1474</a> (range-based truncation) and the Redis-anchor follow-up are live.</p>
+</header>
+
+<!-- ============================================================ -->
+<section id="intro">
+<h2>1. TL;DR (for the impatient)</h2>
+
+<p>When the range-gate fires <code>range_threshold_cache_invalidation</code>, it preempts a future cache-write that the user would otherwise have paid for. The user&rsquo;s next LLM call lands on a truncated prefix that costs Anthropic less.</p>
+
+<p>This design captures that savings as Emergent margin instead of passing it silently to the user. On the first LLM call after such a squash, <code>activityPostHook</code> swaps <code>Request.CostUSD</code> from the actual cost <span class="term">y</span> to the as-if-no-range-gate cost <span class="term">z</span>, exactly mirroring CAP&rsquo;s billing-decoupling mechanism.</p>
+
+<p class="formula">margin = z &minus; y &nbsp;&nbsp;&nbsp;(<code>x = 0</code> &mdash; range-gate has no ping cost)</p>
+
+<p>Scope deliberately tight: one new file (<code>core/xcontext/margin.go</code>), one new state field, one new branch in <code>activityPostHook</code>, three new OTel counters, one experiment flag. <strong>No</strong> new package, <strong>no</strong> new Temporal activity, <strong>no</strong> new DB column, <strong>no</strong> rename of <code>core/cap/</code>.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="prereqs">
+<h2>2. Prerequisites</h2>
+
+<p>This design assumes both of these are deployed:</p>
+
+<ol>
+  <li><a href="https://github.com/emergentbase/cortex/pull/1474"><strong>cortex#1474 &mdash; range-based truncation Tier 1</strong></a>. The <code>RangeThresholdPolicy</code> gate fires <code>range_threshold_cache_invalidation</code> when in-range and the prompt cache is predicted dead, <code>range_threshold_hard_floor</code> at <code>upper</code> unconditionally. <code>ApplyAndPersistSquashResult.Reason</code> carries the attribution string. <code>elite.squash.cache_creation_avoided_tokens</code> is already emitted as a metric.</li>
+  <li><strong>Redis cross-run anchor</strong> (cortex#1479). <code>state.lastLLMCallTime</code> is seeded from the Redis-backed cross-run anchor at workflow start, so the gate actually fires on the first iteration of a resumed run. Without this, the gate misses the most lucrative case and margin capture has nothing to capture.</li>
+</ol>
+
+<p>If either is rolled back, this feature self-disables (the gate either never fires or fires on the wrong call &mdash; both observable in the fail-safe metrics).</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="problem">
+<h2>3. The margin leak</h2>
+
+<p>From the <a href="../range-based-truncation-opus-4-7/design.html">range-based truncation design</a>: in the cache-invalidation arm, the range-gate squashes <em>preemptively</em> at, say, 250k tokens because it predicts the cache is about to TTL-die. Without the gate, the user would have paid:</p>
+
+<ul>
+  <li>cache_create on the <em>full</em> ~250k prefix at the moment of natural TTL expiry, then</li>
+  <li>cache_create again on the truncated prefix when prompt eventually hits 275k.</li>
+</ul>
+
+<p>With the gate, the user pays <em>only</em> the second cache_create &mdash; on the truncated prefix. The first one (full prefix) is the &ldquo;avoided&rdquo; event.</p>
+
+<p>Today, the savings flow straight through. The user&rsquo;s <code>cost_usd</code> reported to emergent reflects only the truncated cache_create. We pay Anthropic the same. <strong>Emergent earns nothing on this optimization</strong>. The PRD&rsquo;s explicit ask:</p>
+
+<div class="callout">
+  <p>&ldquo;Deduction: We should deduct the cost that user would have incurred for the cache write &hellip; in case of invalidation at each of the call we help user reduce costs.&rdquo;</p>
+</div>
+
+<p>Same shape as CAP&rsquo;s leak: an optimization that reduces our spend with Anthropic also reduces user&rsquo;s spend with us, when we could instead hold the user&rsquo;s price flat and pocket the difference.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="solution">
+<h2>4. The decoupling idea (the fix)</h2>
+
+<p>Charge the user as if the range-gate never fired. Pay Anthropic the actual reduced amount. Margin per qualifying call = difference.</p>
+
+<p>Concretely, on the first LLM call after a qualifying squash:</p>
+
+<ol>
+  <li>Compute <span class="term">y</span> exactly as today (<code>calculateCostUSD</code> on the call&rsquo;s real <code>Usage</code>).</li>
+  <li>Compute <span class="term">z</span> by taking the same <code>Usage</code> and adding the <em>avoided_cache_creation_tokens</em> to <code>CacheCreationInputTokens</code>, then re-pricing. <em>This is the only new math.</em></li>
+  <li>In <code>activityPostHook</code>: <code>Request.CostUSD = z</code>; <code>Request.AccumulatedCost += (z &minus; y)</code>; mirror the delta into workflow state so iter N+1 carries forward.</li>
+</ol>
+
+<p>The PostHook payload contract to emergent is unchanged. The only thing that changes is what numbers fill <code>cost_usd</code> / <code>accumulated_cost</code> &mdash; identical to CAP.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="vocab">
+<h2>5. Vocabulary</h2>
+
+<p>Reuses CAP&rsquo;s notation so cross-doc reading is cheap. There&rsquo;s no <span class="term">x</span> here because the range-gate doesn&rsquo;t make its own LLM call.</p>
+
+<dl class="kv">
+  <dt><span class="term">y</span> &mdash; actual-cost</dt>
+  <dd>What Anthropic charges us for the post-squash LLM call. Priced from the call&rsquo;s real <code>Usage</code> by xllm&rsquo;s pricing calculator. Same number that <code>calculateCostUSD</code> already produces today.</dd>
+
+  <dt><span class="term">z</span> &mdash; as-if-no-range-gate</dt>
+  <dd>What the call <em>would</em> have cost if the gate hadn&rsquo;t fired. Constructed by adding <code>avoided_cache_creation_tokens</code> (from the squash event) to <code>Usage.CacheCreationInputTokens</code>, then pricing. <strong>z &ge; y, always.</strong></dd>
+
+  <dt><span class="term">avoided_cache_creation_tokens</span></dt>
+  <dd>The number of cache-create tokens the user did <em>not</em> pay. Computed at squash time as <code>pre_squash_cached_prefix &minus; post_squash_cache_create</code> &mdash; see <a href="#attribution">&sect;6</a>. Distinct from PR 1474&rsquo;s metric-only over-approximation; we tighten the formula for billing.</dd>
+
+  <dt><span class="term">range-gate decoupled call</span></dt>
+  <dd>An LLM call that meets every attribution gate. User pays <span class="term">z</span>, Anthropic gets <span class="term">y</span>, Emergent margin = <span class="term">z &minus; y</span>.</dd>
+</dl>
+
+<p class="formula">margin = z &minus; y</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="attribution">
+<h2>6. The attribution rule</h2>
+
+<p>We do <strong>not</strong> bill at <span class="term">z</span> on every squash. Same philosophy as CAP: <em>false positives are visible (overcharging); false negatives are silent</em>. When in doubt, bill at <span class="term">y</span>.</p>
+
+<p>An LLM call is range-gate-decoupled <strong>iff all</strong> of these hold:</p>
+
+<table>
+  <tr><th>#</th><th>Gate</th><th>Rationale</th></tr>
+  <tr>
+    <td>1</td>
+    <td><code>state.pendingSquashMargin != nil</code></td>
+    <td>A squash fired in this iteration. The pending event is set when the squash activity returns and cleared at the end of the same iteration&rsquo;s PostHook.</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>Reason is <code>range_threshold_cache_invalidation</code></td>
+    <td>Only this reason corresponds to a <em>real</em> avoided cache_create. <code>range_threshold_hard_floor</code> defers the legacy 275k squash but does not avoid a cache_create (cache may have been alive). <code>image_overflow</code> and <code>legacy_threshold</code> are not range-gate optimizations.</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>Provider is Anthropic (<code>provider_clamp</code>)</td>
+    <td>Cache-write pricing semantics are Anthropic-specific. Other providers&rsquo; cache models differ and the math would not apply.</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>Experiment flag <code>RangeGateMarginEnabled</code> is on</td>
+    <td>Gradual rollout via the existing elite-experiments client. See <a href="#gate">&sect;13</a>.</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td><code>avoided_tokens &gt; 0</code> after subtracting post-squash cache_create</td>
+    <td>If the post-squash prefix is <em>larger</em> than the pre-squash cache (unusual but possible with image squash interleavings), there is no avoidance.</td>
+  </tr>
+  <tr>
+    <td>6</td>
+    <td><code>y &gt; 0</code> AND <code>z &gt; y</code></td>
+    <td>Pricing must succeed for both. If either returns 0 or <code>z &le; y</code> (math sanity), no swap. Mirrors CAP&rsquo;s <code>BillableCostUSD &gt; 0</code> guard.</td>
+  </tr>
+</table>
+
+<h3>Computing avoided_tokens precisely</h3>
+
+<p>PR 1474&rsquo;s metric uses an approximation that over-counts (it equates avoided to the full pre-squash cached prefix). For <em>billing</em>, we need a tighter formula because the post-squash cache_create has not happened yet at squash time &mdash; we only know its size after the next LLM call returns.</p>
+
+<p>So <code>avoided_tokens</code> is finalized at PostHook time, not at squash time:</p>
+
+<pre><code>// At squash time (xcontext.ApplySquash):
+pendingMargin.PreSquashCachedPrefix = lastUsage.CacheCreationInputTokens +
+                                       lastUsage.CacheReadInputTokens
+
+// At PostHook time, using the current LLM call's Usage:
+postSquashCacheCreate := currentUsage.CacheCreationInputTokens
+avoided                := pendingMargin.PreSquashCachedPrefix - postSquashCacheCreate
+if avoided &le; 0 { /* gate 5 fails, fall back to y */ }
+</code></pre>
+
+<div class="callout warn">
+  <h4>Why we keep PR 1474&rsquo;s metric AND the billing formula</h4>
+  <p>PR 1474&rsquo;s <code>elite.squash.cache_creation_avoided_tokens</code> is a coarse health signal &mdash; it answers &ldquo;how often does the gate fire and how big are the squashes?&rdquo;. The billing formula is the conservative number used to compute the actual <code>z &minus; y</code> swap. They diverge for the same squash event by exactly the post-squash cache_create size. Both are correct for their respective purposes.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="dryruns">
+<h2>7. Dry runs</h2>
+
+<p>Opus 4.7 list prices used throughout:</p>
+
+<ul>
+  <li>Input: $15 / 1M tokens</li>
+  <li>Cache-write (5-min TTL): $18.75 / 1M tokens</li>
+  <li>Cache-read: $1.50 / 1M tokens</li>
+  <li>Output: $75 / 1M tokens</li>
+</ul>
+
+<div class="scenario">
+  <h4>Scenario A &mdash; Cache-invalidation squash on resume <span class="pill good">decoupled</span></h4>
+  <p><strong>Timeline:</strong> Workflow run A ends at 03:33:28 with cached prefix = 452k tokens (200k cache_create + 252k cache_read). User idles for 6m+. Workflow run B starts at 03:39:42; with the Redis anchor, the gate sees <code>elapsed = 6m16s &ge; cacheDeadline (4m45s)</code> AND tokens (~452k) <code>&ge; upper (0.325 of 1M = 325k)</code> &rArr; fires <code>range_threshold_cache_invalidation</code> immediately, truncating the prefix to ~150k.</p>
+
+  <p>03:39:44 LLM call lands on the truncated prefix. Returned <code>Usage</code>:</p>
+  <ul>
+    <li>input_tokens = 500</li>
+    <li>cache_creation_input_tokens = 150,000</li>
+    <li>cache_read_input_tokens = 0</li>
+    <li>output_tokens = 1,000</li>
+  </ul>
+
+  <p class="calc-section-title">Actual cost <span class="term">y</span></p>
+  <table class="calc-table">
+    <tr><th>Component</th><th>Formula</th><th>Value</th></tr>
+    <tr><td>input</td><td class="formula">500 &times; $15/M</td><td class="value">$0.0075</td></tr>
+    <tr><td>cache_create</td><td class="formula">150,000 &times; $18.75/M</td><td class="value">$2.8125</td></tr>
+    <tr><td>cache_read</td><td class="formula">0</td><td class="value">$0.0000</td></tr>
+    <tr><td>output</td><td class="formula">1,000 &times; $75/M</td><td class="value">$0.0750</td></tr>
+    <tr class="subtotal"><td>y</td><td></td><td class="value">$2.8950</td></tr>
+  </table>
+
+  <p class="calc-section-title">avoided_tokens (tight formula)</p>
+  <table class="calc-table">
+    <tr><th>Source</th><th>Tokens</th></tr>
+    <tr><td>pre_squash_cached_prefix (snapshotted from prior call&rsquo;s Usage)</td><td class="value">452,000</td></tr>
+    <tr><td>post_squash cache_create (this call&rsquo;s Usage)</td><td class="value">150,000</td></tr>
+    <tr class="highlight"><td>avoided_tokens</td><td class="value">302,000</td></tr>
+  </table>
+
+  <p class="calc-section-title">As-if cost <span class="term">z</span> (same Usage but cache_create += avoided)</p>
+  <table class="calc-table">
+    <tr><th>Component</th><th>Formula</th><th>Value</th></tr>
+    <tr><td>input</td><td class="formula">500 &times; $15/M</td><td class="value">$0.0075</td></tr>
+    <tr><td>cache_create</td><td class="formula">(150,000 + 302,000) &times; $18.75/M</td><td class="value">$8.4750</td></tr>
+    <tr><td>cache_read</td><td class="formula">0</td><td class="value">$0.0000</td></tr>
+    <tr><td>output</td><td class="formula">1,000 &times; $75/M</td><td class="value">$0.0750</td></tr>
+    <tr class="subtotal"><td>z</td><td></td><td class="value">$8.5575</td></tr>
+  </table>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User charged (z)</div><div class="amount">$8.5575</div></div>
+    <div class="box"><div class="label">Anthropic paid (y)</div><div class="amount">$2.8950</div></div>
+    <div class="box margin"><div class="label">Margin captured</div><div class="amount">$5.6625</div></div>
+  </div>
+
+  <p><strong>PostHook effect:</strong> <code>Request.CostUSD = $8.5575</code>, <code>Request.AccumulatedCost += $5.6625</code>, <code>state.AddCost($5.6625)</code> mirrors the delta so iter N+1 carries forward.</p>
+</div>
+
+<div class="scenario">
+  <h4>Scenario B &mdash; Hard-floor squash, cache still alive <span class="pill bad">not decoupled</span></h4>
+  <p><strong>Timeline:</strong> Prompt grows to 325k inside a single active workflow run (cache hot the whole time). The hard-floor arm fires <code>range_threshold_hard_floor</code>. Cache_create on the truncated 150k prefix on the next call.</p>
+
+  <p>The user&rsquo;s &ldquo;without range gate&rdquo; counterfactual: the legacy 0.275 threshold would have squashed earlier at 275k, leading to a cache_create on a similar truncated prefix at that earlier moment. <strong>No avoided cache_create event &mdash; only deferred.</strong></p>
+
+  <p>Gate 2 fails (<code>reason != range_threshold_cache_invalidation</code>). We bill at <span class="term">y</span>, no swap. PR 1474&rsquo;s metric still records the squash for telemetry; only the billing pipeline declines.</p>
+
+  <div class="outcome">
+    <div class="box"><div class="label">User charged (y)</div><div class="amount">$2.8950</div></div>
+    <div class="box"><div class="label">Anthropic paid (y)</div><div class="amount">$2.8950</div></div>
+    <div class="box"><div class="label">Margin</div><div class="amount">$0.0000</div></div>
+  </div>
+</div>
+
+<div class="scenario">
+  <h4>Scenario C &mdash; Pricing fails for an unknown model <span class="pill bad">fail-safe</span></h4>
+  <p><strong>Timeline:</strong> Same as Scenario A but xllm&rsquo;s pricing calculator returns 0 for the model ID (misconfiguration, new model, etc.).</p>
+
+  <p>Gate 6 fails (<code>y == 0</code>). No swap. The PostHook proceeds with whatever <code>calculateCostUSD</code> returned (likely $0 too &mdash; the existing pre-CAP behavior). A warning is logged with the model ID; the <code>squashmargin.attribution.skipped_total{reason="pricing_failed"}</code> counter is incremented.</p>
+
+  <div class="callout warn"><p><strong>Bias:</strong> the math sanity check (<code>z &gt; y</code>) and the pricing positivity check (<code>y &gt; 0</code>) are deliberately loud. Better to log a skipped opportunity than overcharge a customer because the pricing table is stale.</p></div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="dataflow">
+<h2>8. Data flow</h2>
+
+<p>Inside one iteration of <code>runIteration</code>:</p>
+
+<pre><code>1. squashEvalTime := exec.Now()
+2. if needsSquashing(...) {
+       result := applySquashing(...)
+       if result.WasApplied && isRangeGateCacheInvalidation(result.Reason) {
+           state.SetPendingSquashMargin(&amp;xcontext.PendingMarginEvent{
+               Reason:                 result.Reason,
+               PreSquashCachedPrefix:  result.PreSquashCachedPrefixTokens,
+               Model:                  setup.CurrentModel,
+               Provider:               setup.CurrentProvider,
+               FiredAt:                squashEvalTime,
+           })
+       }
+   }
+3. LLM call on the truncated prefix
+4. tool execution
+5. BuildPostHookRequest &rarr; hookReq.CostUSD = calculateCostUSD(model, usage) // y
+6. ExecuteActivity(ActivityPostHook, PostHookActivityInput{
+       Request, CapEnabled, CapPings, Iteration, PendingSquashMargin: state.PendingSquashMargin(),
+   })
+   // inside activityPostHook:
+   //   - CAP attribution (existing) computes cap_delta
+   //   - if input.PendingSquashMargin != nil &amp;&amp; gates pass:
+   //         rangeGateAttribution := xcontext.ResolveMarginAttribution(...)
+   //         rg_delta = rangeGateAttribution.AsIfCostUSD - rangeGateAttribution.ActualCostUSD
+   //         Request.CostUSD = y + cap_delta + rg_delta
+   //         Request.AccumulatedCost += cap_delta + rg_delta
+   //         (clears pending event via result.SquashMarginConsumed = true)
+   //   - agentSvc.PostHook(Request)
+7. state.AddCost(result.CostDiff)  // existing CAP path; covers both deltas
+8. if result.SquashMarginConsumed { state.ClearPendingSquashMargin() }</code></pre>
+
+<p>Key property: the pending event lives exactly one iteration. If the LLM call errored before PostHook fired, the pending event is still alive next iteration and the next successful PostHook consumes it. If iter N+1&rsquo;s squash also fires before that PostHook (unusual), the event is overwritten &mdash; the older opportunity is lost on purpose (we can&rsquo;t bill two deltas to one call).</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="code">
+<h2>9. Code changes</h2>
+
+<p>Estimate: ~150 production lines, ~150 test lines. One new file. No new package. No new Temporal activity.</p>
+
+<h3>9.1 <code>core/xcontext/margin.go</code> (NEW, ~80 lines)</h3>
+
+<p>Pure types and one resolver function. Lives next to the squash decision in the same package. Imports <code>cap.NewPricingCalculator</code> + <code>cap.CalculateActualCost</code> for pricing &mdash; see <a href="#reuse">&sect;10</a>.</p>
+
+<pre><code>// core/xcontext/margin.go
+package xcontext
+
+import (
+    "context"
+
+    "cortex/core/cap"   // pricing primitives reused; no other cap dependency
+    "cortex/pkg/agentsdk/io"
+    "github.com/emergentbase/xllm"
+)
+
+// PendingMarginEvent is recorded when a range-gate cache-invalidation squash
+// fires and consumed by the next PostHook on the same iteration.
+type PendingMarginEvent struct {
+    Reason                  string  // always range_threshold_cache_invalidation when set
+    PreSquashCachedPrefix   int     // last call's cache_creation + cache_read
+    Model                   string
+    Provider                string
+}
+
+// MarginInput is the resolver input. Workflow-side state extracts these
+// fields and hands them in; the resolver does pure math + pricing.
+type MarginInput struct {
+    Pending           *PendingMarginEvent
+    CurrentUsage      *io.TokenUsage
+    ProviderClamped   bool   // experiment + provider gate evaluated by caller
+    ExperimentEnabled bool
+}
+
+// MarginAttribution is the resolver output. Decoupled=false means &ldquo;bill at y&rdquo;.
+type MarginAttribution struct {
+    Decoupled         bool
+    ActualCostUSD     float64  // y
+    AsIfCostUSD       float64  // z
+    AvoidedTokens     int
+    EligibilityReason string   // skipped reasons or "decoupled"
+}
+
+const (
+    EligibilityDecoupled              = "decoupled"
+    EligibilityNoPendingEvent         = "no_pending_event"
+    EligibilityReasonNotEligible      = "reason_not_eligible"
+    EligibilityExperimentDisabled     = "experiment_disabled"
+    EligibilityProviderNotAllowed     = "provider_not_allowed"
+    EligibilityAvoidedNonPositive     = "avoided_non_positive"
+    EligibilityPricingFailed          = "pricing_failed"
+    EligibilityMathSanityFailed       = "math_sanity_failed"
+)
+
+func ResolveMarginAttribution(ctx context.Context, in MarginInput) MarginAttribution {
+    if in.Pending == nil { return failsafe(EligibilityNoPendingEvent, 0, 0) }
+    if in.Pending.Reason != ReasonRangeThresholdCacheInvalidation {
+        return failsafe(EligibilityReasonNotEligible, 0, 0)
+    }
+    if !in.ExperimentEnabled { return failsafe(EligibilityExperimentDisabled, 0, 0) }
+    if !in.ProviderClamped   { return failsafe(EligibilityProviderNotAllowed, 0, 0) }
+
+    avoided := in.Pending.PreSquashCachedPrefix - int(in.CurrentUsage.CacheCreationInputTokens)
+    if avoided &le; 0 { return failsafe(EligibilityAvoidedNonPositive, 0, 0) }
+
+    calc := cap.NewPricingCalculator(ctx)
+    y    := cap.CalculateActualCost(calc, in.Pending.Model, in.CurrentUsage)
+    if y == 0 { return failsafe(EligibilityPricingFailed, 0, 0) }
+
+    asIf  := cloneWithAddedCacheCreate(in.CurrentUsage, avoided)
+    z, err := calc.Calculate(in.Pending.Model, asIf)
+    if err != nil || z.TotalCost == 0 {
+        return failsafe(EligibilityPricingFailed, y, 0)
+    }
+    if z.TotalCost &le; y { return failsafe(EligibilityMathSanityFailed, y, z.TotalCost) }
+
+    return MarginAttribution{
+        Decoupled:         true,
+        ActualCostUSD:     y,
+        AsIfCostUSD:       z.TotalCost,
+        AvoidedTokens:     avoided,
+        EligibilityReason: EligibilityDecoupled,
+    }
+}</code></pre>
+
+<h3>9.2 Touched fields and one new branch</h3>
+
+<table>
+  <tr><th>File</th><th>Change</th><th>Lines</th></tr>
+  <tr><td><code>core/xcontext/squash.go</code></td><td>Add <code>PreSquashCachedPrefixTokens int</code> to <code>ApplySquashResult</code>; populate in <code>ApplySquash</code> from <code>state.LastUsage</code> when reason is range-gate cache-invalidation.</td><td>+5</td></tr>
+  <tr><td><code>core/workflows/elite/request.go</code></td><td>Add the same field to <code>ApplyAndPersistSquashResult</code>; add <code>PendingSquashMargin *xcontext.PendingMarginEvent</code> to <code>PostHookActivityInput</code>; add <code>SquashMarginConsumed bool</code> to <code>PostHookActivityResult</code>.</td><td>+8</td></tr>
+  <tr><td><code>core/workflows/elite/state.go</code></td><td>Add unexported <code>pendingSquashMargin</code> field with <code>GetPendingSquashMargin / SetPendingSquashMargin / ClearPendingSquashMargin</code> accessors.</td><td>+18</td></tr>
+  <tr><td><code>core/workflows/elite/flow.go</code></td><td>After <code>HandleSquashResult</code>, set the pending event when the squash result reason is <code>range_threshold_cache_invalidation</code>. Pass <code>state.GetPendingSquashMargin()</code> into <code>PostHookActivityInput</code>. On result, clear pending if consumed.</td><td>+12</td></tr>
+  <tr><td><code>core/workflows/elite/activities.go</code></td><td>In <code>activityPostHook</code>, after the existing CAP block: if <code>input.PendingSquashMargin != nil</code>, call <code>xcontext.ResolveMarginAttribution(&hellip;)</code>; if <code>Decoupled</code>, stack the delta onto <code>Request.CostUSD</code> / <code>Request.AccumulatedCost</code> and set <code>result.SquashMarginConsumed = true</code>. Log + record metrics either way.</td><td>+30</td></tr>
+  <tr><td><code>core/workflows/elite/metrics.go</code></td><td>Three new counters &mdash; see <a href="#reporting">&sect;14</a>.</td><td>+30</td></tr>
+  <tr><td><code>pkg/agentsdk/configs/feature_request.go</code></td><td>Add <code>RangeGateMarginEnabled bool</code> field to <code>FeatureRequest</code> (resolved by the existing experiments client; wired through the same plumbing as <code>IsParallelToolExecution</code>).</td><td>+3</td></tr>
+</table>
+
+<p>That&rsquo;s it. The <code>cap</code> package is not touched. The <code>squashmargin</code> package is not created. The PostHook payload contract is unchanged.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="reuse">
+<h2>10. No duplication with CAP</h2>
+
+<p>We reuse two entry points from <code>core/cap/</code>:</p>
+
+<pre><code>cap.NewPricingCalculator(ctx)  // returns *xllm/pricing.Calculator wired with cortex defaults
+cap.CalculateActualCost(calc, model, usage)  // prices a real Usage; same fn already used for y</code></pre>
+
+<p>We do <strong>not</strong> reuse <code>cap.CalculateColdCacheCost</code> &mdash; its swap shape is different (cache_read &rarr; cache_create, accounting for a global cache baseline). The range-gate swap (cache_create += avoided) is a separate operation, performed inline inside <code>ResolveMarginAttribution</code> via a one-line clone of <code>Usage</code>. No new helper added to <code>cap</code>.</p>
+
+<div class="callout">
+  <h4>Why not extract pricing into a neutral <code>core/billing/</code>?</h4>
+  <p>Tempting but out of scope. The two entry points we reuse are already thin wrappers over <code>xllm/pricing</code>. Extracting them buys consistency at the cost of one rename PR touching every CAP call site. Defer until a third consumer needs them.</p>
+</div>
+
+<p>We also do <strong>not</strong> reuse <code>cap.Attribution</code>, <code>cap.EligibilityDecision</code>, or any cap attribution constants. Those carry CAP-specific fields (<code>PingRequestID</code>, <code>GlobalCacheBaseline</code>). Mixing them into a range-gate path would force the cap package to learn about squash events &mdash; the wrong layering. <code>MarginAttribution</code> has its own minimal shape (4 fields), independent of <code>cap.Attribution</code>.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="compose">
+<h2>11. Composition with CAP on the same call</h2>
+
+<p>A CAP-decoupled call and a range-gate-decoupled call can happen on the same LLM call (rare but possible: CAP refresh kept the cache alive through a long tool execution, then the next iteration&rsquo;s prompt re-entered the range and the cache-invalidation arm fired). Both deltas need to stack.</p>
+
+<p>Order inside <code>activityPostHook</code>:</p>
+
+<ol>
+  <li>Existing CAP block computes <code>cap_delta = cap.BillableCostUSD - cap.ActualCostUSD</code>. If non-zero, <code>Request.CostUSD = cap.BillableCostUSD; AccumulatedCost += cap_delta</code>.</li>
+  <li>New squash-margin block reads <em>the current</em> <code>Request.CostUSD</code> (which may already be <code>z_cap</code>) and the original Usage. Computes <code>y</code> from Usage directly (not from <code>Request.CostUSD</code>, which may be post-CAP), then <code>z_squash</code>, then <code>rg_delta = z_squash - y</code>. Adds <code>rg_delta</code> on top.</li>
+</ol>
+
+<p>Both deltas reference the same <code>y</code> baseline (the call&rsquo;s real cost). They are additive because they capture different mechanisms &mdash; CAP captures &ldquo;cache stayed alive past TTL&rdquo;; squash margin captures &ldquo;cache was killed to avoid a future cache_create&rdquo;. Mathematically disjoint.</p>
+
+<pre><code>final_billable = y + cap_delta + rg_delta
+                = y_actual + (z_cap - y) + (z_squash - y)
+                = z_cap + z_squash - y</code></pre>
+
+<p><code>result.CostDiff = cap_delta + rg_delta</code>; <code>state.AddCost(result.CostDiff)</code> mirrors both into workflow state.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="failure">
+<h2>12. Failure modes</h2>
+
+<p>Every layer fails open to the user (bill at <span class="term">y</span>, log, emit a skipped-metric).</p>
+
+<table>
+  <tr><th>Failure</th><th>Behaviour</th></tr>
+  <tr><td><code>state.pendingSquashMargin == nil</code></td><td>No range-gate squash this iteration. Skip silently.</td></tr>
+  <tr><td>Squash reason != cache_invalidation (e.g., hard_floor, image_overflow)</td><td>Gate 2 fails. <code>skipped_total{reason=reason_not_eligible}</code>.</td></tr>
+  <tr><td>Experiment flag off</td><td>Gate 4 fails. <code>skipped_total{reason=experiment_disabled}</code>. Used during rollout.</td></tr>
+  <tr><td>Provider != Anthropic</td><td>Gate 3 fails. <code>skipped_total{reason=provider_not_allowed}</code>.</td></tr>
+  <tr><td><code>avoided_tokens &le; 0</code></td><td>Gate 5 fails. Unusual; possible with weird image-squash interleavings.</td></tr>
+  <tr><td>Pricing returns 0 for model</td><td>Gate 6 fails (<code>y == 0</code> or <code>z == 0</code>). Bill at original <code>calculateCostUSD</code> output. Loud warning logged with model ID.</td></tr>
+  <tr><td><code>z &le; y</code> (math sanity)</td><td>Gate 6 fails. Refuse to swap; would overcharge in the unlikely case. <code>skipped_total{reason=math_sanity_failed}</code>.</td></tr>
+  <tr><td>Pending event stuck because LLM call errored before PostHook</td><td>Next successful PostHook consumes it. Worst case: pending event stale across an entire iteration. Cleared either by next consumption or workflow exit.</td></tr>
+  <tr><td>Workflow restart between squash and PostHook (pinned versioning replay)</td><td><code>state.pendingSquashMargin</code> is workflow-state-only; replay reconstructs it from history. Same correctness as today&rsquo;s <code>state.AccumulatedCost</code>.</td></tr>
+  <tr><td>CAP attribution and squash margin both decouple but one of them fails</td><td>Each block is independent. CAP success + squash failure &rArr; bill at <code>z_cap</code> (no squash delta). Squash success + CAP failure &rArr; bill at <code>y + rg_delta</code>. No interaction.</td></tr>
+</table>
+
+<div class="callout good">
+  <h4>Bias toward under-billing</h4>
+  <p>Every check is &ldquo;bill at <span class="term">y</span> if anything looks off&rdquo;. We&rsquo;d rather miss margin than overcharge. The skipped-metric labels let us see exactly how much we&rsquo;re leaving on the table by reason.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="gate">
+<h2>13. Experiment gate</h2>
+
+<p>Two layers, both wired through the existing elite-experiments client (see how <code>FeatureRequest</code> drives <code>IsParallelToolExecution</code> at <code>flow.go:1130</code>).</p>
+
+<h3>13.1 Per-agent opt-in</h3>
+
+<p>Already exists from PR 1474: presence of <code>context.range_threshold</code> in the agent YAML. Agents without it never produce a <code>range_threshold_cache_invalidation</code> reason &mdash; gate 2 closes naturally. No code change.</p>
+
+<h3>13.2 Per-job experiment flag</h3>
+
+<p>New: <code>RangeGateMarginEnabled bool</code> on <code>FeatureRequest</code>. Default false. Resolved at workflow start by the experiments client against the user/job context &mdash; same path as every other elite experiment. Setup copies it onto a setup-time field; <code>activityPostHook</code> reads it from the input.</p>
+
+<pre><code>// pkg/agentsdk/configs/feature_request.go
+type FeatureRequest struct {
+    // existing fields&hellip;
+    RangeGateMarginEnabled bool `json:"range_gate_margin_enabled,omitempty"`
+}
+
+// core/workflows/elite/setup.go (existing pattern)
+type SetupResult struct {
+    // existing fields&hellip;
+    RangeGateMarginEnabled bool
+}
+
+// core/workflows/elite/flow.go &mdash; thread through to PostHook input
+input.RangeGateMarginEnabled = setup.RangeGateMarginEnabled</code></pre>
+
+<p>Rollout plan: enable for a single farm agent on a percentage of jobs, observe <code>squashmargin.attribution.*</code>, ramp.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="reporting">
+<h2>14. Metrics &amp; reporting</h2>
+
+<p>Mirror CAP&rsquo;s <code>cap.attribution.*</code> family with the prefix <code>squashmargin.attribution.*</code>. All counters tagged with <code>model</code>, <code>provider</code>; the decoupled/skipped counters add <code>reason</code>.</p>
+
+<table>
+  <tr><th>Metric</th><th>Type</th><th>What it answers</th></tr>
+  <tr><td><code>squashmargin.attribution.decoupled_total</code></td><td>Counter</td><td>How often did we bill at <code>z</code>?</td></tr>
+  <tr><td><code>squashmargin.attribution.skipped_total</code></td><td>Counter (labels include eligibility reason)</td><td>How often did we bail and why? Headline diagnostic.</td></tr>
+  <tr><td><code>squashmargin.attribution.margin_captured_usd_total</code></td><td>Counter (float)</td><td>$ captured per model/provider. Headline KPI.</td></tr>
+  <tr><td><code>squashmargin.attribution.avoided_tokens_total</code></td><td>Counter</td><td>Token-volume saved; complements the metric in PR 1474 (this one is the tight billing figure, the other is the loose coverage figure).</td></tr>
+  <tr><td><code>squashmargin.attribution.billable_distribution</code></td><td>Histogram</td><td>Distribution of <code>z</code> on decoupled calls &mdash; sanity check for outliers.</td></tr>
+</table>
+
+<h3>14.1 Structured log per call</h3>
+
+<p>One line per resolution (decoupled or skipped), emitted from <code>activityPostHook</code> right after the swap. Loki-queryable by <code>job_id</code> / <code>session_id</code> / <code>message_id</code>:</p>
+
+<pre><code>{
+  "event": "squashmargin attribution resolved",
+  "decoupled": true,
+  "reason": "decoupled",
+  "y_actual_usd": 2.8950,
+  "z_billable_usd": 8.5575,
+  "margin_usd": 5.6625,
+  "avoided_tokens": 302000,
+  "pre_squash_prefix_tokens": 452000,
+  "post_squash_create_tokens": 150000,
+  "model": "claude-opus-4-7",
+  "provider": "anthropic",
+  "job_id": "&hellip;",
+  "session_id": "&hellip;",
+  "message_id": "&hellip;"
+}</code></pre>
+
+<h3>14.2 Cross-reference with PR 1474&rsquo;s squash metrics</h3>
+
+<p>Existing: <code>elite.squash.cache_creation_avoided_tokens{reason=range_threshold_cache_invalidation}</code> tells us &ldquo;how often does the gate fire and how big is the squash?&rdquo; (using the loose formula).</p>
+
+<p>New: <code>squashmargin.attribution.avoided_tokens_total</code> tells us &ldquo;how many of those squashes were billable and what was the tight avoided figure?&rdquo;.</p>
+
+<p>Their ratio is the conversion rate of squash events into captured margin &mdash; useful for tuning <code>cache_ttl_guard</code> or expanding the experiment cohort.</p>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="nonsgoals">
+<h2>15. Non-goals</h2>
+
+<ul>
+  <li>No backfill, no historical replay. Margin starts accruing from PR merge.</li>
+  <li>No emergent-side billing pipeline change. <code>credit_manager.deduct(scaled_cost)</code> reads <code>cost_usd</code> off the existing payload exactly as today.</li>
+  <li>No tier-2 (summarisation) margin in this PR. Out of scope; design generalises but the gates only admit <code>range_threshold_cache_invalidation</code>.</li>
+  <li>No new BigTable column family. Whole margin lifecycle lives in-workflow (squash &rarr; PostHook &rarr; cleared) so there is nothing to persist beyond the existing workflow history.</li>
+  <li>No per-user override surface. Per-agent opt-in plus the experiment flag are the only knobs.</li>
+  <li>No extraction of pricing into a neutral <code>core/billing/</code>. Reuse via direct import from <code>core/cap/</code>; defer the rename until a third consumer appears.</li>
+</ul>
+
+</section>
+
+</main>
+</div>
+
+</body>
+</html>
