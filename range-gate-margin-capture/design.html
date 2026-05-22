@@ -97,6 +97,7 @@
     <li><a href="#problem">The margin leak</a></li>
     <li><a href="#solution">The decoupling idea</a></li>
     <li><a href="#vocab">Vocabulary</a></li>
+    <li><a href="#sources">Sources of truth at squash time</a></li>
     <li><a href="#attribution">Attribution rule</a></li>
     <li><a href="#dryruns">Dry runs</a></li>
     <li><a href="#dataflow">Data flow</a></li>
@@ -212,6 +213,42 @@
 </section>
 
 <!-- ============================================================ -->
+<section id="sources">
+<h2>5b. Sources of truth at squash time</h2>
+
+<p>The margin math depends on two values being correct at the moment the squash fires:</p>
+
+<ol>
+  <li><strong>Elapsed since last LLM call / CAP refresh</strong> &mdash; for the gate-fire decision (PR 1474 logic).</li>
+  <li><strong>Cached-prefix size at the moment of squash</strong> &mdash; for the <code>PreSquashCachedPrefix</code> baseline used by margin attribution.</li>
+</ol>
+
+<p>Both must work for <strong>mid-run squashes</strong> (squash fires several iterations into an active workflow run) <em>and</em> <strong>resume squashes</strong> (squash fires on iteration&nbsp;1 of a fresh workflow run after the user sent a follow-up message). The table below maps each value to its source in each case:</p>
+
+<table>
+  <tr><th>Value</th><th>Mid-run (iter N&gt;1, same workflow run)</th><th>Resume (iter 1 of new workflow run)</th></tr>
+  <tr>
+    <td><code>state.lastLLMCallTime</code> (for elapsed)</td>
+    <td><code>flow.go:679</code> updates after every LLM call; <code>cap.go:85</code> updates after every successful CAP refresh. Always fresh.</td>
+    <td>Seeded at workflow start from the Redis cross-run anchor (<a href="https://github.com/emergentbase/cortex/pull/1479">cortex#1479</a>). Falls back to <code>exec.Now()</code> when Redis is unavailable &mdash; safe (gate cannot fire on the first iteration in that case).</td>
+  </tr>
+  <tr>
+    <td><code>state.LastUsage</code> (for PreSquashCachedPrefix)</td>
+    <td><code>flow.go</code> sets this from each LLM response&rsquo;s Usage before the next iteration. <code>state.LastUsage</code> = the immediately prior LLM call&rsquo;s Usage in this run.</td>
+    <td><code>setup.go:329</code> loads from <code>loadResult.LastUsage</code>, which <code>threads.go:69-76</code> populates as the most-recent assistant message&rsquo;s Usage from the DB. So <code>state.LastUsage</code> on iter&nbsp;1 of a resumed run = the <em>prior workflow run&rsquo;s last LLM call&rsquo;s Usage</em>. Verified in prod &mdash; see <a href="#dryruns">&sect;7 Scenario A</a>.</td>
+  </tr>
+</table>
+
+<p>The design uses <code>state.LastUsage.CacheCreationInputTokens + state.LastUsage.CacheReadInputTokens</code> as <code>PreSquashCachedPrefix</code>. This is correct in both cases because both write paths flow into the same <code>state.LastUsage</code> field.</p>
+
+<div class="callout good">
+  <h4>Why this beats the &ldquo;use Redis for the Usage too&rdquo; alternative</h4>
+  <p>One could imagine also persisting Usage to Redis on every LLM call (alongside the timestamp). It&rsquo;s unnecessary: the DB already stores Usage on every assistant message (<code>threads.go</code> reads it back on resume); the in-process <code>state.LastUsage</code> covers mid-run. Adding Redis for Usage would duplicate the DB and create new consistency questions. Skip it.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
 <section id="attribution">
 <h2>6. The attribution rule</h2>
 
@@ -255,7 +292,12 @@
 
 <h3>Computing avoided_tokens precisely</h3>
 
-<p>PR 1474&rsquo;s metric uses an approximation that over-counts (it equates avoided to the full pre-squash cached prefix). For <em>billing</em>, we need a tighter formula because the post-squash cache_create has not happened yet at squash time &mdash; we only know its size after the next LLM call returns.</p>
+<p>PR 1474&rsquo;s metric uses an approximation that over-counts (it equates avoided to the full pre-squash cached prefix). For <em>billing</em>, we need a tighter formula because two things only become known after the post-squash LLM call returns:</p>
+
+<ol>
+  <li>The post-squash cache_create size (how big the new prefix actually was).</li>
+  <li>The post-squash cache_read size, which reveals the <strong>surviving baseline</strong> &mdash; the part of the prefix (typically system_prompt + tool definitions) that escapes TTL invalidation because it sits at a higher level in the cache hierarchy. This portion would <em>not</em> have been re-paid as cache_create even without the squash, so it must be subtracted from the savings claim.</li>
+</ol>
 
 <p>So <code>avoided_tokens</code> is finalized at PostHook time, not at squash time:</p>
 
@@ -265,13 +307,21 @@ pendingMargin.PreSquashCachedPrefix = lastUsage.CacheCreationInputTokens +
 
 // At PostHook time, using the current LLM call's Usage:
 postSquashCacheCreate := currentUsage.CacheCreationInputTokens
-avoided                := pendingMargin.PreSquashCachedPrefix - postSquashCacheCreate
+postSquashCacheRead   := currentUsage.CacheReadInputTokens
+avoided := pendingMargin.PreSquashCachedPrefix - postSquashCacheCreate - postSquashCacheRead
 if avoided &le; 0 { /* gate 5 fails, fall back to y */ }
 </code></pre>
 
+<p>Equivalent reading: <em>how many tokens of context did we truncate that would have been cache_create on the next call</em>. The formula reduces to <code>PreSquashCachedPrefix &minus; PostSquashCachedPrefix</code> when expressed as prefix delta, which is the physical truth of what changed.</p>
+
+<div class="callout warn">
+  <h4>Why subtract cache_read too</h4>
+  <p>Anthropic&rsquo;s cache hierarchy keeps the system_prompt + tools prefix alive longer than the body messages prefix. In a TTL-invalidation event, typically only the body dies; the baseline (~28k for a mature Opus 4.7 agent) survives. We observed this directly in prod &mdash; see <a href="#dryruns">&sect;7 Scenario A</a> where a 4m16s gap dropped cache_read from 269k to 28k while cache_create jumped to 245k. The 28k baseline was <em>not</em> avoided by the squash &mdash; it would have been cache_read either way &mdash; so it doesn&rsquo;t count toward margin.</p>
+</div>
+
 <div class="callout warn">
   <h4>Why we keep PR 1474&rsquo;s metric AND the billing formula</h4>
-  <p>PR 1474&rsquo;s <code>elite.squash.cache_creation_avoided_tokens</code> is a coarse health signal &mdash; it answers &ldquo;how often does the gate fire and how big are the squashes?&rdquo;. The billing formula is the conservative number used to compute the actual <code>z &minus; y</code> swap. They diverge for the same squash event by exactly the post-squash cache_create size. Both are correct for their respective purposes.</p>
+  <p>PR 1474&rsquo;s <code>elite.squash.cache_creation_avoided_tokens</code> is a coarse health signal &mdash; it answers &ldquo;how often does the gate fire and how big are the squashes?&rdquo;. The billing formula above is the conservative number used to compute the actual <code>z &minus; y</code> swap. They diverge by <code>PostSquashCacheCreate + PostSquashCacheRead</code> for the same squash event. Both are correct for their respective purposes.</p>
 </div>
 
 </section>
@@ -290,52 +340,73 @@ if avoided &le; 0 { /* gate 5 fails, fall back to y */ }
 </ul>
 
 <div class="scenario">
-  <h4>Scenario A &mdash; Cache-invalidation squash on resume <span class="pill good">decoupled</span></h4>
-  <p><strong>Timeline:</strong> Workflow run A ends at 03:33:28 with cached prefix = 452k tokens (200k cache_create + 252k cache_read). User idles for 6m+. Workflow run B starts at 03:39:42; with the Redis anchor, the gate sees <code>elapsed = 6m16s &ge; cacheDeadline (4m45s)</code> AND tokens (~452k) <code>&ge; upper (0.325 of 1M = 325k)</code> &rArr; fires <code>range_threshold_cache_invalidation</code> immediately, truncating the prefix to ~150k.</p>
+  <h4>Scenario A &mdash; Cache-invalidation squash, validated against real prod data <span class="pill good">decoupled</span></h4>
 
-  <p>03:39:44 LLM call lands on the truncated prefix. Returned <code>Usage</code>:</p>
+  <p><strong>Prod observation (job <code>4a2ffbdc-0b1f-4fcd-b125-74bd28af71a4</code>, claude-opus-4-7, 2026-05-22):</strong> three consecutive Anthropic calls from <code>llm_logs_partitioned</code>:</p>
+
+  <table class="calc-table">
+    <tr><th>Time</th><th>cache_create</th><th>cache_read</th><th>cached_prefix</th><th>Gap to next</th></tr>
+    <tr><td>10:16:07</td><td class="value">495</td><td class="value">269,338</td><td class="value">269,833</td><td>4m 16s</td></tr>
+    <tr class="highlight"><td>10:20:23</td><td class="value">245,515</td><td class="value">28,757</td><td class="value">274,272</td><td>27s</td></tr>
+    <tr><td>10:20:50</td><td class="value">1,587</td><td class="value">274,272</td><td class="value">275,859</td><td>&mdash;</td></tr>
+  </table>
+
+  <p>Between 10:16:07 and 10:20:23, the user paused 4m 16s. The body prefix died of TTL (cache_read dropped from 269k &rarr; 28k); only the system_prompt+tools baseline survived. The 10:20:23 call paid <strong>245,515 cache_create</strong> &mdash; the entire body prefix was re-built from cold. <em>Then</em> a future squash at the 275k threshold would have triggered another cache_create. This is exactly the &ldquo;double-pay&rdquo; that PR 1474 is designed to prevent.</p>
+
+  <p><strong>With range-gate fix (cortex#1474 + Redis anchor #1479):</strong> at 10:20:23 the gate sees <code>elapsed = 4m16s &ge; cacheDeadline (4m45s)</code> (or close to it; <code>cache_ttl_guard</code> tunable), tokens (270k) in the truncate range <code>[200k, 325k]</code>, and fires <code>range_threshold_cache_invalidation</code>. Squash truncates the message thread to <code>preserve_last_n=10</code> tool results &mdash; assume the resulting prefix is ~100k tokens.</p>
+
+  <p>State at squash time, from prod-validated mechanism (<a href="#sources">&sect;5b</a>):</p>
   <ul>
-    <li>input_tokens = 500</li>
-    <li>cache_creation_input_tokens = 150,000</li>
-    <li>cache_read_input_tokens = 0</li>
-    <li>output_tokens = 1,000</li>
+    <li><code>state.LastUsage</code> = the 10:16:07 call&rsquo;s Usage (cache_create=495, cache_read=269,338)</li>
+    <li><code>PreSquashCachedPrefix</code> = 495 + 269,338 = <strong>269,833 tokens</strong></li>
   </ul>
+
+  <p>Post-squash 10:20:23 LLM call (hypothetical with squash, illustrative numbers):</p>
+  <ul>
+    <li>input_tokens = 37</li>
+    <li>cache_creation_input_tokens = ~71,000 (the truncated body) </li>
+    <li>cache_read_input_tokens = ~28,757 (system baseline survives, unchanged)</li>
+    <li>output_tokens = 323</li>
+  </ul>
+
+  <p class="calc-section-title">avoided_tokens (tight formula, subtracts surviving baseline)</p>
+  <table class="calc-table">
+    <tr><th>Source</th><th>Tokens</th></tr>
+    <tr><td>PreSquashCachedPrefix (495 + 269,338)</td><td class="value">269,833</td></tr>
+    <tr><td>&minus; PostSquashCacheCreate</td><td class="value">71,000</td></tr>
+    <tr><td>&minus; PostSquashCacheRead (the surviving baseline)</td><td class="value">28,757</td></tr>
+    <tr class="highlight"><td>avoided_tokens</td><td class="value">170,076</td></tr>
+  </table>
 
   <p class="calc-section-title">Actual cost <span class="term">y</span></p>
   <table class="calc-table">
     <tr><th>Component</th><th>Formula</th><th>Value</th></tr>
-    <tr><td>input</td><td class="formula">500 &times; $15/M</td><td class="value">$0.0075</td></tr>
-    <tr><td>cache_create</td><td class="formula">150,000 &times; $18.75/M</td><td class="value">$2.8125</td></tr>
-    <tr><td>cache_read</td><td class="formula">0</td><td class="value">$0.0000</td></tr>
-    <tr><td>output</td><td class="formula">1,000 &times; $75/M</td><td class="value">$0.0750</td></tr>
-    <tr class="subtotal"><td>y</td><td></td><td class="value">$2.8950</td></tr>
+    <tr><td>input</td><td class="formula">37 &times; $15/M</td><td class="value">$0.00056</td></tr>
+    <tr><td>cache_create</td><td class="formula">71,000 &times; $18.75/M</td><td class="value">$1.3313</td></tr>
+    <tr><td>cache_read</td><td class="formula">28,757 &times; $1.50/M</td><td class="value">$0.0431</td></tr>
+    <tr><td>output</td><td class="formula">323 &times; $75/M</td><td class="value">$0.0242</td></tr>
+    <tr class="subtotal"><td>y</td><td></td><td class="value">$1.3992</td></tr>
   </table>
 
-  <p class="calc-section-title">avoided_tokens (tight formula)</p>
-  <table class="calc-table">
-    <tr><th>Source</th><th>Tokens</th></tr>
-    <tr><td>pre_squash_cached_prefix (snapshotted from prior call&rsquo;s Usage)</td><td class="value">452,000</td></tr>
-    <tr><td>post_squash cache_create (this call&rsquo;s Usage)</td><td class="value">150,000</td></tr>
-    <tr class="highlight"><td>avoided_tokens</td><td class="value">302,000</td></tr>
-  </table>
-
-  <p class="calc-section-title">As-if cost <span class="term">z</span> (same Usage but cache_create += avoided)</p>
+  <p class="calc-section-title">As-if cost <span class="term">z</span> (cache_create += avoided)</p>
   <table class="calc-table">
     <tr><th>Component</th><th>Formula</th><th>Value</th></tr>
-    <tr><td>input</td><td class="formula">500 &times; $15/M</td><td class="value">$0.0075</td></tr>
-    <tr><td>cache_create</td><td class="formula">(150,000 + 302,000) &times; $18.75/M</td><td class="value">$8.4750</td></tr>
-    <tr><td>cache_read</td><td class="formula">0</td><td class="value">$0.0000</td></tr>
-    <tr><td>output</td><td class="formula">1,000 &times; $75/M</td><td class="value">$0.0750</td></tr>
-    <tr class="subtotal"><td>z</td><td></td><td class="value">$8.5575</td></tr>
+    <tr><td>input</td><td class="formula">37 &times; $15/M</td><td class="value">$0.00056</td></tr>
+    <tr><td>cache_create</td><td class="formula">(71,000 + 170,076) &times; $18.75/M</td><td class="value">$4.5202</td></tr>
+    <tr><td>cache_read</td><td class="formula">28,757 &times; $1.50/M</td><td class="value">$0.0431</td></tr>
+    <tr><td>output</td><td class="formula">323 &times; $75/M</td><td class="value">$0.0242</td></tr>
+    <tr class="subtotal"><td>z</td><td></td><td class="value">$4.5880</td></tr>
   </table>
 
   <div class="outcome">
-    <div class="box"><div class="label">User charged (z)</div><div class="amount">$8.5575</div></div>
-    <div class="box"><div class="label">Anthropic paid (y)</div><div class="amount">$2.8950</div></div>
-    <div class="box margin"><div class="label">Margin captured</div><div class="amount">$5.6625</div></div>
+    <div class="box"><div class="label">User charged (z)</div><div class="amount">$4.5880</div></div>
+    <div class="box"><div class="label">Anthropic paid (y)</div><div class="amount">$1.3992</div></div>
+    <div class="box margin"><div class="label">Margin captured</div><div class="amount">$3.1888</div></div>
   </div>
 
-  <p><strong>PostHook effect:</strong> <code>Request.CostUSD = $8.5575</code>, <code>Request.AccumulatedCost += $5.6625</code>, <code>state.AddCost($5.6625)</code> mirrors the delta so iter N+1 carries forward.</p>
+  <p>Cross-check against the actual prod call (without the gate): the 10:20:23 call paid cache_create on 245,515 tokens &asymp; <strong>$4.60</strong>. That&rsquo;s within ~0.3% of our computed <code>z</code>. The math is sound and the user&rsquo;s bill stays where it would have been without the optimization.</p>
+
+  <p><strong>PostHook effect:</strong> <code>Request.CostUSD = $4.5880</code>, <code>Request.AccumulatedCost += $3.1888</code>, <code>state.AddCost($3.1888)</code> mirrors the delta so iter N+1 carries forward.</p>
 </div>
 
 <div class="scenario">
@@ -472,7 +543,9 @@ func ResolveMarginAttribution(ctx context.Context, in MarginInput) MarginAttribu
     if !in.ExperimentEnabled { return failsafe(EligibilityExperimentDisabled, 0, 0) }
     if !in.ProviderClamped   { return failsafe(EligibilityProviderNotAllowed, 0, 0) }
 
-    avoided := in.Pending.PreSquashCachedPrefix - int(in.CurrentUsage.CacheCreationInputTokens)
+    avoided := in.Pending.PreSquashCachedPrefix -
+               int(in.CurrentUsage.CacheCreationInputTokens) -
+               int(in.CurrentUsage.CacheReadInputTokens)  // subtract surviving baseline
     if avoided &le; 0 { return failsafe(EligibilityAvoidedNonPositive, 0, 0) }
 
     calc := cap.NewPricingCalculator(ctx)
@@ -641,9 +714,10 @@ input.RangeGateMarginEnabled = setup.RangeGateMarginEnabled</code></pre>
   "y_actual_usd": 2.8950,
   "z_billable_usd": 8.5575,
   "margin_usd": 5.6625,
-  "avoided_tokens": 302000,
-  "pre_squash_prefix_tokens": 452000,
-  "post_squash_create_tokens": 150000,
+  "avoided_tokens": 170076,
+  "pre_squash_prefix_tokens": 269833,
+  "post_squash_create_tokens": 71000,
+  "post_squash_read_tokens": 28757,
   "model": "claude-opus-4-7",
   "provider": "anthropic",
   "job_id": "&hellip;",
