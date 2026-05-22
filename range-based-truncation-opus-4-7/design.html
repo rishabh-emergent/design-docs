@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Range-Based Truncation for Opus 4.7 — Design</title>
+<title>Range-Based Truncation for Opus 4.7 — Design (Tier 1)</title>
 <style>
   :root {
     --bg: #fafafa;
@@ -19,8 +19,6 @@
     --highlight: #fff5d6;
     --tier1: #f9e7c2;
     --tier1-edge: #b06a00;
-    --tier2: #f4c8c4;
-    --tier2-edge: #b3251b;
     --legacy: #e6f0fa;
     --legacy-edge: #0b6bcb;
   }
@@ -72,7 +70,6 @@
   li { margin: 4px 0; }
   .header-meta { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
   .header-meta strong { color: var(--fg); }
-  .strikethrough { text-decoration: line-through; color: #888; }
 </style>
 </head>
 <body>
@@ -87,56 +84,60 @@
     <li><a href="#ranges">Token ranges</a></li>
     <li><a href="#decision">The decision rule</a></li>
     <li><a href="#architecture">Architecture</a></li>
-    <li><a href="#timeline">Worked timelines</a></li>
+    <li><a href="#timeline">Worked timeline</a></li>
     <li><a href="#backcompat">Backward compatibility</a></li>
     <li><a href="#code">Code changes</a></li>
     <li><a href="#failure">Failure modes</a></li>
     <li><a href="#metrics">Metrics</a></li>
-    <li><a href="#critique">Architect critique applied</a></li>
-    <li><a href="#open">Open questions</a></li>
+    <li><a href="#openrisks">Open risks</a></li>
+    <li><a href="#followups">Follow-ups</a></li>
   </ol>
 </nav>
 
 <main>
 
 <header>
-  <h1>Range-Based Truncation for Opus 4.7 (275k Farm Agents)</h1>
+  <h1>Range-Based Truncation for Opus 4.7 — Tier 1 Design</h1>
   <div class="header-meta">
     <strong>Date:</strong> 2026-05-22 &nbsp;·&nbsp;
-    <strong>Status:</strong> Draft design (v0.2, post-critique) &nbsp;·&nbsp;
+    <strong>Status:</strong> Truncation only (Tier 1). Summarisation deferred to a follow-up stacked PR. &nbsp;·&nbsp;
     <strong>Scope:</strong> Opus 4.7 farm agents on 1M context window &nbsp;·&nbsp;
-    <strong>Hard requirement:</strong> backward compatible with existing context config; works whether CAP is enabled or not
+    <strong>PR:</strong> cortex#1474
   </div>
 </header>
+
+<div class="callout warn">
+<h4>What changed since v0.2</h4>
+<p>The earlier draft (v0.2) introduced a dedicated <code>range_based_truncation</code> block with twin specs (<code>truncate_range</code> / <code>summarise_range</code>) and a 3-value action enum. The implementation shipping in cortex#1474 instead bolts a single generic <code>range_threshold</code> field onto the existing <code>Context</code> type and reuses the existing squash dispatch. It's smaller, more idiomatic to cortex, and the same struct will plug into auto-compact for Tier 2 in a follow-up PR. This doc has been rewritten to match the shipping design. Summarisation (Tier 2) is out of scope for this design — it will get its own design doc when stacked.</p>
+</div>
+</section>
 
 <!-- ============================================================ -->
 <section id="tldr">
 <h2>1. TL;DR</h2>
 
 <p>
-Today, Opus 4.7 farm agents squash exactly when <code>prompt_tokens</code> crosses 275k. Anthropic's prompt cache is prefix-based with a 5-minute TTL. A TTL-driven invalidation that lands shortly before 275k forces a cache-write on the post-invalidation call, then a few calls later the 275k squash fires and we pay a cache-write again on the new (truncated) prefix. <strong>We pay for cache invalidation twice.</strong>
+Today, Opus 4.7 farm agents squash exactly when <code>prompt_tokens</code> crosses the 275k threshold. Anthropic's prompt cache is prefix-based with a 5-minute TTL. A TTL-driven invalidation that lands just before 275k forces a cache-write on the post-invalidation call, then a few calls later the squash fires and we pay a cache-write again on the new (truncated) prefix. <strong>We pay for cache invalidation twice.</strong>
 </p>
 
 <p>
-This design adds a <strong>cache-TTL-aware</strong> trigger on top of the existing squash mechanism. Two configurable ranges sit below and above the hard threshold:
+This design adds a <strong>cache-TTL-aware range gate</strong> on top of the existing <code>bulk_checkpoint</code> squash. A single configurable range sits below the legacy hard threshold:
 </p>
 
 <ul>
-  <li><strong>Tier 1 — truncation range <code>[200k, 325k]</code>.</strong> If the cache is predicted to be invalidated on the next call (based on wall-clock elapsed since the last call), truncate now using the existing <code>bulk_checkpoint</code> strategy. Hard floor at 325k: if we reach it without invalidation, truncate anyway.</li>
-  <li><strong>Tier 2 — summarisation range <code>[325k, 350k]</code>.</strong> Same rule, but invoke summarisation through the existing <code>auto_compact</code> pipeline. Hard ceiling at 350k.</li>
+  <li><strong>Truncation range <code>[lower, upper]</code></strong> — recommended <code>[0.200, 0.325]</code> on a 1M context window (= 200k–325k tokens).</li>
+  <li><strong>Inside the range, fires only when the cache is predicted to be invalid</strong> — i.e., elapsed since the last LLM call or CAP refresh is past <code>cap.CacheTTL − cache_ttl_guard</code>.</li>
+  <li><strong>At or above <code>upper</code>, fires unconditionally</strong> — the hard floor.</li>
+  <li><strong>Below <code>lower</code>, no fire.</strong></li>
+  <li><strong>Legacy <code>threshold: 0.275</code> is replaced</strong> for opted-in agents — the range gate is the sole truncation trigger.</li>
 </ul>
 
 <div class="callout good">
-<h4>Two hard contracts (v0.2)</h4>
+<h4>Hard contracts</h4>
 <ul>
-  <li><strong>Works without CAP.</strong> The wall-clock prediction uses <code>state.LastLLMCallTime</code> as the primary anchor. If CAP is also running, its successful pings push the anchor forward — but the feature does not require CAP to be enabled. Opting in does not depend on CAP.</li>
-  <li><strong>Fully backward compatible.</strong> Existing <code>threshold</code>, <code>overflow_threshold</code>, and <code>auto_compact</code> fields keep their existing semantics. Agents that don't opt in see zero behaviour change. Opt-in is per-agent via a single new YAML block.</li>
+  <li><strong>Works whether CAP is on or off.</strong> The signal is <code>elapsed = now − state.LastLLMCallTime</code>. CAP refreshes already update <code>LastLLMCallTime</code> (any successful ping, whether the cache hit or not), so CAP and the range gate share a single source of truth without explicit plumbing.</li>
+  <li><strong>Fully backward compatible.</strong> Agents without the new field see zero behaviour change. Existing <code>threshold</code>, <code>overflow_threshold</code>, <code>auto_compact[]</code>, <code>preserve_last_n</code>, <code>truncation_length</code> keep their semantics for non-opted-in agents.</li>
 </ul>
-</div>
-
-<div class="callout">
-<h4>What changed in v0.2 vs v0.1</h4>
-<p>v0.1 placed prediction in <code>cap.Service.PredictNextCallInvalidation</code>. Architect critique: that couples the feature to CAP being deployed and provisioned, which violates the "works without CAP" contract. v0.2 folds prediction into the pure <code>DecideRangeAction</code> function in <code>core/xcontext/</code> and treats CAP pings as an <em>optional</em> input. Two new files removed; one new function dropped. See <a href="#critique">§11</a> for the full critique walkthrough.</p>
 </div>
 </section>
 
@@ -145,11 +146,7 @@ This design adds a <strong>cache-TTL-aware</strong> trigger on top of the existi
 <h2>2. The problem we're solving</h2>
 
 <p>
-Anthropic's prompt cache is prefix-based with a 5-minute TTL. When the prefix is in the cache, a call pays <code>cache_read</code> (cheap). When it's not, a call pays <code>cache_creation</code> (12.5× the read rate). The expensive cache-creation happens on (a) the first call with a new prefix, or (b) the first call after TTL expiry, or (c) the first call after a prefix-changing squash.
-</p>
-
-<p>
-For an Opus 4.7 farm agent running with <code>threshold: 0.275</code> on a 1M context window, here is the failure case the PRD targets:
+Anthropic's prompt cache is prefix-based with a 5-minute TTL. <code>cache_read</code> is ~12.5× cheaper than <code>cache_creation</code>. Cache-creation gets paid on (a) the first call with a new prefix, (b) the first call after TTL expiry, or (c) the first call after a prefix-changing squash.
 </p>
 
 <div class="figure">
@@ -186,11 +183,11 @@ For an Opus 4.7 farm agent running with <code>threshold: 0.275</code> on a 1M co
 </figure>
 
 <p>
-The insight: if we know cache-creation just happened (or is about to), and we're already in a range where a squash is likely soon, do the squash <em>now</em> and absorb only one cache-write instead of two.
+The insight: if the cache just died (or is about to), and we're already in the truncation range, do the squash <em>now</em> so we only pay cache_write once.
 </p>
 
 <p>
-CAP (Cache Anchor Point) helps suppress TTL expiries via periodic refresh pings — but pings can fail, and the user can simply pause for longer than CAP's refresh budget. <strong>This rule must therefore work whether CAP is on or off.</strong> When CAP is on, its successful pings refine the prediction (we know the cache was alive at the ping time). When CAP is off, we rely on <code>state.LastLLMCallTime</code> alone.
+CAP (Cache Anchor Point) helps suppress TTL expiries via periodic refresh pings. The range gate fires only when CAP fails to keep the cache alive — which is automatic in the implementation, because successful CAP pings already advance <code>state.LastLLMCallTime</code>, so the elapsed-time signal collapses naturally.
 </p>
 </section>
 
@@ -198,57 +195,45 @@ CAP (Cache Anchor Point) helps suppress TTL expiries via periodic refresh pings 
 <section id="ranges">
 <h2>3. Token ranges</h2>
 
-<p>For an opted-in Opus 4.7 farm agent on a 1M context window, the token space is divided into four bands:</p>
+<p>For an opted-in Opus 4.7 farm agent on a 1M context window, the token space is divided into three bands:</p>
 
 <div class="figure">
-<svg viewBox="0 0 920 280" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
-  <line x1="40" y1="200" x2="900" y2="200" stroke="#666" stroke-width="1.5"/>
-  <polygon points="900,200 892,196 892,204" fill="#666"/>
-  <rect x="40" y="120" width="380" height="60" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1"/>
-  <text x="180" y="155" fill="var(--legacy-edge)" font-weight="600">Legacy / no-action</text>
-  <text x="200" y="172" fill="var(--legacy-edge)" font-size="11">[0, 200k)</text>
-  <rect x="420" y="120" width="240" height="60" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="1"/>
-  <text x="475" y="155" fill="var(--tier1-edge)" font-weight="600">Tier 1 — truncate</text>
-  <text x="490" y="172" fill="var(--tier1-edge)" font-size="11">[200k, 325k)</text>
-  <rect x="660" y="120" width="50" height="60" fill="var(--tier2)" stroke="var(--tier2-edge)" stroke-width="1"/>
-  <text x="635" y="100" fill="var(--tier2-edge)" font-weight="600" font-size="12">Tier 2</text>
-  <text x="640" y="118" fill="var(--tier2-edge)" font-size="11">[325k,350k)</text>
-  <rect x="710" y="120" width="100" height="60" fill="#f4f4f4" stroke="#999" stroke-width="1" stroke-dasharray="3,2"/>
-  <text x="725" y="155" fill="#666" font-size="11">overflow buffer</text>
-  <text x="730" y="172" fill="#666" font-size="11">[350k, 400k)</text>
-  <rect x="810" y="120" width="90" height="60" fill="#fdeae8" stroke="#b3251b" stroke-width="1"/>
-  <text x="820" y="155" fill="#b3251b" font-weight="600" font-size="11">ask_human</text>
-  <text x="830" y="172" fill="#b3251b" font-size="11">400k+</text>
-  <line x1="420" y1="195" x2="420" y2="205" stroke="#666"/>
-  <text x="403" y="225" fill="#666" font-size="12">200k</text>
-  <line x1="660" y1="195" x2="660" y2="220" stroke="#b06a00" stroke-width="2"/>
-  <text x="640" y="240" fill="#b06a00" font-size="12" font-weight="600">325k</text>
-  <text x="620" y="255" fill="#b06a00" font-size="10">Tier 1 hard floor</text>
-  <line x1="710" y1="195" x2="710" y2="220" stroke="#b3251b" stroke-width="2"/>
-  <text x="690" y="240" fill="#b3251b" font-size="12" font-weight="600">350k</text>
-  <text x="668" y="255" fill="#b3251b" font-size="10">Tier 2 hard ceiling</text>
-  <line x1="810" y1="195" x2="810" y2="220" stroke="#666"/>
-  <text x="795" y="240" fill="#666" font-size="12">400k</text>
-  <text x="780" y="255" fill="#666" font-size="10">overflow_threshold (raised)</text>
-  <text x="180" y="80" fill="#0b6bcb" font-size="12">No action (legacy)</text>
-  <text x="445" y="80" fill="#b06a00" font-size="12">Truncate if cache invalid</text>
-  <text x="595" y="50" fill="#b3251b" font-size="11">Summarise if cache invalid</text>
-  <path d="M 670 55 Q 685 70 685 115" stroke="#b3251b" stroke-width="0.7" fill="none"/>
-  <text x="40" y="30" fill="#1a1a1a" font-size="14" font-weight="600">Token bands on a 1M context window</text>
-  <text x="40" y="48" fill="#555" font-size="12">tokens = previous LLM call's input_tokens + cache_read + cache_creation</text>
+<svg viewBox="0 0 920 240" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+  <line x1="40" y1="180" x2="900" y2="180" stroke="#666" stroke-width="1.5"/>
+  <polygon points="900,180 892,176 892,184" fill="#666"/>
+  <rect x="40" y="100" width="380" height="60" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1"/>
+  <text x="180" y="135" fill="var(--legacy-edge)" font-weight="600">Below range — no action</text>
+  <text x="200" y="152" fill="var(--legacy-edge)" font-size="11">[0, lower)</text>
+  <rect x="420" y="100" width="240" height="60" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="1"/>
+  <text x="475" y="135" fill="var(--tier1-edge)" font-weight="600">Truncation range</text>
+  <text x="490" y="152" fill="var(--tier1-edge)" font-size="11">[lower, upper)</text>
+  <rect x="660" y="100" width="160" height="60" fill="#f4f4f4" stroke="#999" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="690" y="135" fill="#666" font-size="11">overflow buffer</text>
+  <text x="700" y="152" fill="#666" font-size="11">[upper, overflow)</text>
+  <rect x="820" y="100" width="80" height="60" fill="#fdeae8" stroke="#b3251b" stroke-width="1"/>
+  <text x="830" y="135" fill="#b3251b" font-weight="600" font-size="11">ask_human</text>
+  <line x1="420" y1="175" x2="420" y2="185" stroke="#666"/>
+  <text x="395" y="205" fill="#666" font-size="12">lower</text>
+  <line x1="660" y1="175" x2="660" y2="200" stroke="#b06a00" stroke-width="2"/>
+  <text x="635" y="220" fill="#b06a00" font-size="12" font-weight="600">upper</text>
+  <text x="608" y="235" fill="#b06a00" font-size="10">hard truncation floor</text>
+  <line x1="820" y1="175" x2="820" y2="200" stroke="#666"/>
+  <text x="790" y="220" fill="#666" font-size="12">overflow_threshold</text>
+  <text x="180" y="60" fill="#0b6bcb" font-size="12">No action</text>
+  <text x="450" y="60" fill="#b06a00" font-size="12">Truncate iff cache is predicted invalid</text>
+  <text x="40" y="30" fill="#1a1a1a" font-size="14" font-weight="600">Token bands</text>
+  <text x="40" y="48" fill="#555" font-size="12">all bounds expressed as fractions of context_window; 0.325 × 1M = 325k tokens</text>
 </svg>
-<div class="caption">Figure 2. Four token bands. The legacy <code>threshold: 0.275</code> field is no longer the trigger for opted-in agents — instead, the range bounds drive the decision and the existing <code>overflow_threshold</code> is raised to 0.4 (400k) to give the new ceilings headroom before <code>ask_human</code>.</div>
+<div class="caption">Figure 2. Three bands. The legacy <code>threshold: 0.275</code> field is no longer the trigger for opted-in agents — <code>range_threshold.upper</code> is. <code>overflow_threshold</code> must be raised to leave headroom above <code>upper</code>.</div>
 </figure>
 
 <table>
-  <thead><tr><th>Band</th><th>Range</th><th>Action when cache predicted invalid</th><th>Action otherwise</th></tr></thead>
+  <thead><tr><th>Band</th><th>Range (fraction)</th><th>Action when cache predicted invalid</th><th>Action otherwise</th></tr></thead>
   <tbody>
-    <tr><td>Legacy</td><td><code>[0, 200k)</code></td><td>None</td><td>None</td></tr>
-    <tr><td>Tier 1</td><td><code>[200k, 325k)</code></td><td><span class="pill warn">Truncate</span> via <code>bulk_checkpoint</code></td><td>None</td></tr>
-    <tr><td>Tier 1 hard floor</td><td><code>= 325k</code></td><td colspan="2"><span class="pill warn">Truncate</span> unconditionally</td></tr>
-    <tr><td>Tier 2</td><td><code>[325k, 350k)</code></td><td><span class="pill bad">Summarise</span> via <code>auto_compact</code></td><td>None</td></tr>
-    <tr><td>Tier 2 hard ceiling</td><td><code>= 350k</code></td><td colspan="2"><span class="pill bad">Summarise</span> unconditionally</td></tr>
-    <tr><td>Overflow stop</td><td><code>≥ 400k</code></td><td colspan="2"><code>ask_human</code> via existing <code>checkContextOverflow</code></td></tr>
+    <tr><td>Below range</td><td><code>[0, lower)</code></td><td>None</td><td>None</td></tr>
+    <tr><td>Truncation range</td><td><code>[lower, upper)</code></td><td><span class="pill warn">Truncate</span> via <code>bulk_checkpoint</code></td><td>None (cache still warm)</td></tr>
+    <tr><td>Hard floor</td><td><code>≥ upper</code></td><td colspan="2"><span class="pill warn">Truncate</span> unconditionally</td></tr>
+    <tr><td>Overflow stop</td><td><code>≥ overflow_threshold</code></td><td colspan="2"><code>ask_human</code> via existing <code>checkContextOverflow</code></td></tr>
   </tbody>
 </table>
 </section>
@@ -257,349 +242,214 @@ CAP (Cache Anchor Point) helps suppress TTL expiries via periodic refresh pings 
 <section id="decision">
 <h2>4. The decision rule</h2>
 
-<p>The decision is made <strong>before</strong> the LLM call is dispatched, in the iteration loop. Once the call is sent, any cache invalidation has already been paid for. It is a single pure function.</p>
+<p>The decision is made <strong>before</strong> the LLM call is dispatched. Once the call is sent, any cache invalidation has already been paid.</p>
 
 <h3>4.1 The TTL anchor</h3>
 
-<p>The wall-clock prediction uses an <em>anchor</em> — the most recent point in time at which we have evidence the cache was alive:</p>
+<p>The cache-liveness signal is a single time.Duration computed in the elite layer:</p>
 
 <div class="formula">
-anchor = max(state.LastLLMCallTime, lastSuccessfulCAPPing)<br>
-cache_likely_invalid = (now − anchor) ≥ 5 minutes
+elapsed = now − state.LastLLMCallTime<br>
+cache_likely_invalid = (elapsed &gt; 0) AND (elapsed ≥ cap.CacheTTL − cache_ttl_guard)
 </div>
 
 <p>
-<code>state.LastLLMCallTime</code> is the primary, always-available signal — every workflow updates it after each LLM call. <code>lastSuccessfulCAPPing</code> is the most recent CAP ping with <code>source = post_exit AND cache_hit = true</code> — but it's <strong>optional</strong>. If CAP is disabled, not provisioned, or its ping list is empty, the value is the zero <code>time.Time</code> and <code>max(...)</code> reduces to <code>state.LastLLMCallTime</code>.
+<code>state.LastLLMCallTime</code> is updated by every successful LLM call AND every successful CAP refresh (<code>core/workflows/elite/cap.go:85</code>). So when CAP is running, its pings naturally push the anchor forward — the range gate doesn't need to filter pings explicitly. When CAP is off, the anchor is just the user's last call.
 </p>
 
-<table>
-  <thead><tr><th>Environment</th><th>anchor reduces to</th><th>Result</th></tr></thead>
-  <tbody>
-    <tr><td>CAP off / not provisioned</td><td><code>state.LastLLMCallTime</code></td><td>Prediction works using just the user's call cadence.</td></tr>
-    <tr><td>CAP on, no successful pings yet</td><td><code>state.LastLLMCallTime</code></td><td>Same as above. Pings haven't yet refined the signal.</td></tr>
-    <tr><td>CAP on, recent successful ping</td><td><code>max(LastLLMCallTime, pingTime)</code></td><td>If a ping fired between the user's last call and now, the cache was alive at <code>pingTime</code>; we won't spuriously fire.</td></tr>
-    <tr><td>CAP on, ping returned <code>cache_hit=false</code></td><td><code>state.LastLLMCallTime</code></td><td>Failed pings don't advance the anchor; this is correct because they didn't keep the cache alive.</td></tr>
-  </tbody>
-</table>
+<p>
+The <code>elapsed = 0</code> case (first iteration, or anchor unset) is treated as "cache alive" — no spurious fires on the first iteration after workflow start.
+</p>
 
 <h3>4.2 The decision flow</h3>
 
 <div class="figure">
-<svg viewBox="0 0 920 600" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+<svg viewBox="0 0 920 500" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#666"/>
     </marker>
   </defs>
   <rect x="380" y="20" width="160" height="40" rx="20" fill="#fff" stroke="#666" stroke-width="1.5"/>
-  <text x="460" y="45" text-anchor="middle" font-weight="600">Iteration start</text>
+  <text x="460" y="45" text-anchor="middle" font-weight="600">Pre-LLM iteration</text>
+
   <polygon points="460,90 580,140 460,190 340,140" fill="#fff" stroke="#666" stroke-width="1.5"/>
-  <text x="460" y="135" text-anchor="middle">Spec == nil ?</text>
-  <text x="460" y="152" text-anchor="middle" font-size="11" fill="#555">(opted out)</text>
+  <text x="460" y="135" text-anchor="middle">RangeThreshold</text>
+  <text x="460" y="152" text-anchor="middle" font-size="11" fill="#555">== nil ?</text>
   <line x1="460" y1="60" x2="460" y2="90" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <rect x="620" y="120" width="200" height="40" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
-  <text x="720" y="145" text-anchor="middle" fill="var(--legacy-edge)">Legacy: needsSquashing()</text>
+
+  <rect x="620" y="120" width="240" height="40" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
+  <text x="740" y="145" text-anchor="middle" fill="var(--legacy-edge)">Legacy: CompactionThreshold gate</text>
   <line x1="580" y1="140" x2="620" y2="140" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
   <text x="595" y="135" fill="#555" font-size="11">yes</text>
-  <polygon points="460,220 580,270 460,320 340,270" fill="#fff" stroke="#666" stroke-width="1.5"/>
-  <text x="460" y="265" text-anchor="middle">anchor</text>
-  <text x="460" y="280" text-anchor="middle">is zero ?</text>
+
+  <polygon points="460,220 600,270 460,320 320,270" fill="#fff" stroke="#666" stroke-width="1.5"/>
+  <text x="460" y="265" text-anchor="middle">frac = tokens / ctx_window</text>
+  <text x="460" y="282" text-anchor="middle" font-size="11" fill="#555">Which band?</text>
   <line x1="460" y1="190" x2="460" y2="220" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
   <text x="475" y="208" fill="#555" font-size="11">no</text>
-  <line x1="580" y1="270" x2="620" y2="270" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <rect x="620" y="250" width="200" height="40" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
-  <text x="720" y="275" text-anchor="middle" fill="var(--legacy-edge)">None (no_anchor_yet)</text>
-  <text x="595" y="265" fill="#555" font-size="11">yes</text>
-  <polygon points="460,350 600,400 460,450 320,400" fill="#fff" stroke="#666" stroke-width="1.5"/>
-  <text x="460" y="395" text-anchor="middle">Which band?</text>
-  <text x="460" y="412" text-anchor="middle" font-size="11" fill="#555">(by tokens)</text>
-  <line x1="460" y1="320" x2="460" y2="350" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="475" y="338" fill="#555" font-size="11">no</text>
-  <rect x="20" y="480" width="160" height="40" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
-  <text x="100" y="505" text-anchor="middle" fill="var(--legacy-edge)">None (below_range)</text>
-  <path d="M 360 420 Q 200 450 180 480" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
-  <text x="220" y="465" fill="#555" font-size="11">&lt; 200k</text>
-  <rect x="200" y="480" width="160" height="60" rx="6" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="1.5"/>
-  <text x="280" y="500" text-anchor="middle" fill="var(--tier1-edge)" font-weight="600">if invalid: Tier1Truncate</text>
-  <text x="280" y="517" text-anchor="middle" fill="var(--tier1-edge)" font-size="11">else: None (cache warm)</text>
-  <text x="280" y="532" text-anchor="middle" fill="#555" font-size="11">→ applySquashing</text>
-  <path d="M 400 430 Q 320 460 305 480" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
-  <text x="305" y="465" fill="#555" font-size="11">200k–325k</text>
-  <rect x="380" y="480" width="160" height="60" rx="6" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="2"/>
-  <text x="460" y="505" text-anchor="middle" fill="var(--tier1-edge)" font-weight="600">HardTruncate</text>
-  <text x="460" y="520" text-anchor="middle" fill="var(--tier1-edge)" font-size="11">(unconditional)</text>
-  <text x="460" y="535" text-anchor="middle" fill="#555" font-size="11">→ applySquashing</text>
-  <line x1="460" y1="450" x2="460" y2="480" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <text x="465" y="468" fill="#555" font-size="11">= 325k</text>
-  <rect x="560" y="480" width="160" height="60" rx="6" fill="var(--tier2)" stroke="var(--tier2-edge)" stroke-width="1.5"/>
-  <text x="640" y="500" text-anchor="middle" fill="var(--tier2-edge)" font-weight="600">if invalid: Tier2Summ.</text>
-  <text x="640" y="517" text-anchor="middle" fill="var(--tier2-edge)" font-size="11">else: None</text>
-  <text x="640" y="532" text-anchor="middle" fill="#555" font-size="11">→ maybeApplyAutoCompact</text>
-  <path d="M 560 420 Q 620 450 635 480" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
-  <text x="600" y="465" fill="#555" font-size="11">325k–350k</text>
-  <rect x="740" y="480" width="160" height="60" rx="6" fill="var(--tier2)" stroke="var(--tier2-edge)" stroke-width="2"/>
-  <text x="820" y="505" text-anchor="middle" fill="var(--tier2-edge)" font-weight="600">HardSummarise</text>
-  <text x="820" y="520" text-anchor="middle" fill="var(--tier2-edge)" font-size="11">(unconditional)</text>
-  <text x="820" y="535" text-anchor="middle" fill="#555" font-size="11">→ maybeApplyAutoCompact</text>
-  <path d="M 590 410 Q 750 450 765 480" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
-  <text x="730" y="455" fill="#555" font-size="11">≥ 350k</text>
+
+  <rect x="20" y="360" width="200" height="60" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
+  <text x="120" y="385" text-anchor="middle" fill="var(--legacy-edge)" font-weight="600">no fire</text>
+  <text x="120" y="402" text-anchor="middle" font-size="11" fill="#555">reason = ""</text>
+  <path d="M 360 290 Q 200 340 180 360" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="230" y="340" fill="#555" font-size="11">&lt; lower</text>
+
+  <polygon points="460,360 560,400 460,440 360,400" fill="#fff" stroke="#666" stroke-width="1.5"/>
+  <text x="460" y="395" text-anchor="middle" font-size="11">elapsed ≥</text>
+  <text x="460" y="410" text-anchor="middle" font-size="11">deadline ?</text>
+  <line x1="460" y1="320" x2="460" y2="360" stroke="#666" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="475" y="340" fill="#555" font-size="11">[lower, upper)</text>
+
+  <rect x="240" y="450" width="200" height="40" rx="6" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
+  <text x="340" y="475" text-anchor="middle" fill="var(--legacy-edge)" font-size="11">no fire (cache warm)</text>
+  <path d="M 400 425 L 360 450" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="370" y="445" fill="#555" font-size="11">no</text>
+
+  <rect x="500" y="450" width="220" height="40" rx="6" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="1.5"/>
+  <text x="610" y="475" text-anchor="middle" fill="var(--tier1-edge)" font-size="11" font-weight="600">cache_invalidation reason</text>
+  <path d="M 520 425 L 580 450" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="550" y="445" fill="#555" font-size="11">yes</text>
+
+  <rect x="740" y="360" width="160" height="60" rx="6" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="2"/>
+  <text x="820" y="385" text-anchor="middle" fill="var(--tier1-edge)" font-weight="600">hard_floor reason</text>
+  <text x="820" y="402" text-anchor="middle" font-size="11" fill="#555">(unconditional)</text>
+  <path d="M 580 290 Q 760 340 770 360" stroke="#666" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <text x="700" y="330" fill="#555" font-size="11">≥ upper</text>
 </svg>
-<div class="caption">Figure 3. <code>DecideRangeAction</code> as a state diagram. Two early exits (spec nil; anchor zero) protect the failsafe: opted-out or first-iteration cases never engage the new rule and fall through to legacy.</div>
+<div class="caption">Figure 3. <code>decideSquashReason</code> as a state diagram. The function returns a reason string when squash should fire, or "" otherwise. Reason values: <code>range_threshold_cache_invalidation</code>, <code>range_threshold_hard_floor</code>, <code>legacy_threshold</code> (only on the legacy path), or <code>image_overflow</code> (precedence-after).</div>
 </figure>
 
-<h3>4.3 Why hard floors are enum values, not <code>overflow_threshold</code></h3>
+<h3>4.3 Pure function signature</h3>
+
+<pre><code>// core/xcontext/squash.go
+
+func decideSquashReason(config SquashConfig, state SquashState) string {
+    if config.ContextWindow &lt;= 0 { return "" }
+    tokens := contextTokens(state.Messages, config.SystemPrompt, state.LastUsage)
+
+    if config.RangeThreshold != nil {
+        if o := rangeThresholdOutcome(config.RangeThreshold,
+            config.ContextWindow, tokens, state.Elapsed); o != rangeThresholdNo {
+            return o.String()
+        }
+    } else if config.CompactionThreshold &gt; 0 {
+        threshold := int(float64(config.ContextWindow) * config.CompactionThreshold)
+        if tokens &gt;= threshold { return ReasonLegacyThreshold }
+    }
+    if imageOverflow(config.Policy, state.Messages) { return ReasonImageOverflow }
+    return ""
+}
+
+// core/xcontext/tiered.go
+
+func rangeThresholdOutcome(p *RangeThresholdPolicy, ctxWindow, tokens int, elapsed time.Duration) rangeThresholdReason {
+    if p == nil || ctxWindow &lt;= 0 { return rangeThresholdNo }
+    frac := float64(tokens) / float64(ctxWindow)
+    switch {
+    case frac &gt;= p.Upper:
+        return rangeThresholdHardFloor
+    case frac &gt;= p.Lower &amp;&amp; elapsed &gt; 0 &amp;&amp; elapsed &gt;= p.CacheDeadline():
+        return rangeThresholdCacheInvalidation
+    default:
+        return rangeThresholdNo
+    }
+}</code></pre>
 
 <p>
-Cortex already has a hard stop driven by <code>overflow_threshold</code> in <code>core/workflows/elite/helpers.go</code> via <code>checkContextOverflow</code>. It fires <code>ask_human</code> — i.e., it <em>stops</em> the workflow. That is the wrong behaviour for the Tier 1 hard floor, which must <em>truncate and continue</em>. So:
+The same <code>decideSquashReason</code> is called twice per iteration: once in the workflow (pre-flight gate) and once in the activity (inside <code>applyBulkCheckpointStrategy</code>). Both calls see the same inputs because <code>squashEvalTime := exec.Now()</code> is captured once and threaded through the activity request as <code>req.Elapsed</code>. Replay-deterministic by construction.
 </p>
-
-<ul>
-  <li><strong>Tier 1 / Tier 2 hard floors</strong> are explicit enum values in <code>DecideRangeAction</code> (<code>HardTruncate</code> / <code>HardSummarise</code>). They fire above the configured upper bound of each range and dispatch the same action as the cache-invalid branch.</li>
-  <li><strong><code>overflow_threshold</code></strong> is bumped from <code>0.3</code> to <code>0.4</code> in opted-in YAMLs <em>only to make room</em>. It still fires <code>ask_human</code> as before, just at 400k instead of 300k.</li>
-</ul>
 </section>
 
 <!-- ============================================================ -->
 <section id="architecture">
 <h2>5. Architecture</h2>
 
-<p>Two packages collaborate. <code>core/cap/</code> is consulted opportunistically but is not a dependency.</p>
+<p>Two packages touched. No new packages, no new Temporal activities.</p>
 
 <div class="figure">
-<svg viewBox="0 0 980 460" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
+<svg viewBox="0 0 980 380" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
   <defs>
     <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#444"/>
     </marker>
   </defs>
 
-  <!-- agentsdk -->
-  <rect x="30" y="40" width="240" height="120" rx="8" fill="#f7f7ff" stroke="#5a5fcf" stroke-width="1.5"/>
-  <text x="150" y="62" text-anchor="middle" fill="#5a5fcf" font-weight="600">pkg/agentsdk</text>
-  <text x="150" y="80" text-anchor="middle" font-size="11" fill="#5a5fcf">(agent config schema)</text>
-  <rect x="50" y="95" width="200" height="50" rx="4" fill="#fff" stroke="#5a5fcf" stroke-width="2"/>
-  <text x="150" y="113" text-anchor="middle" font-size="12">Context.RangeBasedTruncation</text>
-  <text x="150" y="130" text-anchor="middle" font-size="11" fill="#5a5fcf">+ Tier1Spec, Tier2Spec (NEW)</text>
+  <rect x="30" y="40" width="220" height="100" rx="8" fill="#f7f7ff" stroke="#5a5fcf" stroke-width="1.5"/>
+  <text x="140" y="62" text-anchor="middle" fill="#5a5fcf" font-weight="600">pkg/agentsdk</text>
+  <rect x="50" y="80" width="180" height="50" rx="4" fill="#fff" stroke="#5a5fcf" stroke-width="2"/>
+  <text x="140" y="100" text-anchor="middle" font-size="11" font-weight="600">Context.RangeThreshold</text>
+  <text x="140" y="116" text-anchor="middle" font-size="11" fill="#5a5fcf">*RangeThresholdConfig</text>
 
-  <!-- xcontext (now owns the whole decision) -->
-  <rect x="30" y="200" width="280" height="200" rx="8" fill="#fff6e8" stroke="#b06a00" stroke-width="1.5"/>
-  <text x="170" y="222" text-anchor="middle" fill="#b06a00" font-weight="600">core/xcontext</text>
-  <text x="170" y="240" text-anchor="middle" font-size="11" fill="#b06a00">(squash policy + decision)</text>
-  <rect x="50" y="255" width="240" height="40" rx="4" fill="#fff" stroke="#b06a00" stroke-dasharray="2,2"/>
-  <text x="170" y="271" text-anchor="middle" font-size="11">NeedsSquashing / ApplySquash</text>
-  <text x="170" y="287" text-anchor="middle" font-size="11" fill="#555">(existing, unchanged)</text>
-  <rect x="50" y="305" width="240" height="80" rx="4" fill="#fff" stroke="#b06a00" stroke-width="2"/>
-  <text x="170" y="325" text-anchor="middle" font-size="11" font-weight="600">DecideRangeAction</text>
-  <text x="170" y="343" text-anchor="middle" font-size="11" fill="#b06a00">(NEW — single pure function</text>
-  <text x="170" y="358" text-anchor="middle" font-size="11" fill="#b06a00">that folds prediction +</text>
-  <text x="170" y="373" text-anchor="middle" font-size="11" fill="#b06a00">action policy)</text>
+  <rect x="30" y="180" width="220" height="170" rx="8" fill="#fff6e8" stroke="#b06a00" stroke-width="1.5"/>
+  <text x="140" y="202" text-anchor="middle" fill="#b06a00" font-weight="600">core/xcontext</text>
+  <rect x="50" y="215" width="180" height="40" rx="4" fill="#fff" stroke="#b06a00" stroke-dasharray="2,2"/>
+  <text x="140" y="231" text-anchor="middle" font-size="11">NeedsSquashing / ApplySquash</text>
+  <text x="140" y="247" text-anchor="middle" font-size="11" fill="#555">(extended)</text>
+  <rect x="50" y="265" width="180" height="40" rx="4" fill="#fff" stroke="#b06a00" stroke-width="2"/>
+  <text x="140" y="281" text-anchor="middle" font-size="11" font-weight="600">decideSquashReason</text>
+  <text x="140" y="297" text-anchor="middle" font-size="11" fill="#b06a00">(NEW — shared by gate &amp; activity)</text>
+  <rect x="50" y="313" width="180" height="32" rx="4" fill="#fff" stroke="#b06a00" stroke-width="2"/>
+  <text x="140" y="332" text-anchor="middle" font-size="11" fill="#b06a00">tiered.go: RangeThresholdPolicy</text>
 
-  <!-- cap (optional signal) -->
-  <rect x="380" y="200" width="200" height="160" rx="8" fill="#f6fff6" stroke="#1b7a3f" stroke-width="1" stroke-dasharray="6,3"/>
-  <text x="480" y="222" text-anchor="middle" fill="#1b7a3f" font-weight="600">core/cap (optional)</text>
-  <text x="480" y="240" text-anchor="middle" font-size="11" fill="#1b7a3f">(may or may not be on)</text>
-  <rect x="395" y="255" width="170" height="60" rx="4" fill="#fff" stroke="#1b7a3f" stroke-dasharray="2,2"/>
-  <text x="480" y="275" text-anchor="middle" font-size="11">setup.Cap.Pings</text>
-  <text x="480" y="291" text-anchor="middle" font-size="11" fill="#555">(if cortex#1411 enabled)</text>
-  <text x="480" y="307" text-anchor="middle" font-size="11" fill="#555">— optional signal</text>
+  <rect x="370" y="40" width="280" height="310" rx="8" fill="#fdf0ed" stroke="#b3251b" stroke-width="1.5"/>
+  <text x="510" y="62" text-anchor="middle" fill="#b3251b" font-weight="600">core/workflows/elite</text>
 
-  <!-- elite -->
-  <rect x="660" y="40" width="290" height="400" rx="8" fill="#fdf0ed" stroke="#b3251b" stroke-width="1.5"/>
-  <text x="805" y="62" text-anchor="middle" fill="#b3251b" font-weight="600">core/workflows/elite</text>
-  <text x="805" y="80" text-anchor="middle" font-size="11" fill="#b3251b">(workflow orchestration)</text>
+  <rect x="390" y="80" width="240" height="44" rx="4" fill="#fff" stroke="#b3251b" stroke-width="2"/>
+  <text x="510" y="98" text-anchor="middle" font-size="11" font-weight="600">flow.go:557</text>
+  <text x="510" y="114" text-anchor="middle" font-size="11" fill="#b3251b">squashEvalTime := exec.Now()</text>
 
-  <rect x="680" y="95" width="250" height="50" rx="4" fill="#fff" stroke="#b3251b" stroke-width="2"/>
-  <text x="805" y="115" text-anchor="middle" font-size="11" font-weight="600">flow.go ~ line 541</text>
-  <text x="805" y="131" text-anchor="middle" font-size="11" fill="#b3251b">(dispatch switch — NEW)</text>
+  <rect x="390" y="140" width="240" height="44" rx="4" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
+  <text x="510" y="158" text-anchor="middle" font-size="11">needsSquashing(..., now) — gate</text>
+  <text x="510" y="174" text-anchor="middle" font-size="11" fill="#555">(workflow side, pre-flight)</text>
 
-  <rect x="680" y="165" width="250" height="60" rx="4" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
-  <text x="805" y="183" text-anchor="middle" font-size="11">applySquashing</text>
-  <text x="805" y="199" text-anchor="middle" font-size="11" fill="#555">(existing, used by</text>
-  <text x="805" y="215" text-anchor="middle" font-size="11" fill="#555">Tier1Truncate, HardTruncate)</text>
+  <rect x="390" y="200" width="240" height="44" rx="4" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
+  <text x="510" y="218" text-anchor="middle" font-size="11">ActivityApplyAndPersistSquash</text>
+  <text x="510" y="234" text-anchor="middle" font-size="11" fill="#555">(activity, runs bulk_checkpoint)</text>
 
-  <rect x="680" y="245" width="250" height="80" rx="4" fill="#fff" stroke="#b3251b" stroke-width="2"/>
-  <text x="805" y="265" text-anchor="middle" font-size="11" font-weight="600">maybeApplyAutoCompact</text>
-  <text x="805" y="281" text-anchor="middle" font-size="11" fill="#b3251b">(existing + 1 new param:</text>
-  <text x="805" y="297" text-anchor="middle" font-size="11" fill="#b3251b">force *AutoCompactConfig)</text>
-  <text x="805" y="313" text-anchor="middle" font-size="11" fill="#555">used by Tier 2</text>
+  <rect x="390" y="260" width="240" height="44" rx="4" fill="#fff" stroke="#b3251b" stroke-width="2"/>
+  <text x="510" y="278" text-anchor="middle" font-size="11" font-weight="600">setup.SquashRangeThresholdPolicy</text>
+  <text x="510" y="294" text-anchor="middle" font-size="11" fill="#b3251b">(populated in setup.go)</text>
 
-  <rect x="680" y="345" width="250" height="80" rx="4" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
-  <text x="805" y="365" text-anchor="middle" font-size="11">activityGenerateSummary,</text>
-  <text x="805" y="381" text-anchor="middle" font-size="11">activitySaveCompactMessage</text>
-  <text x="805" y="397" text-anchor="middle" font-size="11" fill="#555">(existing, unchanged)</text>
+  <rect x="700" y="40" width="240" height="120" rx="8" fill="#f6fff6" stroke="#1b7a3f" stroke-width="1.5"/>
+  <text x="820" y="62" text-anchor="middle" fill="#1b7a3f" font-weight="600">core/cap (read-only)</text>
+  <text x="820" y="82" text-anchor="middle" font-size="11" fill="#1b7a3f">single source of CacheTTL</text>
+  <rect x="720" y="100" width="200" height="44" rx="4" fill="#fff" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <text x="820" y="120" text-anchor="middle" font-size="11">cap.CacheTTL = 5m</text>
+  <text x="820" y="135" text-anchor="middle" font-size="11" fill="#555">imported by setup.go</text>
 
-  <!-- Arrows -->
-  <path d="M 270 100 L 650 100" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
-  <text x="380" y="92" font-size="11" fill="#444">YAML → setup.RangeBasedTruncation</text>
+  <rect x="700" y="180" width="240" height="170" rx="8" fill="#f6fff6" stroke="#1b7a3f" stroke-width="1.5"/>
+  <text x="820" y="202" text-anchor="middle" fill="#1b7a3f" font-weight="600">core/workflows/elite/cap.go</text>
+  <text x="820" y="220" text-anchor="middle" font-size="11" fill="#1b7a3f">CAP refresh loop</text>
+  <rect x="720" y="240" width="200" height="60" rx="4" fill="#fff" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <text x="820" y="260" text-anchor="middle" font-size="11">state.SetLastLLMCallTime(now)</text>
+  <text x="820" y="276" text-anchor="middle" font-size="11" fill="#555">called after every successful</text>
+  <text x="820" y="292" text-anchor="middle" font-size="11" fill="#555">CAP refresh — anchor advances</text>
 
-  <path d="M 310 340 L 650 120" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
-  <text x="380" y="240" font-size="11" fill="#444">RangeDecisionResult</text>
+  <path d="M 250 100 L 380 100" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
+  <text x="280" y="92" font-size="11" fill="#444">YAML → setup.RangeThreshold</text>
 
-  <path d="M 580 280 L 50 340" stroke="#444" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#arrow2)"/>
-  <text x="320" y="313" font-size="10" fill="#555">optional pings (CAP)</text>
+  <path d="M 250 280 L 380 220" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
+  <text x="290" y="260" font-size="11" fill="#444">decision shared</text>
 
-  <path d="M 805 145 L 805 165" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
-  <path d="M 805 145 L 805 245" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)" stroke-dasharray="4,3"/>
-  <path d="M 805 325 L 805 345" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
+  <path d="M 700 105 L 510 240" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)" stroke-dasharray="2,2"/>
+  <text x="600" y="155" font-size="10" fill="#444">CacheTTL → setup</text>
 
-  <path d="M 150 160 L 150 200" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)" stroke-dasharray="2,2"/>
-  <text x="160" y="183" font-size="10" fill="#444">spec ref</text>
+  <path d="M 700 275 L 510 130" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)" stroke-dasharray="2,2"/>
+  <text x="650" y="200" font-size="10" fill="#444">advances LastLLMCallTime</text>
 
-  <!-- Legend -->
-  <rect x="30" y="415" width="14" height="14" fill="#fff" stroke="#b3251b" stroke-width="2"/>
-  <text x="50" y="427" font-size="11" fill="#555">NEW or changed</text>
-  <rect x="160" y="415" width="14" height="14" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
-  <text x="180" y="427" font-size="11" fill="#555">existing, unchanged</text>
-  <rect x="290" y="415" width="14" height="14" fill="#fff" stroke="#1b7a3f" stroke-dasharray="6,3"/>
-  <text x="310" y="427" font-size="11" fill="#555">optional dependency</text>
+  <rect x="30" y="360" width="14" height="14" fill="#fff" stroke="#b3251b" stroke-width="2"/>
+  <text x="50" y="372" font-size="11" fill="#555">NEW / changed</text>
+  <rect x="160" y="360" width="14" height="14" fill="#fff" stroke="#b3251b" stroke-dasharray="2,2"/>
+  <text x="180" y="372" font-size="11" fill="#555">existing, signature extended</text>
 </svg>
-<div class="caption">Figure 4. Two-package architecture. <code>core/cap/</code> is a dashed box: if it's deployed and provisioned, its <code>setup.Cap.Pings</code> sharpens the prediction. If not, the prediction degrades cleanly to using <code>state.LastLLMCallTime</code> alone. <code>maybeApplyAutoCompact</code> gains one new parameter to support Tier 2's forced invocation; no new helper, no extraction.</div>
+<div class="caption">Figure 4. <code>RangeThresholdConfig</code> is a single optional field on <code>agentsdk.Context</code>. <code>core/xcontext</code> owns the gate logic; <code>core/workflows/elite</code> wires it into the existing squash dispatch. <code>core/cap</code> exposes only the constant <code>CacheTTL</code> and (already) updates <code>state.LastLLMCallTime</code> from its refresh loop — the range gate piggybacks on that shared anchor without extra plumbing.</div>
 </figure>
-
-<h3>5.1 Single pure function</h3>
-
-<pre><code>// core/xcontext/rangebased.go
-
-package xcontext
-
-import (
-    "time"
-    "github.com/emergentbase/cortex/core/cap"      // for CacheTTL constant
-    "github.com/emergentbase/cortex/pkg/agentsdk"
-)
-
-type RangeAction int
-
-const (
-    RangeActionNone RangeAction = iota
-    RangeActionTier1Truncate
-    RangeActionHardTruncate
-    RangeActionTier2Summarise
-    RangeActionHardSummarise
-)
-
-type RangeDecisionInput struct {
-    Spec               *agentsdk.RangeBasedTruncation
-    Tokens             int
-    LastLLMCallTime    time.Time
-    LastSuccessfulPing time.Time   // zero if CAP unavailable
-    Now                time.Time
-}
-
-type RangeDecisionResult struct {
-    Action RangeAction
-    Reason string  // "disabled" | "no_anchor_yet" | "below_range"
-                   // | "tier1_cache_warm" | "tier1_cache_expiring" | "tier1_hard_floor"
-                   // | "tier2_cache_warm" | "tier2_cache_expiring" | "tier2_hard_ceiling"
-}
-
-// Pure. No I/O. Safe to call from workflow code.
-// Works whether CAP is enabled or not — LastSuccessfulPing zero is a valid input.
-func DecideRangeAction(in RangeDecisionInput) RangeDecisionResult {
-    if in.Spec == nil || !in.Spec.Enabled {
-        return RangeDecisionResult{RangeActionNone, "disabled"}
-    }
-
-    anchor := in.LastLLMCallTime
-    if in.LastSuccessfulPing.After(anchor) {
-        anchor = in.LastSuccessfulPing
-    }
-    if anchor.IsZero() {
-        return RangeDecisionResult{RangeActionNone, "no_anchor_yet"}
-    }
-    cacheLikelyInvalid := in.Now.Sub(anchor) &gt;= cap.CacheTTL
-
-    // Bands checked highest-to-lowest so hard ceilings/floors win.
-    if in.Tokens &gt;= in.Spec.Tier2.UpperTokens {
-        return RangeDecisionResult{RangeActionHardSummarise, "tier2_hard_ceiling"}
-    }
-    if in.Tokens &gt;= in.Spec.Tier2.LowerTokens {
-        if cacheLikelyInvalid {
-            return RangeDecisionResult{RangeActionTier2Summarise, "tier2_cache_expiring"}
-        }
-        return RangeDecisionResult{RangeActionNone, "tier2_cache_warm"}
-    }
-    if in.Tokens &gt;= in.Spec.Tier1.UpperTokens {
-        return RangeDecisionResult{RangeActionHardTruncate, "tier1_hard_floor"}
-    }
-    if in.Tokens &gt;= in.Spec.Tier1.LowerTokens {
-        if cacheLikelyInvalid {
-            return RangeDecisionResult{RangeActionTier1Truncate, "tier1_cache_expiring"}
-        }
-        return RangeDecisionResult{RangeActionNone, "tier1_cache_warm"}
-    }
-    return RangeDecisionResult{RangeActionNone, "below_range"}
-}
-
-// LastSuccessfulPostExitPing extracts the most recent successful CAP ping
-// from setup.Cap.Pings. Returns zero time if CAP is unavailable or the
-// list contains no successful post_exit pings.
-//
-// This helper is a tiny convenience — callers may inline it.
-func LastSuccessfulPostExitPing(pings []cap.Ping) time.Time {
-    var t time.Time
-    for _, p := range pings {
-        if p.Source == "post_exit" &amp;&amp; p.CacheHit &amp;&amp; p.At.After(t) {
-            t = p.At
-        }
-    }
-    return t
-}
-</code></pre>
-
-<p>That's the entire new file. ~80 lines including comments and the helper.</p>
 </section>
 
 <!-- ============================================================ -->
 <section id="timeline">
-<h2>6. Worked timelines</h2>
-
-<p>Two scenarios — one with CAP off, one with CAP on — illustrate the CAP-independence guarantee.</p>
-
-<h3>6.1 Scenario A — CAP off, user pauses</h3>
-
-<div class="figure">
-<svg viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
-  <line x1="60" y1="220" x2="900" y2="220" stroke="#666" stroke-width="1.5"/>
-  <polygon points="900,220 892,216 892,224" fill="#666"/>
-  <text x="60" y="250" fill="#666" font-size="11">T=0</text>
-  <text x="430" y="250" fill="#666" font-size="11">T=6:30</text>
-  <text x="855" y="250" fill="#666" font-size="11">time</text>
-
-  <rect x="60" y="180" width="370" height="20" fill="#e8f5ec"/>
-  <rect x="430" y="180" width="470" height="20" fill="#fdeae8"/>
-  <text x="60" y="172" fill="#555" font-size="11">cache state →</text>
-
-  <ellipse cx="100" cy="130" rx="55" ry="22" fill="#fff" stroke="#0b6bcb" stroke-width="1.5"/>
-  <text x="100" y="128" text-anchor="middle" font-size="11" font-weight="600">user call</text>
-  <text x="100" y="142" text-anchor="middle" font-size="10" fill="#555">tokens: 240k</text>
-  <line x1="100" y1="152" x2="100" y2="210" stroke="#0b6bcb" stroke-width="1" stroke-dasharray="3,2"/>
-
-  <ellipse cx="430" cy="130" rx="70" ry="22" fill="#fff" stroke="#b3251b" stroke-width="2"/>
-  <text x="430" y="128" text-anchor="middle" font-size="11" font-weight="600">decision time</text>
-  <text x="430" y="142" text-anchor="middle" font-size="10" fill="#555">anchor: T=0</text>
-  <line x1="430" y1="152" x2="430" y2="210" stroke="#b3251b" stroke-width="1.5"/>
-
-  <rect x="320" y="40" width="220" height="60" rx="6" fill="#fdeae8" stroke="#b3251b"/>
-  <text x="430" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="#b3251b">Prediction</text>
-  <text x="430" y="78" text-anchor="middle" font-size="11" fill="#555">elapsed = 6:30 ≥ 5:00</text>
-  <text x="430" y="93" text-anchor="middle" font-size="11" fill="#555">→ cache_likely_invalid</text>
-  <line x1="430" y1="100" x2="430" y2="115" stroke="#b3251b" stroke-width="1" stroke-dasharray="2,2"/>
-
-  <ellipse cx="700" cy="130" rx="80" ry="22" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="2"/>
-  <text x="700" y="128" text-anchor="middle" font-size="11" font-weight="600" fill="var(--tier1-edge)">Tier1Truncate</text>
-  <text x="700" y="142" text-anchor="middle" font-size="10" fill="#555">applySquashing → 130k</text>
-  <line x1="700" y1="152" x2="700" y2="210" stroke="var(--tier1-edge)" stroke-width="1.5"/>
-
-  <path d="M 500 130 L 620 130" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
-
-  <text x="60" y="295" fill="#555" font-size="11">CAP: off / not provisioned. anchor = LastLLMCallTime alone. Decision still fires correctly.</text>
-  <text x="60" y="35" font-size="14" font-weight="600">Scenario A — CAP off</text>
-</svg>
-<div class="caption">Figure 5a. With CAP off, the anchor is just <code>state.LastLLMCallTime</code>. The 6:30 gap exceeds the 5-minute TTL, prediction fires, Tier 1 truncates pre-emptively.</div>
-</figure>
-
-<h3>6.2 Scenario B — CAP on, ping kept cache alive, no fire</h3>
+<h2>6. Worked timeline</h2>
 
 <div class="figure">
 <svg viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13">
@@ -607,11 +457,13 @@ func LastSuccessfulPostExitPing(pings []cap.Ping) time.Time {
   <polygon points="900,220 892,216 892,224" fill="#666"/>
   <text x="60" y="250" fill="#666" font-size="11">T=0</text>
   <text x="350" y="250" fill="#666" font-size="11">T=4:50</text>
-  <text x="650" y="250" fill="#666" font-size="11">T=6:30</text>
+  <text x="635" y="250" fill="#666" font-size="11">T=11:30</text>
   <text x="855" y="250" fill="#666" font-size="11">time</text>
 
-  <rect x="60" y="180" width="840" height="20" fill="#e8f5ec"/>
-  <text x="60" y="172" fill="#555" font-size="11">cache state → (alive throughout)</text>
+  <rect x="60" y="180" width="290" height="20" fill="#e8f5ec"/>
+  <rect x="350" y="180" width="285" height="20" fill="#e8f5ec"/>
+  <rect x="635" y="180" width="265" height="20" fill="#fdeae8"/>
+  <text x="60" y="172" fill="#555" font-size="11">cache state →</text>
 
   <ellipse cx="100" cy="130" rx="55" ry="22" fill="#fff" stroke="#0b6bcb" stroke-width="1.5"/>
   <text x="100" y="128" text-anchor="middle" font-size="11" font-weight="600">user call</text>
@@ -620,31 +472,31 @@ func LastSuccessfulPostExitPing(pings []cap.Ping) time.Time {
 
   <ellipse cx="350" cy="130" rx="60" ry="22" fill="#fff" stroke="#1b7a3f" stroke-width="1.5"/>
   <text x="350" y="128" text-anchor="middle" font-size="11" font-weight="600">CAP ping</text>
-  <text x="350" y="142" text-anchor="middle" font-size="10" fill="#555">cache_hit=true</text>
+  <text x="350" y="142" text-anchor="middle" font-size="10" fill="#555">success — anchor advances</text>
   <line x1="350" y1="152" x2="350" y2="210" stroke="#1b7a3f" stroke-width="1" stroke-dasharray="3,2"/>
 
-  <ellipse cx="650" cy="130" rx="70" ry="22" fill="#fff" stroke="#b3251b" stroke-width="2"/>
-  <text x="650" y="128" text-anchor="middle" font-size="11" font-weight="600">decision time</text>
-  <text x="650" y="142" text-anchor="middle" font-size="10" fill="#555">anchor: T=4:50</text>
-  <line x1="650" y1="152" x2="650" y2="210" stroke="#b3251b" stroke-width="1.5"/>
+  <ellipse cx="635" cy="130" rx="70" ry="22" fill="#fff" stroke="#b3251b" stroke-width="2"/>
+  <text x="635" y="128" text-anchor="middle" font-size="11" font-weight="600">decision time</text>
+  <text x="635" y="142" text-anchor="middle" font-size="10" fill="#555">elapsed = 6:40</text>
+  <line x1="635" y1="152" x2="635" y2="210" stroke="#b3251b" stroke-width="1.5"/>
 
-  <rect x="540" y="40" width="220" height="60" rx="6" fill="#e8f5ec" stroke="#1b7a3f"/>
-  <text x="650" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="#1b7a3f">Prediction</text>
-  <text x="650" y="78" text-anchor="middle" font-size="11" fill="#555">elapsed = 1:40 &lt; 5:00</text>
-  <text x="650" y="93" text-anchor="middle" font-size="11" fill="#555">→ cache warm</text>
-  <line x1="650" y1="100" x2="650" y2="115" stroke="#1b7a3f" stroke-width="1" stroke-dasharray="2,2"/>
+  <rect x="525" y="40" width="220" height="60" rx="6" fill="#fdeae8" stroke="#b3251b" stroke-width="1"/>
+  <text x="635" y="60" text-anchor="middle" font-size="11" font-weight="600" fill="#b3251b">cache_likely_invalid</text>
+  <text x="635" y="78" text-anchor="middle" font-size="11" fill="#555">6:40 ≥ (5:00 − 0:15)</text>
+  <text x="635" y="93" text-anchor="middle" font-size="11" fill="#555">→ range gate fires</text>
+  <line x1="635" y1="100" x2="635" y2="115" stroke="#b3251b" stroke-width="1" stroke-dasharray="2,2"/>
 
-  <ellipse cx="830" cy="130" rx="55" ry="22" fill="var(--legacy)" stroke="var(--legacy-edge)" stroke-width="1.5"/>
-  <text x="830" y="128" text-anchor="middle" font-size="11" font-weight="600" fill="var(--legacy-edge)">None</text>
-  <text x="830" y="142" text-anchor="middle" font-size="10" fill="#555">(tier1_cache_warm)</text>
-  <line x1="830" y1="152" x2="830" y2="210" stroke="var(--legacy-edge)" stroke-width="1.5"/>
+  <ellipse cx="820" cy="130" rx="75" ry="22" fill="var(--tier1)" stroke="var(--tier1-edge)" stroke-width="2"/>
+  <text x="820" y="128" text-anchor="middle" font-size="11" font-weight="600" fill="var(--tier1-edge)">bulk_checkpoint</text>
+  <text x="820" y="142" text-anchor="middle" font-size="10" fill="#555">240k → ~130k</text>
+  <line x1="820" y1="152" x2="820" y2="210" stroke="var(--tier1-edge)" stroke-width="1.5"/>
 
-  <path d="M 720 130 L 775 130" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
+  <path d="M 705 130 L 745 130" stroke="#444" stroke-width="1.5" fill="none" marker-end="url(#arrow2)"/>
 
-  <text x="60" y="295" fill="#555" font-size="11">CAP on. Successful ping at 4:50 advances anchor. Decision sees only 1:40 elapsed since anchor → no fire.</text>
-  <text x="60" y="35" font-size="14" font-weight="600">Scenario B — CAP on, successful ping</text>
+  <text x="60" y="295" fill="#555" font-size="11">Single user call at T=0 puts tokens at 240k. CAP refresh at T=4:50 succeeds, advances the anchor. At T=11:30, elapsed since anchor (6:40) exceeds the cache deadline (4:45) → range gate fires.</text>
+  <text x="60" y="35" font-size="14" font-weight="600">Scenario: in-range tokens (240k), CAP kept cache alive once but then failed to ping again</text>
 </svg>
-<div class="caption">Figure 5b. The same workflow with CAP on and a successful ping in the gap. The anchor moves to T=4:50, elapsed is only 1:40, prediction returns "cache warm" → no fire. This is the desired outcome: CAP did its job, we don't redundantly truncate.</div>
+<div class="caption">Figure 5. The unified anchor means CAP and the range gate share state automatically. The cache deadline is <code>CacheTTL − cache_ttl_guard = 5:00 − 0:15 = 4:45</code> (default). Bulk_checkpoint runs through the existing activity unchanged.</div>
 </figure>
 </section>
 
@@ -652,238 +504,104 @@ func LastSuccessfulPostExitPing(pings []cap.Ping) time.Time {
 <section id="backcompat">
 <h2>7. Backward compatibility</h2>
 
-<p>This is a hard contract. Agents that don't opt in must see zero behaviour change.</p>
-
 <table>
-  <thead><tr><th>Existing config field</th><th>Used by</th><th>Behaviour for non-opted-in agents</th><th>Behaviour for opted-in agents</th></tr></thead>
+  <thead><tr><th>Existing field</th><th>Non-opted-in agents</th><th>Opted-in agents</th></tr></thead>
   <tbody>
     <tr>
       <td><code>context.threshold</code></td>
-      <td><code>NeedsSquashing</code> → 275k legacy squash</td>
-      <td>Unchanged. Still triggers <code>bulk_checkpoint</code> at <code>threshold × context_window</code>.</td>
-      <td>Unused at runtime — the range-based decision pre-empts the legacy threshold check (see dispatch in §8.3). Stays in YAML as a documented fallback.</td>
+      <td>Unchanged — still triggers <code>bulk_checkpoint</code> at <code>threshold × context_window</code>.</td>
+      <td><strong>Bypassed</strong> when <code>range_threshold</code> is non-nil. <code>decideSquashReason</code> takes the range branch and never falls through to <code>CompactionThreshold</code>. Stays in YAML as documented fallback.</td>
     </tr>
     <tr>
       <td><code>context.overflow_threshold</code></td>
-      <td><code>checkContextOverflow</code> → ask_human</td>
       <td>Unchanged.</td>
-      <td>Still drives ask_human. <strong>Operator bumps its value</strong> (e.g., 0.3 → 0.4 on 1M ctx) when adding the range-based block, so ask_human fires only above the Tier 2 ceiling.</td>
+      <td>Still drives <code>ask_human</code>. Operator <strong>must bump</strong> the value above <code>range_threshold.upper</code>. <code>Context.Validate()</code> enforces this at agent-load time.</td>
     </tr>
     <tr>
       <td><code>context.auto_compact[]</code></td>
-      <td><code>maybeApplyAutoCompact</code> via <code>feature_request.auto_compact</code> match</td>
-      <td>Unchanged. Gated by <code>feature_request.auto_compact</code> exactly as today.</td>
-      <td>Unchanged for legacy invocations. Tier 2 calls <code>maybeApplyAutoCompact</code> with a <code>force</code> argument that bypasses the gate but uses an <em>independent</em> synthesised config — no interaction with existing <code>auto_compact[]</code> entries.</td>
+      <td>Unchanged — gated by <code>feature_request.auto_compact</code> matching strategy name.</td>
+      <td>Unchanged. Tier 2 (summarisation) is a separate follow-up PR; this design covers truncation only.</td>
     </tr>
     <tr>
-      <td><code>context.preserve_last_n</code>, <code>context.truncation_length</code></td>
-      <td><code>bulk_checkpoint</code> strategy</td>
+      <td><code>preserve_last_n</code>, <code>truncation_length</code>, <code>squashing_strategy</code></td>
       <td>Unchanged.</td>
-      <td>Unchanged. Range-based Tier 1 reuses <code>bulk_checkpoint</code> byte-for-byte, so these fields keep their existing role.</td>
-    </tr>
-    <tr>
-      <td><code>context.squashing_strategy</code></td>
-      <td>Strategy selection in <code>ApplySquash</code></td>
-      <td>Unchanged.</td>
-      <td>Unchanged. Must be <code>bulk_checkpoint</code> for opt-in (validated at agent load).</td>
+      <td>Unchanged. The range gate <strong>only changes when</strong> truncation fires, not what content survives. <code>bulk_checkpoint</code> is reused byte-for-byte.</td>
     </tr>
   </tbody>
 </table>
 
 <p>
-The dispatch switch in <code>flow.go</code> selects the legacy path whenever <code>RangeBasedTruncation == nil</code> or <code>RangeActionNone</code> is returned. The legacy code path is reached <em>by fall-through</em>, not by a separate code branch — same lines as today, just guarded by an outer <code>switch</code>. See §8.3.
+Implementation: in <code>core/xcontext/squash.go</code> <code>decideSquashReason</code>:
 </p>
+
+<pre><code>if config.RangeThreshold != nil {
+    // range gate decides — legacy bypassed
+    if o := rangeThresholdOutcome(...); o != rangeThresholdNo { return o.String() }
+} else if config.CompactionThreshold &gt; 0 {
+    // legacy path
+    if tokens &gt;= threshold { return ReasonLegacyThreshold }
+}</code></pre>
+
+<p>The mutually-exclusive <code>if/else if</code> guarantees the legacy threshold is never AND-ed with the range gate.</p>
 </section>
 
 <!-- ============================================================ -->
 <section id="code">
 <h2>8. Code changes</h2>
 
-<h3>8.1 File-by-file inventory (v0.2, post-critique)</h3>
-
 <table>
-  <thead><tr><th>File</th><th>Lines</th><th>Type</th><th>Change</th></tr></thead>
+  <thead><tr><th>File</th><th>+/-</th><th>Type</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr>
-      <td><code>pkg/agentsdk/context.go</code></td>
-      <td>+25</td>
-      <td>edit</td>
-      <td>Add <code>RangeBasedTruncation</code> pointer field + nested <code>Tier1Spec</code>/<code>Tier2Spec</code>. No <code>Validate()</code> for v0; YAML parse errors surface naturally.</td>
-    </tr>
-    <tr>
-      <td><code>core/xcontext/rangebased.go</code></td>
-      <td>~80</td>
-      <td>new</td>
-      <td>One file: <code>RangeAction</code> enum, <code>DecideRangeAction</code>, <code>LastSuccessfulPostExitPing</code>. CAP-independent — only imports <code>cap.CacheTTL</code> constant.</td>
-    </tr>
-    <tr>
-      <td><code>core/xcontext/rangebased_test.go</code></td>
-      <td>~80</td>
-      <td>new</td>
-      <td>Table-driven matrix: 5 token bands × 3 cache states (off / warm / expired) = 15 cases.</td>
-    </tr>
-    <tr>
-      <td><code>core/workflows/elite/flow.go</code></td>
-      <td>+25 / −4</td>
-      <td>edit</td>
-      <td>Wrap squash block at ~line 541 in a dispatch switch behind <code>exec.GetVersion("elite-range-based-truncation", 1)</code>.</td>
-    </tr>
-    <tr>
-      <td><code>core/workflows/elite/compact.go</code></td>
-      <td>+10 / −2</td>
-      <td>edit</td>
-      <td>Add <code>force *agentsdk.AutoCompactConfig</code> parameter to <code>maybeApplyAutoCompact</code>. When non-nil, use it instead of <code>setup.AutoCompactConfig</code> and skip the <code>NeedsCompact</code> gate. Existing call site passes nil — behaviour unchanged.</td>
-    </tr>
-    <tr>
-      <td><code>core/workflows/elite/setup.go</code></td>
-      <td>+5</td>
-      <td>edit</td>
-      <td>Populate <code>setup.RangeBasedTruncation</code> from <code>agentConfig.Context.RangeBasedTruncation</code>.</td>
-    </tr>
-    <tr>
-      <td><code>core/workflows/elite/metrics.go</code></td>
-      <td>+10</td>
-      <td>edit</td>
-      <td>One helper <code>recordRangeBasedDecision(ctx, result)</code> emitting two metrics (see §10).</td>
-    </tr>
-    <tr>
-      <td>Opus 4.7 farm-agent YAMLs (×7)</td>
-      <td>+12 each</td>
-      <td>edit</td>
-      <td>Opt-in <code>range_based_truncation</code> block + bump <code>overflow_threshold</code> 0.3 → 0.4.</td>
-    </tr>
+    <tr><td><code>pkg/agentsdk/context.go</code></td><td>+46</td><td>edit</td><td><code>RangeThresholdConfig</code> + cross-field overflow validation</td></tr>
+    <tr><td><code>pkg/agentsdk/context_test.go</code></td><td>+65</td><td>edit</td><td>Validate tests + overflow stacking checks</td></tr>
+    <tr><td><code>core/xcontext/tiered.go</code></td><td>+59</td><td>new</td><td><code>RangeThresholdPolicy</code>, <code>rangeThresholdOutcome</code>, reason constants</td></tr>
+    <tr><td><code>core/xcontext/tiered_test.go</code></td><td>+43</td><td>new</td><td><code>CacheDeadline</code> table tests</td></tr>
+    <tr><td><code>core/xcontext/squash.go</code></td><td>+86 / −64</td><td>edit</td><td>Single decision point <code>decideSquashReason</code>, shared by <code>NeedsSquashing</code> + <code>applyBulkCheckpointStrategy</code></td></tr>
+    <tr><td><code>core/xcontext/squash_test.go</code></td><td>+127</td><td>edit</td><td>Reason-tagged squash result + range-gate paths</td></tr>
+    <tr><td><code>core/workflows/elite/setup.go</code></td><td>+24</td><td>edit</td><td>Build <code>SquashRangeThresholdPolicy</code> from agent config + <code>cap.CacheTTL</code></td></tr>
+    <tr><td><code>core/workflows/elite/squash.go</code></td><td>+26 / −12</td><td>edit</td><td>Thread <code>squashEvalTime</code> through gate + <code>BuildSquashRequest</code>; add <code>elapsedSince</code> helper</td></tr>
+    <tr><td><code>core/workflows/elite/flow.go</code></td><td>+6 / −4</td><td>edit</td><td>Capture <code>squashEvalTime := exec.Now()</code> once, pass to gate + activity</td></tr>
+    <tr><td><code>core/workflows/elite/helpers.go</code></td><td>+3 / −2</td><td>edit</td><td><code>needsSquashing</code> takes <code>now time.Time</code></td></tr>
+    <tr><td><code>core/workflows/elite/activities.go</code></td><td>+10 / −4</td><td>edit</td><td>Thread <code>Elapsed</code> + <code>SquashRangeThresholdPolicy</code> through activity request; propagate <code>Reason</code> through result</td></tr>
+    <tr><td><code>core/workflows/elite/request.go</code></td><td>+10</td><td>edit</td><td>Two new fields on <code>ApplyAndPersistSquashRequest</code> + <code>Reason</code> on response</td></tr>
+    <tr><td><code>core/workflows/elite/metrics.go</code></td><td>+43 / −17</td><td>edit</td><td><code>reason</code> label on <code>squashTotal</code>; new <code>squashCacheCreationAvoided</code> counter</td></tr>
+    <tr><td><code>core/workflows/elite/helpers_test.go</code></td><td>+52</td><td>edit</td><td><code>elapsedSince</code> tests</td></tr>
+    <tr><td><code>internal/pgsql/agents.go</code></td><td>+11 / −7</td><td>edit</td><td>jsonb round-trip for <code>range_threshold</code> on create + update + read paths</td></tr>
+    <tr><td><code>pkg/agentsdk/configs/loader_test.go</code></td><td>+8 / −2</td><td>edit</td><td>Loader assertion accepts opted-in <code>overflow_threshold</code></td></tr>
+    <tr><td>Opus 4.7 farm YAML</td><td>+11 / −2</td><td>edit</td><td>Opt-in <code>range_threshold</code> block; bump <code>overflow_threshold</code> 0.3 → 0.34</td></tr>
+    <tr><td><code>prds/truncation.md</code>, <code>prds/claude_trd.md</code></td><td>+445</td><td>new</td><td>PRD reference + design doc in repo</td></tr>
   </tbody>
 </table>
 
-<p><strong>Total non-test: ~110 LoC. With tests: ~190 LoC.</strong> No new packages, no new Temporal activities, no extraction refactors.</p>
-
-<h3>8.2 Configuration schema</h3>
-
-<p>Added under <code>context:</code> in opted-in Opus 4.7 farm-agent YAMLs:</p>
+<h3>8.1 Configuration schema</h3>
 
 <pre><code>context:
-  # ─── existing fields, kept verbatim ────────────────────────────────
   squashing_strategy: bulk_checkpoint
-  threshold: 0.275                    # legacy — unused when range-based is on
+  threshold: 0.275            # retained as fallback (inert when range_threshold is set)
   preserve_last_n: 10
   truncation_length: 150
-  overflow_threshold: 0.4             # was 0.3 — bumped so ask_human fires above 350k
-  auto_compact:                       # existing — kept for legacy compact_near_overflow path
-    - name: compact_near_overflow
-      strategy: compact_near_overflow
-      enabled: false
-      threshold: 0.3
-      last_n: 0
-      summary_prompt_name: summarizer_prompt_v2
-      target_agent_id: "infinite_fullstack_prompt_v2_opus_4_7"
+  overflow_threshold: 0.34    # must exceed range_threshold.upper
 
-  # ─── NEW opt-in block ──────────────────────────────────────────────
-  range_based_truncation:
-    enabled: true
-    tier1:
-      lower_tokens: 200000
-      upper_tokens: 325000
-    tier2:
-      lower_tokens: 325000
-      upper_tokens: 350000
-      summary_prompt_name: opus_4_7_summarise_v1
-      last_n: 8
-</code></pre>
+  range_threshold:
+    lower: 0.200              # 200k on 1M — cache-aware fire begins
+    upper: 0.325              # 325k — hard squash floor
+    cache_ttl_guard: 15s      # fire when elapsed ≥ (5m − 15s) = 4m45s</code></pre>
 
-<p>Go schema in <code>pkg/agentsdk/context.go</code>:</p>
+<h3>8.2 Go schema</h3>
 
 <pre><code>type Context struct {
     // ... existing fields, untouched ...
-    RangeBasedTruncation *RangeBasedTruncation `yaml:"range_based_truncation,omitempty"`
+    RangeThreshold *RangeThresholdConfig `json:"range_threshold,omitempty" yaml:"range_threshold,omitempty"`
 }
 
-type RangeBasedTruncation struct {
-    Enabled bool      `yaml:"enabled"`
-    Tier1   Tier1Spec `yaml:"tier1"`
-    Tier2   Tier2Spec `yaml:"tier2"`
-}
-
-type Tier1Spec struct {
-    LowerTokens int `yaml:"lower_tokens"`
-    UpperTokens int `yaml:"upper_tokens"`
-}
-
-type Tier2Spec struct {
-    LowerTokens       int    `yaml:"lower_tokens"`
-    UpperTokens       int    `yaml:"upper_tokens"`
-    SummaryPromptName string `yaml:"summary_prompt_name"`
-    LastN             int    `yaml:"last_n"`
-}
-</code></pre>
-
-<h3>8.3 Dispatch (flow.go, around line 541)</h3>
-
-<pre><code>var squash *xllm.SquashResult
-
-// Build prediction inputs. setup.Cap may be nil when CAP is off — that's fine.
-var lastPing time.Time
-if setup.Cap != nil {
-    lastPing = xcontext.LastSuccessfulPostExitPing(setup.Cap.Pings)
-}
-
-decision := xcontext.DecideRangeAction(xcontext.RangeDecisionInput{
-    Spec:               setup.Agent.Config.Context.RangeBasedTruncation,
-    Tokens:             currentInputTokens(state.LastUsage(), messages, setup.Agent.GetSystemPrompt()),
-    LastLLMCallTime:    state.GetLastLLMCallTime(),
-    LastSuccessfulPing: lastPing,
-    Now:                exec.Now(),
-})
-recordRangeBasedDecision(exec.Context(), decision)
-
-switch decision.Action {
-case xcontext.RangeActionTier1Truncate, xcontext.RangeActionHardTruncate:
-    squash = w.applySquashing(exec, req, setup, agent, state, messages)
-    if squash != nil { messages = squash.Messages }
-
-case xcontext.RangeActionTier2Summarise, xcontext.RangeActionHardSummarise:
-    forceCfg := tier2AutoCompactCfg(setup.Agent.Config.Context.RangeBasedTruncation)
-    outcome := w.maybeApplyAutoCompact(exec, req, setup, state, &amp;forceCfg)
-    if outcome.ShouldHandoff { /* existing handoff branch */ }
-    if outcome.Compacted { messages = state.Messages() }
-
-case xcontext.RangeActionNone:
-    // ── Legacy path — opted out, or opted in but no action.
-    //    These are the existing lines, unchanged.
-    if needsSquashing(setup.SquashPolicy, setup, state, messages) {
-        squash = w.applySquashing(exec, req, setup, agent, state, messages)
-        if squash != nil { messages = squash.Messages }
-    }
-}
-</code></pre>
-
-<h3>8.4 The <code>force</code> parameter on <code>maybeApplyAutoCompact</code></h3>
-
-<p>Minimal modification — adds one optional parameter; existing callers pass <code>nil</code>:</p>
-
-<pre><code>func (w *Workflow) maybeApplyAutoCompact(
-    exec WorkflowExecutor, req *Request, setup *SetupResult, state *State,
-    force *agentsdk.AutoCompactConfig,   // NEW — nil = legacy behaviour
-) xcontext.AutoCompactHandoffResult {
-
-    cfg := force
-    if cfg == nil {
-        // Legacy path — unchanged.
-        if setup.AutoCompactConfig == nil || !setup.AutoCompactConfig.Enabled {
-            return xcontext.AutoCompactHandoffResult{}
-        }
-        cfg = setup.AutoCompactConfig
-        status := xcontext.ComputeAutoCompactStatus(/* ... */)
-        if !status.NeedsCompact {
-            return xcontext.AutoCompactHandoffResult{}
-        }
-    }
-    // From here on, use cfg.SummaryPromptName / cfg.LastN throughout.
-    // ... existing pre-hook → generate → save → post-hook → reload pipeline ...
-}
-</code></pre>
+type RangeThresholdConfig struct {
+    Lower         float64       `json:"lower" yaml:"lower"`
+    Upper         float64       `json:"upper" yaml:"upper"`
+    CacheTTLGuard time.Duration `json:"cache_ttl_guard" yaml:"cache_ttl_guard"`
+}</code></pre>
 
 <p>
-This is ~10 lines changed inside an existing function. Architect B's earlier proposal to <em>extract</em> a new <code>runAutoCompactPipeline</code> helper was rejected on critique — it touches more lines and creates a risk of behaviour drift between two callers of the same pipeline.
+<strong>Why fractions instead of tokens.</strong> Matches the existing <code>threshold: 0.8</code> convention in cortex (which is also a fraction of context_window). Trade-off: if an agent's <code>context_window</code> changes, the same fraction means a different token count. Documented as a footgun; PRD says context-window changes are out of scope.
 </p>
 </section>
 
@@ -891,123 +609,80 @@ This is ~10 lines changed inside an existing function. Architect B's earlier pro
 <section id="failure">
 <h2>9. Failure modes</h2>
 
-<p>PRD #16: "If TTL state cannot be determined for any reason, fall back to today's behavior — never block the call, never spuriously truncate or summarise."</p>
-
-<p>The failsafe is data-driven, not exception-driven. Every degenerate input produces <code>RangeActionNone</code>, which falls through to the legacy <code>needsSquashing</code> path:</p>
+<p>PRD #16 graceful fallback: "never block the call, never spuriously truncate."</p>
 
 <table>
-  <thead><tr><th>Failure</th><th>Where</th><th>Behaviour</th></tr></thead>
+  <thead><tr><th>Condition</th><th>Behaviour</th></tr></thead>
   <tbody>
-    <tr><td>Agent not opted in (<code>Spec == nil</code> or <code>!Enabled</code>)</td><td><code>DecideRangeAction</code></td><td><code>None / "disabled"</code>. Legacy path runs.</td></tr>
-    <tr><td>CAP off / not provisioned / <code>setup.Cap == nil</code></td><td>flow.go pre-call</td><td><code>lastPing</code> stays zero. Decision uses just <code>LastLLMCallTime</code>. <strong>Feature still works.</strong></td></tr>
-    <tr><td>CAP on but BigTable ping read failed</td><td><code>setup.Cap.Pings</code> empty</td><td>Same as "CAP off" — degrades to <code>LastLLMCallTime</code> only.</td></tr>
-    <tr><td>First iteration, no <code>LastUsage</code> and no pings</td><td><code>DecideRangeAction</code></td><td><code>anchor</code> is zero → <code>None / "no_anchor_yet"</code>. Legacy path runs (tokens are below range anyway).</td></tr>
-    <tr><td>Malformed YAML (e.g., <code>tier1.upper &lt; tier1.lower</code>)</td><td>YAML unmarshal / agent load</td><td>Parse error fails agent load before any workflow starts. (For v0 we don't add a custom <code>Validate</code> — Go's strict YAML behaviour on bad shapes plus sensible defaults at decision time is enough.)</td></tr>
+    <tr><td>Agent not opted in (<code>RangeThreshold == nil</code>)</td><td>Legacy <code>CompactionThreshold</code> gate runs unchanged.</td></tr>
+    <tr><td>First iteration / no anchor (<code>elapsed == 0</code>)</td><td><code>cache_likely_invalid = false</code> by construction. Hard floor at <code>upper</code> still fires unconditionally.</td></tr>
+    <tr><td>CAP disabled / not provisioned</td><td>No effect — anchor is just <code>state.LastLLMCallTime</code> updated by user calls.</td></tr>
+    <tr><td>CAP refresh fails partway</td><td>That refresh doesn't advance the anchor. Subsequent iterations see the elapsed time growing past the cache deadline → range gate fires → preemptive truncate.</td></tr>
+    <tr><td><code>cache_ttl_guard >= CacheTTL</code></td><td>Setup logs a warning; the cache deadline becomes non-positive; <code>elapsed > 0 && elapsed >= deadline</code> is always true once the first call happens → fires every iteration in range. Caught at setup; should also be caught at Validate.</td></tr>
+    <tr><td>Malformed config (e.g., <code>lower &gt; upper</code>)</td><td>Agent fails to load via <code>RangeThresholdConfig.Validate()</code> before any workflow starts.</td></tr>
+    <tr><td><code>overflow_threshold <= range_threshold.upper</code></td><td>Agent fails to load via <code>Context.Validate()</code> cross-field check.</td></tr>
   </tbody>
 </table>
-
-<p>None of these paths introduce a new error class, raise an alert, or block the workflow. The <code>Reason</code> tag surfaces in the <code>elite.rangebased.decision_total{reason}</code> metric, so an alarm on unexpected <code>reason</code> rates (e.g., <code>"no_anchor_yet"</code> on a mid-session workflow) detects regressions.</p>
 </section>
 
 <!-- ============================================================ -->
 <section id="metrics">
 <h2>10. Metrics</h2>
 
-<p>For v0, the minimum that covers PRD #14 ("per-tier fires + prompt size at fire"). Avoidance-token estimation and summariser cost can land in a follow-up without re-architecting.</p>
-
 <table>
   <thead><tr><th>Metric</th><th>Type</th><th>Labels</th><th>Emitted at</th></tr></thead>
   <tbody>
-    <tr>
-      <td><code>elite.rangebased.decision_total</code></td>
-      <td>counter</td>
-      <td><code>action</code>, <code>reason</code>, <code>agent_id</code></td>
-      <td>Every decision (including <code>None</code>).</td>
-    </tr>
-    <tr>
-      <td><code>elite.rangebased.tokens_at_decision</code></td>
-      <td>histogram</td>
-      <td><code>action</code></td>
-      <td>Every non-<code>None</code> decision.</td>
-    </tr>
+    <tr><td><code>elite.squash.total</code></td><td>counter</td><td><code>strategy</code>, <code>status</code>, <code>reason</code></td><td>Every squash evaluation — <code>status="applied"</code> with <code>reason ∈ {range_threshold_cache_invalidation, range_threshold_hard_floor, legacy_threshold, image_overflow}</code>, or <code>status="not_applied"</code></td></tr>
+    <tr><td><code>elite.squash.tokens_at_truncation</code></td><td>histogram</td><td><code>strategy</code>, <code>reason</code></td><td>On applied squash. New bucket boundaries extend up to 350k to capture range fires.</td></tr>
+    <tr><td><code>elite.squash.cache_creation_avoided_tokens</code></td><td>counter</td><td><code>strategy</code>, <code>reason</code></td><td>On applied squash. Approximate: prior call's <code>CacheCreationInputTokens + CacheReadInputTokens</code> = prefix size that would have been re-paid as cache_creation. Most meaningful when <code>reason="range_threshold_cache_invalidation"</code>.</td></tr>
   </tbody>
 </table>
 
-<p>One counter + one histogram. Both emitted from a single helper <code>recordRangeBasedDecision</code> in <code>core/workflows/elite/metrics.go</code>, called once from the dispatch site. Dashboards can split by tier via the <code>action</code> label.</p>
+<p>
+PRD #14 coverage: (a) fires count ✅ via <code>squash.total{reason}</code>, (b) prompt size at fire ✅ via <code>tokens_at_truncation{reason}</code>, (c) cache_creation avoided ✅ approximate via <code>cache_creation_avoided_tokens{reason}</code>. (d) summariser cost is a Tier 2 concern, out of scope for this PR.
+</p>
 </section>
 
 <!-- ============================================================ -->
-<section id="critique">
-<h2>11. Architect critique applied</h2>
-
-<p>v0.1 of this design was synthesised from three architects' debate. After re-reading with the user's two hard requirements (CAP-independence; backward compatibility) and an architect-style critique pass, the design shrank by roughly half. The simplifications:</p>
-
-<table>
-  <thead><tr><th>v0.1 (rejected)</th><th>v0.2 (chosen)</th><th>Reason</th></tr></thead>
-  <tbody>
-    <tr>
-      <td>Prediction lived in <code>core/cap/prediction.go</code> as <code>Service.PredictNextCallInvalidation</code>, returning a <code>PredictionResult</code> struct.</td>
-      <td>Prediction is folded into <code>DecideRangeAction</code> as wall-clock math on <code>(LastLLMCallTime, LastSuccessfulPing, now)</code>. No new file, no new method, no <code>PredictionResult</code> type.</td>
-      <td>Critical: prediction must work when CAP is off. Putting it on <code>cap.Service</code> couples the feature to CAP being deployed. Folding it into the pure decision function removes the coupling.</td>
-    </tr>
-    <tr>
-      <td>Tier 2 dispatch required extracting <code>runAutoCompactPipeline</code> from <code>maybeApplyAutoCompact</code> (~30 LoC refactor).</td>
-      <td><code>maybeApplyAutoCompact</code> gains one <code>force *AutoCompactConfig</code> parameter. ~10 LoC. Existing callers pass <code>nil</code>.</td>
-      <td>The extraction risked behaviour drift between two callers of the same pipeline. A parameter is smaller and keeps a single code path.</td>
-    </tr>
-    <tr>
-      <td>4 metrics: <code>decision_total</code>, <code>tokens_at_decision</code>, <code>cache_creation_avoided_tokens</code>, <code>summariser_cost_usd</code>.</td>
-      <td>2 metrics: <code>decision_total</code>, <code>tokens_at_decision</code>.</td>
-      <td>Avoidance-token estimation requires post-LLM-call plumbing (delta between predicted and actual cache_creation). Summariser cost requires usage plumbing from <code>activityGenerateSummary</code>. Both useful, neither blocks v0. Defer.</td>
-    </tr>
-    <tr>
-      <td><code>RangeBasedTruncation.Validate()</code> method (~20 LoC).</td>
-      <td>No <code>Validate</code>. YAML parse and runtime defaults handle malformed configs.</td>
-      <td>Validation can be added when it earns its keep. For v0, "tier1.upper &lt; tier1.lower" simply produces <code>None</code> for tokens above tier1.upper because the band check fails — a noisy but safe outcome that surfaces via the <code>reason</code> label.</td>
-    </tr>
-    <tr>
-      <td>Three concrete files in <code>core/cap/</code> and <code>core/xcontext/</code> + 5 places to touch.</td>
-      <td>One new file (<code>core/xcontext/rangebased.go</code>) + 4 places to touch.</td>
-      <td>Smaller surface, smaller import graph, smaller PR.</td>
-    </tr>
-  </tbody>
-</table>
-
-<p>Critically, none of the requirements were dropped — Tier 1/2 fires, hard floors, CAP-aware prediction, opt-in, backward compat, multi-truncation, graceful fallback all remain. The PRD's behavioural surface is unchanged. Only the implementation surface shrank.</p>
-
-<h3>11.1 What we still <em>could</em> drop but chose to keep</h3>
-
-<ul>
-  <li><strong>The <code>Reason</code> tag</strong> in <code>RangeDecisionResult</code>. It's not strictly needed for behaviour. But the cost of debugging a misfire without it is enormous, so it stays.</li>
-  <li><strong>The 5-value enum</strong> (Tier1Truncate, HardTruncate, Tier2Summarise, HardSummarise, None). Could collapse to 3 (None, Truncate, Summarise) — hard floors and range fires take the same code path. But the dispatch site benefits from knowing which fire it was, for metric labels and future divergent behaviour. The 5-value enum costs nothing.</li>
-  <li><strong>The <code>exec.GetVersion</code> replay gate</strong> on the new dispatch. Strictly speaking, only opted-in agents can take the new path, so non-opted-in replays are safe by construction. But the gate is one line and matches the existing cortex pattern — keep it.</li>
-</ul>
-</section>
-
-<!-- ============================================================ -->
-<section id="open">
-<h2>12. Open questions</h2>
+<section id="openrisks">
+<h2>11. Open risks</h2>
 
 <ol>
   <li>
-    <strong>Tier 1 minimum gap (anti-thrashing).</strong> Multi-truncation works by design (PRD #5), but if tokens hover at 200k–210k with the cache repeatedly expiring, we could fire Tier 1 on every other call. Worth adding an optional <code>min_gap_seconds</code> (e.g., 60s) between Tier 1 fires? Or do we trust that <code>bulk_checkpoint</code>'s cutoff-advancement-only-forward naturally limits it?
+    <strong>Resume-after-pause anchor.</strong> If <code>state.LastLLMCallTime</code> is not persisted across worker restarts, a resumed workflow starts with <code>elapsed = 0</code> and never fires the cache-invalidation reason on the first iteration after resume. The hard floor still fires correctly. Verify whether <code>LastLLMCallTime</code> is part of the persisted state in <code>core/sessions/...</code>.
   </li>
   <li>
-    <strong>Tier 2 prompt config — duplicate or share?</strong> The new <code>tier2.summary_prompt_name</code> is conceptually adjacent to the existing <code>auto_compact[].summary_prompt_name</code>. We chose duplication (independent value) to keep the new block self-contained and avoid coupling. Acceptable, or should Tier 2 reference an existing <code>auto_compact[]</code> entry by name?
+    <strong>Double evaluation of <code>decideSquashReason</code>.</strong> The pre-flight gate (workflow side) and <code>applyBulkCheckpointStrategy</code> (activity side) both call <code>decideSquashReason</code> on the same snapshot. Cheap but redundant. Optional optimisation: pass the reason from gate → activity in the request.
   </li>
   <li>
-    <strong>Avoidance-token measurement plan.</strong> For post-launch sizing of PRD success criteria, we need to estimate cache_creation tokens we saved. The simplest method is to compare the pre-truncation token count to the post-LLM-call <code>cache_creation_tokens</code>. Is that acceptable, or do we need a more principled measurement?
+    <strong>Approximation in <code>cache_creation_avoided_tokens</code>.</strong> The metric uses <code>CacheCreationInputTokens + CacheReadInputTokens</code> from the prior call as a proxy for "what we would have paid as cache_creation on the next call without the range gate." Reasonable approximation but not measured. The metric's description should note this.
   </li>
   <li>
-    <strong>Rollout staging.</strong> PRD says rollout is out of scope. But shipping all 7 farm agents simultaneously is risky. Roll out one (e.g., <code>portfolio_expert_agent_opus_4_7</code>) first for ~48h, watch the metric panel, then proceed?
+    <strong>Reason label cardinality.</strong> When <code>status="not_applied"</code>, the reason label is empty (<code>""</code>). Creates an awkward series in Prometheus. Either omit when empty or set to <code>"none"</code>.
   </li>
+  <li>
+    <strong>Fraction vs token configuration.</strong> All bounds are fractions of <code>context_window</code>. If an agent's context_window ever changes, the same YAML means a different token threshold. PRD's recommended values (200k, 325k) correspond to (0.200, 0.325) on a 1M context window; on a 2M window they'd be (0.100, 0.1625).
+  </li>
+</ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="followups">
+<h2>12. Follow-ups</h2>
+
+<ol>
+  <li><strong>Summarisation tier (PRD Tier 2).</strong> Adds <code>range_threshold</code> at the <code>auto_compact[]</code> level, reusing the same <code>RangeThresholdConfig</code>. <code>Context.Validate()</code> enforces non-overlap with the squash range. Will land as a stacked PR.</li>
+  <li><strong>Anchor persistence verification.</strong> Confirm whether <code>state.LastLLMCallTime</code> survives a workflow resume. If not, add a session-level persistence column.</li>
+  <li><strong>Direct cache_creation measurement.</strong> Replace the approximation in <code>cache_creation_avoided_tokens</code> with a real before/after measurement using the next LLM call's actual <code>CacheCreationInputTokens</code>.</li>
+  <li><strong>Tighter <code>cache_ttl_guard</code> validation.</strong> Add an upper bound (e.g., <code>guard &lt; CacheTTL / 2</code>) to catch misconfigurations earlier than the setup-time warning.</li>
+  <li><strong>Direct <code>rangeThresholdOutcome</code> tests.</strong> Current <code>tiered_test.go</code> covers <code>CacheDeadline</code> only; the decision branches deserve dedicated table tests with boundary cases.</li>
 </ol>
 </section>
 
 <hr>
 
 <p class="meta">
-Document version: 0.2 (post-critique) · 2026-05-22 · Hard contracts: works without CAP; backward compatible with existing context config. Synthesised from three architect proposals plus a software-architect critique pass that removed two files and one extraction refactor.
+Document version: 1.0 (matches PR cortex#1474, Tier 1 only) · 2026-05-22 · Hard contracts: works without CAP; backward compatible with existing context config; replaces legacy threshold for opted-in agents.
 </p>
 
 </main>

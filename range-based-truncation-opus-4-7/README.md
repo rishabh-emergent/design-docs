@@ -1,49 +1,53 @@
-# Range-Based Truncation for Opus 4.7 (275k Farm Agents)
+# Range-Based Truncation for Opus 4.7 (Tier 1)
 
 | Doc | Covers | PR |
 |---|---|---|
-| [design.html](./design.html) | End-to-end design — token bands, cache-TTL prediction, decision flow, architecture, code changes, backward compatibility, failure modes, metrics, architect-critique trail | TBD |
+| [design.html](./design.html) | End-to-end design — token bands, cache-TTL prediction, decision flow, architecture, code changes, backward compatibility, failure modes, metrics, open risks. **Truncation only.** | [cortex#1474](https://github.com/emergentbase/cortex/pull/1474) |
 
 ## What this is
 
-Today, Opus 4.7 farm agents squash at exactly 275k tokens. Anthropic's prompt cache has a 5-minute TTL and is prefix-based — every squash invalidates the cache and forces a fresh `cache_creation` charge. If a TTL expiry lands just before 275k, we pay for cache invalidation **twice** (once on the post-expiry call, once on the post-squash call). This design adds a cache-TTL-aware trigger that squashes pre-emptively when the cache is predicted to die within a configured range, so we absorb only one `cache_creation` instead of two.
+Today, Opus 4.7 farm agents squash at exactly 275k tokens via the legacy `context.threshold` gate. Anthropic's prompt cache has a 5-minute TTL — if it expires near the 275k mark, we pay `cache_creation` once on the post-expiry call and again a few calls later when the squash fires. This design adds a **cache-TTL-aware range gate** that pre-emptively truncates when the cache is predicted to be invalid inside a configurable range below the legacy threshold, so we absorb only one `cache_creation` charge.
 
-## Hard contracts (v0.2)
+## Scope
 
-- **Works without CAP.** Prediction uses `state.LastLLMCallTime` as the primary anchor. CAP ping data is consumed opportunistically if available, but is not a dependency. Opt-in does not require CAP to be enabled.
-- **Fully backward compatible.** Existing `threshold`, `overflow_threshold`, `auto_compact[]` semantics are untouched for non-opted-in agents. Opt-in is a single new YAML block (`range_based_truncation:`) with no interaction with existing fields.
+**Truncation (Tier 1) only.** Summarisation (Tier 2) — the upper range that fires the auto-compact pipeline — is deferred to a separate stacked PR. This design covers the squash-side range gate exclusively.
+
+## Hard contracts
+
+- **Works whether CAP is on or off.** The TTL anchor is `state.LastLLMCallTime`. CAP refreshes already update this field via `core/workflows/elite/cap.go:85`, so the range gate piggybacks on a shared anchor without explicit CAP plumbing.
+- **Fully backward compatible.** Agents without the new `range_threshold` field see zero behaviour change. For opted-in agents, the legacy `context.threshold` gate is **bypassed entirely** — the range gate is the sole truncation trigger.
 
 ## Code locations (cortex-only)
 
-- **Schema**: `pkg/agentsdk/context.go` — new `RangeBasedTruncation` pointer field on `Context`, plus `Tier1Spec` / `Tier2Spec`
-- **Decision**: `core/xcontext/rangebased.go` (NEW, ~80 LoC) — single pure function `DecideRangeAction` that folds prediction + action policy
-- **Dispatch**: `core/workflows/elite/flow.go` — switch added around the existing squash block (~line 541) behind a Temporal version gate
-- **Tier 2 plumbing**: `core/workflows/elite/compact.go` — `maybeApplyAutoCompact` gains one `force *AutoCompactConfig` parameter; existing callers pass `nil` and see no behaviour change
-- **Setup**: `core/workflows/elite/setup.go` — populate `setup.RangeBasedTruncation` from `agentConfig.Context.RangeBasedTruncation`
-- **Metrics**: `core/workflows/elite/metrics.go` — `recordRangeBasedDecision` emits two histograms
-- **Opt-in**: 7 Opus 4.7 farm-agent YAMLs in `resources/agents/farm_agents/`
+- **Schema**: `pkg/agentsdk/context.go` — `RangeThresholdConfig` field on `Context`. Cross-field validation enforces `overflow_threshold > range_threshold.upper`.
+- **Decision**: `core/xcontext/squash.go` (`decideSquashReason`) + `core/xcontext/tiered.go` (`RangeThresholdPolicy`, `rangeThresholdOutcome`). Single shared decision function used by both `NeedsSquashing` (pre-flight) and `applyBulkCheckpointStrategy` (in-activity).
+- **Wiring**: `core/workflows/elite/setup.go` builds `setup.SquashRangeThresholdPolicy` from agent config + `cap.CacheTTL`. `core/workflows/elite/flow.go:557` captures `squashEvalTime := exec.Now()` once and threads it through gate + activity.
+- **Persistence**: `internal/pgsql/agents.go` jsonb writer + reader updated to round-trip the new field.
+- **Opt-in**: `resources/agents/farm_agents/full_stack_app_builder_cloud_v8_opus_4_7.yaml` adds `range_threshold` and bumps `overflow_threshold` to 0.34.
 
-**Total non-test: ~110 LoC.** No new packages. No new Temporal activities. No extraction refactors.
+**Total: ~700 LoC (incl. tests + PRDs).** One new package file (`core/xcontext/tiered.go`). No new Temporal activities.
 
 ## What this does NOT change
 
-- No change to the `bulk_checkpoint` strategy. Tier 1 reuses `applySquashing` byte-for-byte.
-- No change to `activityGenerateSummary` / `activitySaveCompactMessage`. Tier 2 invokes them via the existing `maybeApplyAutoCompact` pipeline.
-- No change for any non-opted-in agent or non-Opus-4.7 model.
-- No change to CAP behaviour, intervals, or attribution. CAP ping data is read; CAP code is not modified.
-- No emergent-side schema change. No new metrics namespace.
+- No change to the `bulk_checkpoint` strategy. The range gate only changes **when** truncation fires, not what content survives.
+- No change to `auto_compact` or summarisation behaviour. Tier 2 is a separate follow-up.
+- No change for any non-opted-in agent.
+- No change to CAP refresh behaviour. CAP continues to update `state.LastLLMCallTime`; the range gate reads it.
 
 ## Status
 
-| Change | Branch | State |
+| Change | PR | State |
 |---|---|---|
-| Design (v0.2, post-critique) | — | Draft |
-| Implementation | TBD | Not started |
+| Tier 1 truncation (this design) | [cortex#1474](https://github.com/emergentbase/cortex/pull/1474) | Open |
+| Tier 2 summarisation | [cortex#1475](https://github.com/emergentbase/cortex/pull/1475) | Open (stacked on #1474) |
+| YAML opt-in for Tier 2 | TBD | Pending |
 
-## Dependency
+## Supersession history
 
-The optional CAP ping consumption (`setup.Cap.Pings`) was introduced by [cortex#1411 CAP Margin Capture](../cap-margin-capture/). If `setup.Cap` is nil (CAP not deployed, BigTable client missing, provider clamp rejected the workflow), the feature degrades cleanly to using `state.LastLLMCallTime` alone. Opting in does not block on cortex#1411 — the design uses CAP as a signal-improving optional input.
+| Version | Date | Notes |
+|---|---|---|
+| v0.1 (dual-spec, action enum) | 2026-05-22 | Initial design — dedicated `range_based_truncation` block with twin `truncate_range`/`summarise_range` sub-structs and a 3-value action enum. **Superseded.** |
+| v0.2 (post-critique, simplified enum) | 2026-05-22 | Renamed types, trimmed comments, added fire logs. Still dual-spec. **Superseded.** |
+| **v1.0 (truncation only, generic gate)** | **2026-05-22** | **Current.** Single generic `RangeThresholdConfig` bolted onto `Context`. Bypasses legacy threshold for opted-in agents. Matches cortex#1474. |
 
-## Architect debate
-
-The final design was synthesised from three competing architect proposals (minimal-diff, modular sub-package, CAP-owned) followed by a software-architect critique pass that removed two files and one extraction refactor without dropping any PRD requirement. The trail is documented inline in `design.html` §11.
+The earlier proposals (cortex#1472 alt design) were closed in favour of cortex#1474's approach: smaller surface, generic gate reusable for Tier 2, idiomatic cortex extension pattern.
