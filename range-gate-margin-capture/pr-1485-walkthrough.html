@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PR #1485 walkthrough — Range-Gate Margin Capture</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #161b22;
+    --panel2: #1c232c;
+    --border: #2d333b;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #f0883e;
+    --red: #f85149;
+    --yellow: #d29922;
+    --purple: #a371f7;
+    --code-bg: #0d1117;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 80px; }
+  .hero {
+    background: linear-gradient(180deg, #1c2533 0%, var(--panel) 100%);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin-bottom: 28px;
+  }
+  .hero h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+    letter-spacing: -0.5px;
+  }
+  .hero .sub { color: var(--muted); font-size: 14px; }
+  .hero .tldr {
+    margin-top: 18px;
+    padding: 14px 16px;
+    background: var(--panel2);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+    font-size: 15px;
+  }
+  h2 {
+    margin: 36px 0 12px;
+    font-size: 22px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 8px;
+  }
+  h3 { margin: 22px 0 8px; font-size: 17px; }
+  .commit-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 18px 0;
+  }
+  .commit-card.feat { border-left-color: var(--green); }
+  .commit-card.fix { border-left-color: var(--orange); }
+  .commit-card.debug { border-left-color: var(--yellow); }
+  .commit-card.build { border-left-color: var(--purple); }
+  .commit-card h3 { margin-top: 0; }
+  .sha {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: var(--code-bg);
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+  }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    padding: 2px 8px;
+    border-radius: 12px;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .tag.feat { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.4); }
+  .tag.fix { background: rgba(240,136,62,0.15); color: var(--orange); border: 1px solid rgba(240,136,62,0.4); }
+  .tag.debug { background: rgba(210,153,34,0.15); color: var(--yellow); border: 1px solid rgba(210,153,34,0.4); }
+  .tag.build { background: rgba(163,113,247,0.15); color: var(--purple); border: 1px solid rgba(163,113,247,0.4); }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; }
+  pre .add { color: var(--green); display: block; }
+  pre .del { color: var(--red); display: block; }
+  pre .hl { color: var(--yellow); }
+  pre .cm { color: var(--muted); font-style: italic; }
+  .grid {
+    display: grid;
+    gap: 14px;
+    grid-template-columns: 1fr 1fr;
+    margin: 14px 0;
+  }
+  .grid .box {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 14px;
+  }
+  .box h4 { margin: 0 0 6px; font-size: 14px; color: var(--accent); }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+  }
+  th { background: var(--panel2); }
+  .ok { color: var(--green); font-weight: 600; }
+  .bad { color: var(--red); font-weight: 600; }
+  .meh { color: var(--yellow); font-weight: 600; }
+  svg { display: block; margin: 14px auto; max-width: 100%; }
+  .small { font-size: 13px; color: var(--muted); }
+  .toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 22px;
+    margin-bottom: 24px;
+  }
+  .toc ol { margin: 6px 0 0 0; padding-left: 22px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .callout {
+    background: rgba(88,166,255,0.07);
+    border-left: 3px solid var(--accent);
+    padding: 10px 14px;
+    margin: 12px 0;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .callout.warn { background: rgba(240,136,62,0.07); border-left-color: var(--orange); }
+  .callout.bad { background: rgba(248,81,73,0.07); border-left-color: var(--red); }
+  .step {
+    display: flex; gap: 14px;
+    align-items: flex-start;
+    margin: 8px 0;
+  }
+  .step-num {
+    flex: 0 0 28px;
+    height: 28px;
+    background: var(--accent);
+    color: var(--bg);
+    border-radius: 50%;
+    font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+  }
+  .step-text { flex: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- ─────────────────────────────  HERO  ───────────────────────────── -->
+<div class="hero">
+  <h1>PR #1485 — Range-Gate Margin Capture</h1>
+  <div class="sub">
+    8 commits · branch <code>stacked/range-gate-on-1483</code> ·
+    <a href="https://github.com/emergentbase/cortex/pull/1485" style="color: var(--accent);">github.com/emergentbase/cortex/pull/1485</a>
+  </div>
+  <div class="tldr">
+    <strong>TL;DR — Hinglish</strong><br>
+    Anthropic cache 5 minute me expire ho jata hai. Pehle agent har baar 275k tokens pe truncate karta tha — bina ye dekhe cache abhi alive hai ya dead. Iss PR me hum
+    <b>cache-aware range gate</b> add karte hain (200k–325k band) jo cache <em>dead</em> hone par hi early truncate karta hai. Aur jab early truncate hota hai to humari
+    <b>actual billing kam</b> ho jati hai (kyunki cache_create save ho jata hai) — phir bhi user ko hum
+    <b>"as-if no gate" cost</b> (z) charge karte hain, taaki Emergent ko margin mile.
+  </div>
+</div>
+
+<!-- ─────────────────────────────  TOC  ───────────────────────────── -->
+<div class="toc">
+  <strong>Index</strong>
+  <ol>
+    <li><a href="#problem">Pehle samjho problem (why this PR)</a></li>
+    <li><a href="#concept">Concept — Range gate + Margin capture</a></li>
+    <li><a href="#commits">8 commits — step-by-step kya kiya</a></li>
+    <li><a href="#flow">End-to-end flow diagram</a></li>
+    <li><a href="#bugs">Deploy ke time mile bugs aur fixes</a></li>
+    <li><a href="#status">Status summary</a></li>
+  </ol>
+</div>
+
+<!-- ─────────────────────────────  PROBLEM  ───────────────────────────── -->
+<h2 id="problem">1. Pehle samjho problem</h2>
+
+<p><b>Anthropic prompt cache ki 3 reality:</b></p>
+
+<svg viewBox="0 0 900 220" xmlns="http://www.w3.org/2000/svg">
+  <!-- Timeline -->
+  <line x1="80" y1="80" x2="820" y2="80" stroke="#58a6ff" stroke-width="2"/>
+  <text x="50" y="84" fill="#e6edf3" font-size="13" text-anchor="end" font-family="monospace">t=0</text>
+  <text x="850" y="84" fill="#e6edf3" font-size="13" font-family="monospace">5 min</text>
+  <!-- Cache alive zone -->
+  <rect x="80" y="55" width="555" height="50" fill="#3fb950" fill-opacity="0.18" stroke="#3fb950" stroke-width="1"/>
+  <text x="357" y="40" fill="#3fb950" font-size="14" text-anchor="middle" font-weight="600">Cache ALIVE (cache_read sasta)</text>
+  <text x="357" y="135" fill="#8b949e" font-size="12" text-anchor="middle">Har LLM call ke baad TTL refresh ho jata hai</text>
+  <!-- Guard zone -->
+  <rect x="635" y="55" width="40" height="50" fill="#d29922" fill-opacity="0.25" stroke="#d29922" stroke-width="1"/>
+  <text x="655" y="40" fill="#d29922" font-size="11" text-anchor="middle">guard 15s</text>
+  <!-- Cache dead zone -->
+  <rect x="675" y="55" width="145" height="50" fill="#f85149" fill-opacity="0.18" stroke="#f85149" stroke-width="1"/>
+  <text x="747" y="40" fill="#f85149" font-size="14" text-anchor="middle" font-weight="600">Cache DEAD</text>
+  <text x="747" y="135" fill="#8b949e" font-size="12" text-anchor="middle">Agle call me POORA cache_create lagega</text>
+  <!-- Markers -->
+  <circle cx="80" cy="80" r="5" fill="#58a6ff"/>
+  <circle cx="635" cy="80" r="5" fill="#d29922"/>
+  <circle cx="675" cy="80" r="5" fill="#f85149"/>
+  <text x="635" y="175" fill="#d29922" font-size="11" text-anchor="middle">4m 45s</text>
+  <text x="80" y="175" fill="#58a6ff" font-size="11" text-anchor="middle">last LLM call</text>
+  <text x="675" y="175" fill="#f85149" font-size="11" text-anchor="middle">5m 00s</text>
+  <text x="450" y="200" fill="#8b949e" font-size="13" text-anchor="middle" font-style="italic">"Cache deadline" = cache_ttl (5m) − guard (15s)</text>
+</svg>
+
+<div class="grid">
+  <div class="box">
+    <h4>💸 Pricing fact</h4>
+    <code>cache_read</code> tokens = roughly 10% of input price.<br>
+    <code>cache_create</code> tokens = roughly 1.25× input price.<br>
+    Bada prompt + dead cache = bahut mehnga.
+  </div>
+  <div class="box">
+    <h4>🏠 Old behavior</h4>
+    Squash threshold = 0.275 hard. Mtlb 275k tokens cross hote hi truncate. <em>Cache alive ya dead, koi farak nahi</em>. Agar cache alive tha to hum cheaply re-use kar sakte the, but truncation se hum khud cache invalidate kar dete the.
+  </div>
+</div>
+
+<!-- ─────────────────────────────  CONCEPT  ───────────────────────────── -->
+<h2 id="concept">2. Concept — Range gate + Margin capture</h2>
+
+<h3>Range gate band</h3>
+
+<svg viewBox="0 0 900 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Token bar -->
+  <rect x="60" y="80" width="780" height="40" fill="#161b22" stroke="#2d333b"/>
+  <!-- Safe zone -->
+  <rect x="60" y="80" width="156" height="40" fill="#3fb950" fill-opacity="0.25"/>
+  <!-- Range gate band -->
+  <rect x="216" y="80" width="98" height="40" fill="#d29922" fill-opacity="0.35"/>
+  <!-- Hard floor -->
+  <rect x="314" y="80" width="526" height="40" fill="#f85149" fill-opacity="0.30"/>
+  <!-- Lines -->
+  <line x1="216" y1="60" x2="216" y2="140" stroke="#d29922" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="314" y1="60" x2="314" y2="140" stroke="#f85149" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <line x1="60" y1="60" x2="60" y2="140" stroke="#3fb950" stroke-width="1.5"/>
+  <line x1="840" y1="60" x2="840" y2="140" stroke="#3fb950" stroke-width="1.5"/>
+
+  <text x="60" y="55" fill="#3fb950" font-size="12" text-anchor="middle" font-family="monospace">0</text>
+  <text x="216" y="55" fill="#d29922" font-size="12" text-anchor="middle" font-family="monospace">lower=0.2 (200k)</text>
+  <text x="314" y="55" fill="#f85149" font-size="12" text-anchor="middle" font-family="monospace">upper=0.325 (325k)</text>
+  <text x="840" y="55" fill="#3fb950" font-size="12" text-anchor="middle" font-family="monospace">1M</text>
+
+  <text x="138" y="105" fill="#3fb950" font-size="13" text-anchor="middle" font-weight="600">No squash</text>
+  <text x="265" y="105" fill="#d29922" font-size="13" text-anchor="middle" font-weight="600">Squash ONLY if cache dead</text>
+  <text x="577" y="105" fill="#f85149" font-size="13" text-anchor="middle" font-weight="600">Squash unconditionally (hard floor)</text>
+
+  <text x="450" y="170" fill="#8b949e" font-size="13" text-anchor="middle" font-style="italic">
+    Token usage as fraction of context window (1M for Opus 4.7)
+  </text>
+</svg>
+
+<p>Iss PR me ek <code>range_threshold</code> object aata hai agent YAML me:</p>
+<pre><code>range_threshold:
+  lower: 0.200          <span class="cm"># 200k tokens — cache-invalidation band start</span>
+  upper: 0.325          <span class="cm"># 325k tokens — hard squash floor</span>
+  cache_ttl_guard: 15s  <span class="cm"># cache_ttl (5m) − 15s = deadline</span></code></pre>
+
+<p>Decision logic (<code>core/xcontext/tiered.go</code>):</p>
+<pre><code>func rangeThresholdOutcome(p, ctxWindow, tokens, elapsed) reason {
+    frac := tokens / ctxWindow
+    deadline := p.CacheTTL - p.CacheTTLGuard
+    switch {
+    case frac &gt;= p.Upper:
+        return <span class="hl">rangeThresholdHardFloor</span>                <span class="cm">// 325k+: always squash</span>
+    case frac &gt;= p.Lower && elapsed &gt;= deadline:
+        return <span class="hl">rangeThresholdCacheInvalidation</span>        <span class="cm">// 200k–325k AND cache dead: squash</span>
+    default:
+        return rangeThresholdNo                              <span class="cm">// keep cache alive</span>
+    }
+}</code></pre>
+
+<h3>Margin capture — y / z / margin</h3>
+
+<svg viewBox="0 0 900 260" xmlns="http://www.w3.org/2000/svg">
+  <!-- y bar -->
+  <rect x="80" y="40" width="280" height="46" fill="#3fb950" fill-opacity="0.3" stroke="#3fb950"/>
+  <text x="220" y="68" fill="#3fb950" font-size="14" text-anchor="middle" font-weight="600">y = actual cost ($1.40)</text>
+  <text x="60" y="68" fill="#e6edf3" font-size="13" text-anchor="end" font-family="monospace">y</text>
+
+  <!-- z bar -->
+  <rect x="80" y="110" width="610" height="46" fill="#f0883e" fill-opacity="0.3" stroke="#f0883e"/>
+  <text x="385" y="138" fill="#f0883e" font-size="14" text-anchor="middle" font-weight="600">z = as-if no range gate ($4.59)</text>
+  <text x="60" y="138" fill="#e6edf3" font-size="13" text-anchor="end" font-family="monospace">z</text>
+
+  <!-- margin -->
+  <rect x="360" y="110" width="330" height="46" fill="#a371f7" fill-opacity="0.25"/>
+  <text x="525" y="200" fill="#a371f7" font-size="14" text-anchor="middle" font-weight="600">margin = z − y = $3.19</text>
+  <line x1="360" y1="156" x2="360" y2="195" stroke="#a371f7" stroke-width="1.5" stroke-dasharray="2,2"/>
+  <line x1="690" y1="156" x2="690" y2="195" stroke="#a371f7" stroke-width="1.5" stroke-dasharray="2,2"/>
+
+  <text x="450" y="240" fill="#8b949e" font-size="13" text-anchor="middle" font-style="italic">
+    Real Opus 4.7 job — pre-squash 269k cached prefix, gate fires, cache_create avoided ≈ 170k tokens
+  </text>
+</svg>
+
+<table>
+  <tr><th>Term</th><th>Meaning</th></tr>
+  <tr><td><code>y</code></td><td><b>Actual</b> cost paid to Anthropic (squash hua, cache_create save ho gaya)</td></tr>
+  <tr><td><code>z</code></td><td><b>As-if</b> cost — agar range gate NA hota, agent ko full cache invalidation pay karna padta</td></tr>
+  <tr><td><code>avoided</code></td><td>cache_create tokens jo "bachaye" — <code>pre_squash_cached_prefix − post_cache_create − post_cache_read</code></td></tr>
+  <tr><td><code>margin</code></td><td><b>z − y</b> — Emergent ka extra revenue (kyunki user ko z bill ho raha hai)</td></tr>
+</table>
+
+<div class="callout">
+<b>Sanity guard:</b> agar koi bhi sanity check fail ho jaye (<code>avoided ≤ 0</code>, pricing nil, <code>z &lt; y</code>) to swap nahi hota → user ko original <code>y</code> hi bill hota hai. <b>Fail-safe by design.</b>
+</div>
+
+<!-- ─────────────────────────────  COMMITS  ───────────────────────────── -->
+<h2 id="commits">3. 8 commits — step by step kya kiya</h2>
+
+<!-- Commit 1 -->
+<div class="commit-card feat">
+  <h3><span class="tag feat">FEAT</span> <span class="sha">a1dbf1afc</span> Cache-aware range gate (cortex#1474 base)</h3>
+  <p><b>Goal:</b> 0.275 wala legacy threshold ko replace karo cache-aware band se. Naya <code>RangeThresholdPolicy</code> + decision function.</p>
+  <p><b>Key changes:</b></p>
+  <ul>
+    <li><code>core/xcontext/tiered.go</code> (NEW) — <code>RangeThresholdPolicy</code> struct + <code>rangeThresholdOutcome()</code> function</li>
+    <li><code>core/xcontext/squash.go</code> — <code>decideSquashReason()</code> me range_threshold check pehle</li>
+    <li><code>resources/agents/farm_agents/full_stack_app_builder_cloud_v8_opus_4_7.yaml</code> — added <code>range_threshold</code> block, raised <code>overflow_threshold</code> to 0.34</li>
+    <li><code>pkg/agentsdk/context.go</code> — <code>RangeThreshold *RangeThresholdConfig</code> field + validation</li>
+  </ul>
+  <pre><code>if config.RangeThreshold != nil {
+    if o := rangeThresholdOutcome(...); o != rangeThresholdNo {
+        return o.String()  <span class="cm">// range_threshold_cache_invalidation OR range_threshold_hard_floor</span>
+    }
+} else if config.CompactionThreshold &gt; 0 {
+    <span class="cm">// legacy 0.275 fallback for agents jinhe range_threshold nahi mila</span>
+}</code></pre>
+</div>
+
+<!-- Commit 2 -->
+<div class="commit-card fix">
+  <h3><span class="tag fix">FIX</span> <span class="sha">3ab432931</span> Seed lastLLMCallTime from Redis anchor</h3>
+  <p><b>Problem:</b> Resume workflow start hone par <code>state.lastLLMCallTime</code> hamesha <code>exec.Now()</code> set hota tha. Mtlb elapsed=0, mtlb cache always dikhayi deta tha "alive" — range gate kabhi fire nahi hoti resume pe.</p>
+  <p><b>Fix:</b> <code>sessions.RuntimeMeta</code> (Redis) me persisted <code>LastLLMCallAt</code> seed karo. Cold-start pe fallback to Now.</p>
+  <pre><span class="del">-  state.SetLastLLMCallTime(exec.Now())</span>
+<span class="add">+  seed := setup.LastLLMCallAt</span>
+<span class="add">+  if seed.IsZero() { seed = exec.Now() }</span>
+<span class="add">+  state.SetLastLLMCallTime(seed)</span></pre>
+</div>
+
+<!-- Commit 3 -->
+<div class="commit-card feat">
+  <h3><span class="tag feat">FEAT</span> <span class="sha">0753337d8</span> Range-gate margin capture (main feature)</h3>
+  <p><b>Goal:</b> Jab <code>range_threshold_cache_invalidation</code> fire ho, PostHook me actual cost (y) ko as-if cost (z) se swap kar do. Margin = z − y user ko charge ho.</p>
+  <p><b>5 step pipeline:</b></p>
+  <div class="step"><div class="step-num">1</div><div class="step-text">
+    <b>Snapshot pre-squash baseline.</b><br>
+    <code>xcontext.ApplySquashResult.PreSquashCachedPrefixTokens</code> me <code>cache_creation + cache_read</code> save karte hain — sirf jab reason = cache_invalidation.
+  </div></div>
+  <div class="step"><div class="step-num">2</div><div class="step-text">
+    <b>Stage pending event in workflow state.</b><br>
+    <code>state.SetPendingSquashMargin(&PendingSquashMargin{PreSquashCachedPrefix: ...})</code> in <code>flow.go applySquashing()</code>.
+  </div></div>
+  <div class="step"><div class="step-num">3</div><div class="step-text">
+    <b>Pass through PostHookActivityInput.</b><br>
+    Workflow PostHook call karte time <code>PendingSquashMargin</code> bhejta hai activity ko.
+  </div></div>
+  <div class="step"><div class="step-num">4</div><div class="step-text">
+    <b>Resolve attribution inside activity.</b><br>
+    <code>xcontext.ResolveSquashMarginAttribution()</code> — pure function, computes <code>avoided</code>, <code>y</code>, <code>z</code>, returns swap or refused-with-reason.
+  </div></div>
+  <div class="step"><div class="step-num">5</div><div class="step-text">
+    <b>Stack delta with CAP attribution.</b><br>
+    <code>totalDelta := capDelta + squashDelta</code> → <code>Request.CostUSD += totalDelta</code> → ye agent-service ko bhejta hai → user ko bill hota hai z (not y).
+  </div></div>
+  <p><b>New files:</b></p>
+  <ul>
+    <li><code>core/xcontext/margin.go</code> — pricing math, eligibility gates, sanity checks</li>
+    <li><code>core/xcontext/margin_test.go</code> — 7 unit tests</li>
+  </ul>
+  <p><b>Touched files:</b> <code>state.go</code> (pending field), <code>request.go</code> (wire fields), <code>flow.go</code> (staging), <code>activities.go</code> (split into <code>resolveCapAttributionDelta</code> + <code>resolveSquashMarginDelta</code>), <code>metrics.go</code> (3 OTel counters)</p>
+</div>
+
+<!-- Commit 4 -->
+<div class="commit-card debug">
+  <h3><span class="tag debug">DEBUG</span> <span class="sha">d42aac928</span> DEBUG_PERSIST logs for range_threshold round-trip</h3>
+  <p><b>Purpose:</b> Investigate kyon <code>agents.squashing_strategy.range_threshold</code> null tha jabki spec me set tha. 3 jagah log dale:</p>
+  <ul>
+    <li><code>internal/pgsql/agents.go</code> — <code>CreateAgentWithRequest</code>, <code>UpdateAgentWithRequest</code>, <code>agentRowToConfig</code></li>
+    <li><code>core/agents/resolver.go</code> — <code>Resolve()</code> entry (DEBUG_RESOLVE)</li>
+  </ul>
+  <p class="small">⚠️ Temporary — feature merge ke baad drop karne hain.</p>
+</div>
+
+<!-- Commit 5 -->
+<div class="commit-card debug">
+  <h3><span class="tag debug">DEBUG</span> <span class="sha">f60bc3884</span> DEBUG_MARGIN logs end-to-end</h3>
+  <p><b>Purpose:</b> Margin attribution kis call pe land kar raha, decoupled ya refused, with which reason — trace karo per-iteration.</p>
+  <p>Logs in <code>core/xcontext/margin.go</code> at every gate (provider, avoided, pricing, math sanity) + workflow-side staging log in <code>core/workflows/elite/flow.go</code>.</p>
+  <p class="small">⚠️ Temporary — same as above.</p>
+</div>
+
+<!-- Commit 6 -->
+<div class="commit-card build">
+  <h3><span class="tag build">BUILD</span> <span class="sha">7568df3af</span> Wire REDIS_ADDR + CAP_BIGTABLE_* into eph deploy env</h3>
+  <p>Ephemeral environments par <code>sessions.RuntimeMeta</code> Redis se read kar paye → seed-on-resume kaam kare. Aur <code>cap_bigtable</code> ka column family setup ho.</p>
+  <p>File: <code>build/secrets_and_env_cortex.json</code> — 18 lines added.</p>
+</div>
+
+<!-- Commit 7 -->
+<div class="commit-card fix">
+  <h3><span class="tag fix">FIX</span> <span class="sha">a0a20c4dd</span> PR review feedback</h3>
+  <p>Codex + manual review se aaye <b>5 issues</b> — sab ek commit me fix:</p>
+  <table>
+    <tr><th>#</th><th>Issue</th><th>Fix</th></tr>
+    <tr><td>1</td><td>CI "Check Formatting" failing on <code>metrics.go</code></td><td><code>goimports -w</code> — 3 struct field alignment fix</td></tr>
+    <tr><td>2</td><td><code>state.lastLLMCallTime</code> only seeded when CAP enabled — range gate ke liye bhi chahiye</td><td>Unconditionally seed; <code>capRefreshLoop</code> goroutine still gated on CAP</td></tr>
+    <tr><td>3</td><td><code>ResolveSquashMarginAttribution</code> deref <code>in.CurrentUsage</code> without nil check → panic on failed LLM</td><td>Nil guards + new eligibility reason <code>usage_unavailable</code></td></tr>
+    <tr><td>4</td><td>Auto-compact / handoff supersede squashed prompt → stale pending margin baseline</td><td>Clear pending margin in <code>runIteration</code> if <code>Compacted</code> or <code>ShouldHandoff</code></td></tr>
+    <tr><td>5</td><td><code>cache_ttl_guard ≥ cache_ttl</code> misconfig → <code>CacheDeadline() ≤ 0</code> → every elapsed&gt;0 fires</td><td>Guard <code>deadline &gt; 0</code> in <code>rangeThresholdOutcome</code></td></tr>
+    <tr><td>6</td><td>Manish: "remove" <code>Provider</code> field — implicit Anthropic clamp via YAML opt-in is enough</td><td>Dropped <code>Provider</code> from <code>IterationContext</code> + <code>SquashMarginInput</code>; removed <code>isAnthropicProvider</code> helper + 2 tests</td></tr>
+  </table>
+  <p><b>Net:</b> 7 files, +42 / −66. Negative LOC — cleaner code.</p>
+</div>
+
+<!-- Commit 8 -->
+<div class="commit-card fix">
+  <h3><span class="tag fix">FIX</span> <span class="sha">ba01a203a</span> Preserve range_threshold across resume in session decoder</h3>
+  <p><b>Bug discovered on eph:</b> Resume workflow (HITL response, new message) range_threshold ko silently drop kar deta tha. Reason — do alag JSONB decoders hain, ek me <code>RangeThreshold</code> field tha, doosre me nahi.</p>
+  <table>
+    <tr><th>Decoder</th><th>File</th><th>RangeThreshold?</th><th>Called from</th></tr>
+    <tr><td><code>agentRowToConfig</code></td><td><code>agents.go:555</code></td><td class="ok">✓ Yes</td><td><code>GetAgentConfig</code> (debugger / patcher)</td></tr>
+    <tr><td>Sessions joined decoder</td><td><code>sessions.go:794</code></td><td class="bad">✗ Missing</td><td><code>ResolveFromSession</code> (RESUME flow)</td></tr>
+  </table>
+  <p><b>Fix:</b> sessions.go decoder me ek line add — mirror legacy <code>Threshold</code> pattern exactly.</p>
+  <pre>var sq struct {
+    Strategy          string                         `json:"strategy"`
+    Threshold         *float64                       `json:"threshold"`
+    PreserveLastN     *int                           `json:"preserve_last_n"`
+    TruncationLength  *int                           `json:"truncation_length"`
+    AutoCompact       []agentsdk.AutoCompactConfig   `json:"auto_compact"`
+    Upgrade           *agentsdk.UpgradeSpec          `json:"upgrade"`
+    OverflowThreshold *float64                       `json:"overflow_threshold"`
+<span class="add">+   RangeThreshold    *agentsdk.RangeThresholdConfig `json:"range_threshold"`</span>
+}
+...
+<span class="add">+ cfg.Context.RangeThreshold = sq.RangeThreshold</span></pre>
+  <p><b>Proof:</b> Same job <code>b151aff5</code> ke 3 alag runs:</p>
+  <table>
+    <tr><th>Run</th><th>RunID</th><th>Type</th><th>DEBUG_PERSIST</th></tr>
+    <tr><td>1</td><td><code>019e5466</code></td><td>Initial (10:34:27)</td><td>—  (CREATE bypasses log)</td></tr>
+    <tr><td>2</td><td><code>0efb2e2a</code></td><td>RESUME (10:34:48)</td><td class="bad">range_threshold_set: False</td></tr>
+    <tr><td>3</td><td><code>da9bddd3</code></td><td>RESUME (11:10:26)</td><td class="bad">range_threshold_set: False</td></tr>
+  </table>
+  <p>Har resume run ne DB me <code>null</code> overwrite kiya. Fix deploy ke baad ye chain tootegi — resume runs ab range_threshold preserve karenge.</p>
+</div>
+
+<!-- ─────────────────────────────  E2E FLOW  ───────────────────────────── -->
+<h2 id="flow">4. End-to-end flow diagram</h2>
+
+<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg">
+  <!-- Boxes -->
+  <g font-family="monospace" font-size="12">
+    <!-- 1 squash -->
+    <rect x="60" y="30" width="200" height="60" fill="#161b22" stroke="#3fb950"/>
+    <text x="160" y="52" fill="#3fb950" text-anchor="middle" font-weight="600">applySquashing()</text>
+    <text x="160" y="70" fill="#8b949e" text-anchor="middle" font-size="11">flow.go</text>
+    <text x="160" y="84" fill="#e6edf3" text-anchor="middle" font-size="11">fires range gate</text>
+
+    <!-- arrow 1 -->
+    <line x1="260" y1="60" x2="350" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="305" y="48" fill="#58a6ff" text-anchor="middle" font-size="10">reason matches?</text>
+
+    <!-- 2 snapshot -->
+    <rect x="350" y="30" width="240" height="60" fill="#161b22" stroke="#a371f7"/>
+    <text x="470" y="52" fill="#a371f7" text-anchor="middle" font-weight="600">snapshot baseline</text>
+    <text x="470" y="68" fill="#8b949e" text-anchor="middle" font-size="11">xcontext.ApplySquashResult</text>
+    <text x="470" y="84" fill="#e6edf3" text-anchor="middle" font-size="11">PreSquashCachedPrefixTokens</text>
+
+    <!-- arrow 2 -->
+    <line x1="590" y1="60" x2="660" y2="60" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <!-- 3 stage -->
+    <rect x="660" y="30" width="200" height="60" fill="#161b22" stroke="#d29922"/>
+    <text x="760" y="52" fill="#d29922" text-anchor="middle" font-weight="600">stage on state</text>
+    <text x="760" y="68" fill="#8b949e" text-anchor="middle" font-size="11">state.go</text>
+    <text x="760" y="84" fill="#e6edf3" text-anchor="middle" font-size="11">pendingSquashMargin</text>
+
+    <!-- arrow down -->
+    <line x1="760" y1="90" x2="760" y2="160" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+    <text x="770" y="125" fill="#58a6ff" font-size="10">next LLM call →</text>
+
+    <!-- 4 LLM call -->
+    <rect x="660" y="160" width="200" height="60" fill="#161b22" stroke="#58a6ff"/>
+    <text x="760" y="182" fill="#58a6ff" text-anchor="middle" font-weight="600">LLM call</text>
+    <text x="760" y="198" fill="#8b949e" text-anchor="middle" font-size="11">small prompt → small bill</text>
+    <text x="760" y="214" fill="#3fb950" text-anchor="middle" font-size="11">y = actual cost</text>
+
+    <!-- arrow down -->
+    <line x1="760" y1="220" x2="760" y2="290" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <!-- 5 posthook -->
+    <rect x="600" y="290" width="260" height="80" fill="#161b22" stroke="#f0883e"/>
+    <text x="730" y="312" fill="#f0883e" text-anchor="middle" font-weight="600">activityPostHook()</text>
+    <text x="730" y="328" fill="#8b949e" text-anchor="middle" font-size="11">activities.go</text>
+    <text x="730" y="346" fill="#e6edf3" text-anchor="middle" font-size="11">capDelta + squashDelta</text>
+    <text x="730" y="362" fill="#a371f7" text-anchor="middle" font-size="11">Request.CostUSD swapped y→z</text>
+
+    <!-- arrow left -->
+    <line x1="600" y1="330" x2="500" y2="330" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <!-- 6 resolve -->
+    <rect x="220" y="290" width="280" height="80" fill="#161b22" stroke="#f85149"/>
+    <text x="360" y="312" fill="#f85149" text-anchor="middle" font-weight="600">ResolveSquashMarginAttribution</text>
+    <text x="360" y="328" fill="#8b949e" text-anchor="middle" font-size="11">xcontext/margin.go (pure fn)</text>
+    <text x="360" y="346" fill="#e6edf3" text-anchor="middle" font-size="11">avoided = pre − postCreate − postRead</text>
+    <text x="360" y="362" fill="#f0883e" text-anchor="middle" font-size="11">y = actual; z = price(usage + avoided)</text>
+
+    <!-- arrow down -->
+    <line x1="360" y1="370" x2="360" y2="440" stroke="#58a6ff" stroke-width="1.5" marker-end="url(#a)"/>
+
+    <!-- 7 agentsvc -->
+    <rect x="220" y="440" width="280" height="60" fill="#161b22" stroke="#3fb950"/>
+    <text x="360" y="462" fill="#3fb950" text-anchor="middle" font-weight="600">agent-service.PostHook(req)</text>
+    <text x="360" y="478" fill="#8b949e" text-anchor="middle" font-size="11">trajectories table</text>
+    <text x="360" y="494" fill="#e6edf3" text-anchor="middle" font-size="11">user billed z (not y) — margin = z − y</text>
+
+    <!-- arrow defs -->
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M0,0 L10,5 L0,10" fill="#58a6ff"/>
+      </marker>
+    </defs>
+  </g>
+</svg>
+
+<!-- ─────────────────────────────  BUGS  ───────────────────────────── -->
+<h2 id="bugs">5. Deploy ke time mile bugs aur fixes</h2>
+
+<div class="callout bad">
+<b>Bug 1: stale eph binary</b><br>
+Initial deploy stale image use kar raha tha (commit <code>d42aac928</code>) — feature code <code>0753337d8</code> deployed nahi tha. Solution: trigger cloud build with HEAD SHA explicitly. Now binary = HEAD.
+</div>
+
+<div class="callout bad">
+<b>Bug 2: log filter</b><br>
+GCloud logging me <code>textPayload</code> par filter karte time DEBUG_MARGIN nahi mil raha tha. Cortex ka <code>pkg/log</code> JSON-structured logs deta hai stderr pe — wo <code>jsonPayload</code> me jaate hain, not textPayload. Filter fix kiya: <code>jsonPayload.msg=~"DEBUG_MARGIN"</code> → saare logs dikhe.
+</div>
+
+<div class="callout bad">
+<b>Bug 3: resume decoder dropping range_threshold (THE BIG ONE)</b><br>
+<code>internal/pgsql/sessions.go:794</code> decoder me <code>RangeThreshold</code> field hi nahi tha. Resume workflow ResolveFromSession se aata hai → ye decoder use karta hai → <code>RangeThreshold</code> silently drop ho jata tha → UpdateAgent re-persist karta nil ko → DB me <code>range_threshold: null</code>.
+<br><br>
+<b>Fix:</b> commit <code>ba01a203a</code> — sessions.go decoder me <code>RangeThreshold</code> field add kiya, mirror karke <code>agentRowToConfig</code>.
+<br><br>
+<b>Recovery:</b> Existing 6 jobs (jo resume ho chuke the) ki DB rows manually patch ki — agent_specs.spec.context.range_threshold se agents.squashing_strategy.range_threshold me copy. <code>UPDATE 6</code> rows affected, committed atomically.
+</div>
+
+<div class="callout warn">
+<b>Important order for deploy:</b>
+<ol>
+  <li>Pehle naya binary deploy (commit <code>ba01a203a</code> ke saath)</li>
+  <li>Phir purane jobs ko resume karo — agar pehle resume kiya to old binary phir se clobber karega DB ko</li>
+</ol>
+</div>
+
+<!-- ─────────────────────────────  STATUS  ───────────────────────────── -->
+<h2 id="status">6. Status summary</h2>
+
+<table>
+  <tr><th>Component</th><th>Status</th><th>Notes</th></tr>
+  <tr><td>Range gate (Tier 1) cache-aware band</td><td class="ok">Working</td><td>Verified via setup log <code>range_threshold enabled lower=0.2 upper=0.325</code></td></tr>
+  <tr><td>Redis-anchor seed on resume</td><td class="ok">Working</td><td>Cross-run elapsed correctly hydrated</td></tr>
+  <tr><td>Margin capture pipeline</td><td class="ok">Working</td><td>7 iterations of <code>b151aff5</code> showed clean staging + resolution</td></tr>
+  <tr><td>Auto-compact / handoff invalidation</td><td class="ok">Working</td><td><code>state.ClearPendingSquashMargin()</code> on Compacted/ShouldHandoff</td></tr>
+  <tr><td>Nil guards (Pending, CurrentUsage)</td><td class="ok">Working</td><td>Refused with reason <code>usage_unavailable</code></td></tr>
+  <tr><td>Resume decoder fix</td><td class="ok">Pushed</td><td>Awaiting eph redeploy to validate</td></tr>
+  <tr><td>Decoupled swap actually fires</td><td class="meh">Pending</td><td>Need a job that crosses 200k tokens + 4m45s+ idle — short jobs nahi trigger karte</td></tr>
+  <tr><td>DEBUG_* diagnostic logs</td><td class="meh">Temporary</td><td>Drop ke baad next PR me clean up</td></tr>
+</table>
+
+<h3>Next steps for QA</h3>
+<ol>
+  <li>Redeploy eph with HEAD = <code>ba01a203a</code></li>
+  <li>Run a job with <code>full_stack_app_builder_cloud_v8_opus_4_7</code> prompt + claude-opus-4-7</li>
+  <li>Bada task do — minimum 200k tokens cross karne wala</li>
+  <li>Idle time ≥ 4m 45s between calls — taaki cache invalidate ho aur range gate fire kare</li>
+  <li>Logs check karo: <code>squashing applied reason=range_threshold_cache_invalidation</code> + <code>DEBUG_MARGIN decoupled: margin captured</code></li>
+  <li>HITL response do → resume workflow → check ki <code>range_threshold</code> DB me preserve hai (not null)</li>
+</ol>
+
+<div class="callout">
+<b>Files in this folder:</b>
+<ul style="margin: 6px 0 0 0;">
+  <li><code>design.html</code> — main design document (PRD-level)</li>
+  <li><code>pr-1485-walkthrough.html</code> — <em>this file</em> (commit-level walkthrough)</li>
+  <li><code>critique.md</code> — senior-architect critique session</li>
+  <li><code>test-cases.xlsx</code> — 22 test cases</li>
+</ul>
+</div>
+
+<p class="small" style="margin-top: 40px; text-align: center;">
+  Generated 2026-05-23 · cortex/PR-1485 walkthrough · self-contained HTML
+</p>
+
+</div>
+</body>
+</html>
