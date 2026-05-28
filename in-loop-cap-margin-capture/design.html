@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>In-Loop CAP Margin Capture — Design</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a1a; --muted: #555;
+    --accent: #0b6bcb; --accent-soft: #e6f0fa;
+    --good: #1b7a3f; --bad: #b3251b; --warn: #b06a00;
+    --grid: #e5e5e5; --card: #fff; --code-bg: #f4f4f4; --highlight: #fff5d6;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px; line-height: 1.55; }
+  .wrapper { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto;
+    padding: 24px 16px; border-right: 1px solid var(--grid); background: #fff; }
+  nav.toc h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 12px; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: section; }
+  nav.toc ol li { counter-increment: section; margin: 4px 0; font-size: 14px; }
+  nav.toc ol li::before { content: counter(section) ". "; color: var(--muted); }
+  nav.toc a { color: var(--fg); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); }
+  main { padding: 40px 56px; max-width: 980px; }
+  h1 { font-size: 28px; margin: 0 0 8px; }
+  h2 { font-size: 22px; margin: 40px 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  h3 { font-size: 18px; margin: 24px 0 10px; }
+  h4 { font-size: 15px; margin: 16px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  p { margin: 8px 0; }
+  code { font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 13px; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre { background: var(--code-bg); padding: 14px 18px; border-radius: 6px; overflow-x: auto; font-size: 13px; line-height: 1.5; }
+  pre code { background: none; padding: 0; }
+  .callout { background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 12px 16px; margin: 16px 0; border-radius: 0 6px 6px 0; }
+  .callout.warn { background: #fff6e8; border-left-color: var(--warn); }
+  .callout.bad  { background: #fdeae8; border-left-color: var(--bad); }
+  .callout.good { background: #e8f5ec; border-left-color: var(--good); }
+  .callout h4 { margin-top: 0; color: var(--fg); }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 14px; }
+  th, td { border: 1px solid var(--grid); padding: 8px 12px; text-align: left; vertical-align: top; }
+  th { background: #f0f0f0; font-weight: 600; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+  .pill.good { background: #e8f5ec; color: var(--good); }
+  .pill.bad  { background: #fdeae8; color: var(--bad); }
+  .pill.warn { background: #fff6e8; color: var(--warn); }
+  .pill.info { background: var(--accent-soft); color: var(--accent); }
+  .figure { background: var(--card); border: 1px solid var(--grid); border-radius: 8px; padding: 16px; margin: 18px 0; text-align: center; }
+  .figure svg { max-width: 100%; height: auto; }
+  .figure .caption { color: var(--muted); font-size: 13px; margin-top: 10px; font-style: italic; }
+  hr { border: none; border-top: 1px solid var(--grid); margin: 32px 0; }
+  .term { font-weight: 600; color: var(--accent); }
+  .formula { font-family: "SF Mono", Menlo, Consolas, monospace; background: var(--highlight); padding: 8px 14px; border-radius: 5px; display: inline-block; margin: 6px 0; }
+  .kv { display: grid; grid-template-columns: 180px 1fr; gap: 4px 16px; margin: 8px 0; }
+  .kv dt { font-weight: 600; color: var(--muted); }
+  .kv dd { margin: 0; }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#intro">TL;DR</a></li>
+    <li><a href="#prereqs">Prerequisites</a></li>
+    <li><a href="#whats-shipped">What's shipped vs the gaps</a></li>
+    <li><a href="#vocab">Vocabulary (delta)</a></li>
+    <li><a href="#design">The design</a></li>
+    <li><a href="#dataflow">Data flow</a></li>
+    <li><a href="#races">Race conditions and edges</a></li>
+    <li><a href="#code">Code changes</a></li>
+    <li><a href="#failure">Failure modes</a></li>
+    <li><a href="#reporting">Reporting</a></li>
+  </ol>
+</nav>
+
+<main>
+
+<header>
+  <h1>In-Loop CAP Margin Capture</h1>
+  <p class="meta">Extends <a href="../cap-margin-capture/">cap-margin-capture</a>. Captures margin on the LLM call following a long-running tool execution. <strong>Read the terminal-state design first</strong> — this doc assumes that vocabulary and machinery.</p>
+</header>
+
+<!-- ============================================================ -->
+<section id="intro">
+<h2>1. TL;DR (for the impatient)</h2>
+
+<p>CAP already keeps the prompt cache alive during long-running tool executions via <strong>in-loop refresh pings</strong> (<code>core/workflows/elite/cap.go:capRefreshLoop</code>). The firing side is shipped and battle-tested. But the <strong>attribution side</strong> — the part that re-bills the next LLM call at the as-if-cold-cache price <span class="term">z</span> and captures the margin — is hard-gated to iter 1 of every workflow (<code>activities.go:776</code>, the <code>IsFirstIteration</code> short-circuit). That gate exists because the <code>PrevAssistantMsgAt</code> eligibility boundary is snapshotted from Redis at workflow setup and never advanced per-iter; running attribution on iter 2+ with a stale window would re-claim the same ping pool and double-count.</p>
+
+<p>This change makes one targeted shift: <strong>delete the iter-1 gate, advance the eligibility window per-iter, and merge in-flight <code>in_loop</code> pings into the attribution input</strong>. Same <code>z − y − x</code> math, same Unleash experiment, same metrics. No new flag, no schema change.</p>
+
+<div class="callout good">
+<h4>Scope</h4>
+<ul>
+  <li><strong>Same flag as terminal-state.</strong> Reuses <code>cap_enable_refresh</code>; a patch on the same experiment toggles <code>LongRunningMaxRefreshes &gt; 0</code> to fire in-loop pings. If firing is on, attribution follows.</li>
+  <li><strong>No new package, no new activity, no new metric.</strong> The existing <code>cap.attribution.*</code> histograms already carry a <code>ping_source</code> label (set from <code>PingRecord.Source</code>) — in-loop margin surfaces as a <code>ping_source="in_loop"</code> slice on the same Grafana panels.</li>
+  <li><strong>5 files changed, +20 / −10 lines net.</strong> Net code <em>shrinks</em>: deleting the <code>IsFirstIteration</code> gate removes more code than the per-iter advance adds.</li>
+</ul>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="prereqs">
+<h2>2. Prerequisites</h2>
+
+<p>This design assumes a working understanding of the <a href="../cap-margin-capture/">terminal-state CAP Margin Capture</a> doc — specifically:</p>
+
+<ul>
+  <li><strong>The <span class="term">y / z / x</span> vocabulary</strong> (<a href="../cap-margin-capture/design.html#vocab">section 6</a> of the parent doc). Margin per decoupled call = <code>z − y − x</code>.</li>
+  <li><strong>The attribution rule</strong> (parent <a href="../cap-margin-capture/design.html#attribution">section 7</a>): decouple only when (a) elapsed since the previous elite call exceeds <code>CacheTTL = 5min</code>, AND (b) at least one cache-hit ping fired in the eligibility window <code>(prevAt, callTime]</code>.</li>
+  <li><strong>The Redis runtime-meta layout</strong> (parent <a href="../cap-margin-capture/design.html#runtime-meta">section 11</a>): <code>last_assistant_msg_at</code> is the boundary; CAP pings deliberately do NOT advance it.</li>
+  <li><strong>BigTable <code>ping_data</code> column family</strong> as the persistence layer for all pings, in_loop and post_exit alike (parent <a href="../cap-margin-capture/design.html#schema">section 10</a>). <em>Here we will not load in-flight in_loop pings from BigTable — we'll carry them in workflow state.</em></li>
+</ul>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="whats-shipped">
+<h2>3. What's shipped vs the gaps</h2>
+
+<p>The firing side of in-loop CAP is mature. The gap is entirely on the attribution side, and it's smaller than it looks.</p>
+
+<h3>3.1 Already shipped (firing)</h3>
+
+<table>
+  <thead><tr><th>Component</th><th>Where</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Background coroutine that fires in-loop pings</td><td><code>elite/cap.go:capRefreshLoop</code></td><td>✓ shipped</td></tr>
+    <tr><td>Per-fire gate (elapsed, cacheTokens, refreshCount budget)</td><td><code>cap/config.go:ShouldRefreshLongRunning</code></td><td>✓ shipped</td></tr>
+    <tr><td>Refresh activity (sends ping to Anthropic, returns RefreshResult)</td><td><code>cap/workflow.go:activityRefreshCacheAnchor</code></td><td>✓ shipped</td></tr>
+    <tr><td>BigTable persistence with <code>Source = "in_loop"</code></td><td><code>internal/pgsql/cap_pings.go:SavePing</code></td><td>✓ shipped</td></tr>
+    <tr><td>Same caching policy as post_exit (zero <code>cache_creation</code>)</td><td><code>cap/workflow.go</code> (uses <code>CAPCachingPolicy</code>)</td><td>✓ shipped (verified in <a href="https://github.com/emergentbase/cortex/pull/1487">cortex#1487</a>)</td></tr>
+  </tbody>
+</table>
+
+<h3>3.2 The two attribution gaps</h3>
+
+<table>
+  <thead><tr><th>#</th><th>Gap</th><th>Where it breaks</th><th>Symptom</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>G1</td>
+      <td><strong>In-flight in_loop pings are invisible to attribution.</strong> <code>refreshCacheAnchorIfNeeded</code> writes to BigTable via the activity, but the result is dropped on the floor — nothing is appended to any in-memory list the PostHook activity can read.</td>
+      <td><code>elite/cap.go:73-93</code></td>
+      <td>Even with all filters removed, iter N+1 sees <code>CapPings: setup.Cap.Pings</code> (frozen at setup) → empty → <code>no_qualifying_ping</code> → bills <code>y</code>.</td>
+    </tr>
+    <tr>
+      <td>G2</td>
+      <td><strong>Attribution is hard-gated to iter 1.</strong> The <code>!input.Iteration.IsFirstIteration</code> short-circuit was added precisely to prevent double-counting the same post_exit pool on later iters — at the cost of making in-loop margin uncapturable.</td>
+      <td><code>elite/activities.go:776</code></td>
+      <td>Iter 2+ never run attribution; log line is <code>cap attribution skipped reason=not_first_iteration</code>.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+<h4>Why G2 exists today (and why removing it is the right call now)</h4>
+<p>With <code>PrevAssistantMsgAt</code> frozen at workflow-setup load, the eligibility window for iter N is <code>(Redis-loaded-time, iter_N_CallTime]</code>. Both iter 1 and iter 2 would see the same post_exit pings in their windows → iter 2 would re-claim the margin iter 1 already claimed. The cheap defense was <em>"only attribute on iter 1"</em>. That works for terminal-only CAP. It doesn't work for in-loop, because in-loop pings fire <em>between</em> iters, and only iter 2+ can claim them. The proper fix is per-iter window advance — which makes the gate redundant.</p>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="vocab">
+<h2>4. Vocabulary (delta)</h2>
+
+<p>No new vocabulary. We reuse <span class="term">y</span>, <span class="term">z</span>, <span class="term">x</span> from the parent doc. One existing term is highlighted because it gains a new role:</p>
+
+<dl class="kv">
+  <dt>eligibility window</dt>
+  <dd>For attribution at iter N: the time interval <code>(prevAt, callTime]</code> where <code>prevAt</code> is the previous elite LLM call's start time. <strong>Today</strong> (terminal-only): <code>prevAt</code> = Redis-loaded value, fixed for the workflow. <strong>After this change</strong> (unified): <code>prevAt</code> = iter (N−1)'s CallTime for iter ≥ 2; <code>prevAt</code> = Redis-loaded value for iter 1.</dd>
+  <dt>PingRecord.Source</dt>
+  <dd>Already exists: <code>"post_exit"</code> | <code>"in_loop"</code>. Currently used as a hard filter (drop in_loop). After this change, used only as an audit label for metrics/logs — both sources participate in attribution equally.</dd>
+</dl>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="design">
+<h2>5. The design</h2>
+
+<h3>5.1 Two new fields on workflow state</h3>
+
+<pre><code>// core/workflows/elite/state.go
+type State struct {
+    // ... existing fields ...
+
+    lastAssistantMsgAt time.Time          // seeded from setup.Cap.LastAssistantMsgAt at workflow start;
+                                          // advanced to thisIter's CallTime per elite LLM call;
+                                          // read by PostHook builder as the previous-iter boundary.
+
+    inLoopPings        []cap.PingRecord    // empty at workflow start;
+                                          // appended after each successful refreshCacheAnchorIfNeeded;
+                                          // merged into PostHookActivityInput.CapPings.
+}
+
+func (s *State) GetLastAssistantMsgAt() time.Time          { return s.lastAssistantMsgAt }
+func (s *State) SetLastAssistantMsgAt(t time.Time)         { s.lastAssistantMsgAt = t }
+func (s *State) GetInLoopPings() []cap.PingRecord          { return s.inLoopPings }
+func (s *State) AppendInLoopPing(p cap.PingRecord)         { s.inLoopPings = append(s.inLoopPings, p) }
+</code></pre>
+
+<h3>5.2 The read-advance-merge pattern at every PostHook build site</h3>
+
+<pre><code>// core/workflows/elite/flow.go (build site for PostHookActivityInput, ~line 950)
+
+// Capture before advance — this is what attribution uses as "previous iter".
+prevAt := state.GetLastAssistantMsgAt()
+state.SetLastAssistantMsgAt(p.LLMCallStartedAt)
+
+// Merge in-flight in_loop pings on top of the setup-loaded post_exit pings.
+mergedPings := append(append([]cap.PingRecord{}, setup.Cap.Pings...), state.GetInLoopPings()...)
+
+input := PostHookActivityInput{
+    Request:    *postHookReq,
+    CapEnabled: setup.Cap.Enabled,
+    CapPings:   mergedPings,
+    Iteration: IterationContext{
+        ...
+        PrevAssistantMsgAt: prevAt,
+        // IsFirstIteration: DELETED
+    },
+    PendingSquashMargin: state.PendingSquashMargin(),
+}
+</code></pre>
+
+<div class="callout">
+<h4>Why a local for <code>prevAt</code>, not a third state field</h4>
+<p>The "previous" value is only meaningful at the precise instant we build PostHook input. Once we've used it, advancing the canonical <code>lastAssistantMsgAt</code> immediately makes the snapshot stale. Co-locating snapshot + advance in three lines (read, set, use) eliminates the class of bug where a future contributor adds a fourth read site and gets the wrong value. <strong>The cons of an explicit <code>state.prevAssistantMsgAt</code> sibling field are documented in <a href="./adr/0001-state-shape-for-in-loop-pings.md">ADR-0001</a>.</strong></p>
+</div>
+
+<h3>5.3 Appending to the in-loop ping list</h3>
+
+<p><code>RefreshResult</code> gains one field — <code>FiredAt time.Time</code>, captured by the activity at the moment it actually fires the ping. That's the only datum the workflow doesn't already know; everything else needed for a <code>PingRecord</code> is in the <code>RefreshRequest</code> that was sent in.</p>
+
+<pre><code>// core/cap/refresh.go (add to RefreshResult)
+FiredAt time.Time `json:"fired_at"`
+
+// core/workflows/cap/workflow.go (activityRefreshCacheAnchor — set on the result before return)
+result.FiredAt = time.Now()
+
+// core/workflows/elite/cap.go (refreshCacheAnchorIfNeeded, after activity succeeds)
+state.AppendInLoopPing(cap.PingRecord{
+    JobID:               req.JobID,
+    SessionID:           setup.Agent.SessionID,
+    RequestID:           refreshReq.RequestID,
+    Source:              cap.PingSourceInLoop,
+    Model:               setup.CurrentModel,
+    CacheHit:            result.CacheHit,
+    CacheReadTokens:     result.CacheReadTokens,
+    CacheCreationTokens: result.CacheCreationTokens,
+    CostUSD:             result.CostUSD,
+    FiredAt:             result.FiredAt,
+})
+</code></pre>
+
+<p>The activity's <code>time.Now()</code> is captured deterministically into the activity result, which Temporal records in workflow history. Replays of the same workflow see the same <code>FiredAt</code> on the same iteration. No replay nondeterminism.</p>
+
+<h3>5.4 Three deletions on the attribution side</h3>
+
+<table>
+  <thead><tr><th>File</th><th>What</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>core/cap/attribution.go:57</code></td>
+      <td>Drop <code>if p.Source != PingSourcePostExit { continue }</code> in <code>PickCandidate</code></td>
+      <td>Both sources are valid candidates; the source field becomes a label, not a filter.</td>
+    </tr>
+    <tr>
+      <td><code>core/cap/attribution.go:84</code></td>
+      <td>Drop same filter in <code>SumPostExitPingCosts</code>; rename to <code>SumPingCosts</code></td>
+      <td>x must include both source kinds; the old name lied about scope.</td>
+    </tr>
+    <tr>
+      <td><code>core/workflows/elite/activities.go:776</code></td>
+      <td>Delete the <code>!input.Iteration.IsFirstIteration</code> short-circuit branch</td>
+      <td>The per-iter window advance makes the gate redundant.</td>
+    </tr>
+    <tr>
+      <td><code>core/workflows/elite/request.go:497-500</code></td>
+      <td>Delete <code>IsFirstIteration</code> field from <code>IterationContext</code></td>
+      <td>No remaining readers.</td>
+    </tr>
+    <tr>
+      <td><code>core/workflows/elite/flow.go:962</code></td>
+      <td>Delete <code>IsFirstIteration: postHookReq.Iteration == 1</code> field assignment</td>
+      <td>Field no longer exists.</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+<h4>What does NOT change</h4>
+<ul>
+  <li><code>internal/pgsql/cap_pings.go:LoadCapPings</code> keeps its <code>source != post_exit</code> filter on setup-time loads. <strong>This is intentional</strong> — in-loop pings only matter within the workflow that fired them; cross-workflow load only needs post_exit pings. We carry the in-flight ones in workflow state instead.</li>
+  <li><code>cap.Service.ResolveAttribution</code>'s signature is unchanged. Same <code>ResolveInput</code> struct, same return shape. The in-loop pings just arrive merged into <code>Pings</code>.</li>
+  <li>Existing failure modes from the parent doc all still apply with the same semantics. BigTable write failure on a ping → ping not persisted, but it <em>is</em> in <code>state.inLoopPings</code> for the rest of this workflow → margin attributed correctly. Better than terminal-state, where BT-write-failure means the ping is lost forever.</li>
+</ul>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="dataflow">
+<h2>6. Data flow</h2>
+
+<p>Three iters of a single workflow showing the unified attribution path. iter 1 claims post_exit pings (from prior workflow); iter 2's tool execution generates in_loop pings; iter 3 claims them.</p>
+
+<div class="figure">
+<svg viewBox="0 0 1280 760" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13" style="width:100%; max-width:1280px;">
+  <g stroke="#bbb" stroke-dasharray="3,3">
+    <line x1="120"  y1="80" x2="120"  y2="720"/>
+    <line x1="350"  y1="80" x2="350"  y2="720"/>
+    <line x1="610"  y1="80" x2="610"  y2="720"/>
+    <line x1="880"  y1="80" x2="880"  y2="720"/>
+    <line x1="1150" y1="80" x2="1150" y2="720"/>
+  </g>
+
+  <g font-weight="600" text-anchor="middle" font-size="14">
+    <rect x="60"   y="42" width="120" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="120"  y="64">Elite WF</text>
+    <rect x="280"  y="42" width="140" height="34" fill="#fff" stroke="#0b6bcb"/>
+    <text x="350"  y="64" fill="#0b6bcb">state (in-memory)</text>
+    <rect x="540"  y="42" width="140" height="34" fill="#fff" stroke="#b06a00"/>
+    <text x="610"  y="64" fill="#b06a00">capRefreshLoop</text>
+    <rect x="810"  y="42" width="140" height="34" fill="#fff" stroke="#1b7a3f"/>
+    <text x="880"  y="64" fill="#1b7a3f">activityPostHook</text>
+    <rect x="1070" y="42" width="160" height="34" fill="#fff" stroke="#555"/>
+    <text x="1150" y="64" fill="#555">Anthropic / BigTable</text>
+  </g>
+
+  <!-- ITER 1 -->
+  <rect x="40" y="100" width="240" height="22" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="160" y="116" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">Iter 1 @ t=0 — first elite call after resume</text>
+
+  <line x1="120" y1="145" x2="345" y2="145" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="345,145 337,141 337,149" fill="#0b6bcb"/>
+  <text x="232" y="139" text-anchor="middle" font-size="12" fill="#0b6bcb">setup loaded: lastAssistantMsgAt = T_redis (pre-resume)</text>
+
+  <line x1="120" y1="172" x2="875" y2="172" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="875,172 867,168 867,176" fill="#0b6bcb"/>
+  <text x="497" y="166" text-anchor="middle" font-size="12" fill="#0b6bcb">build PostHook input: prevAt = T_redis, advance state to t=0</text>
+
+  <line x1="120" y1="200" x2="875" y2="200" stroke="#0b6bcb" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="497" y="194" text-anchor="middle" font-size="11" fill="#0b6bcb" font-style="italic">CapPings = setup.Cap.Pings (post_exit from prior wf) ++ state.inLoopPings (empty)</text>
+
+  <line x1="880" y1="225" x2="120" y2="225" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <polygon points="120,225 128,221 128,229" fill="#1b7a3f"/>
+  <text x="497" y="219" text-anchor="middle" font-size="12" fill="#1b7a3f" font-weight="600">attribution: window=(T_redis, t=0], post_exit ping found → decoupled, bill z</text>
+
+  <line x1="50" y1="248" x2="1240" y2="248" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- TOOL EXECUTION (long) -->
+  <rect x="40" y="261" width="280" height="22" fill="#fff6e8" stroke="#b06a00"/>
+  <text x="180" y="277" text-anchor="middle" font-size="12" font-weight="600" fill="#b06a00">Long tool: t=0 → t=10  (in-loop pings fire)</text>
+
+  <line x1="610" y1="308" x2="1145" y2="308" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="1145,308 1137,304 1137,312" fill="#b06a00"/>
+  <text x="877" y="302" text-anchor="middle" font-size="12" fill="#b06a00">refresh activity @ t=4:50 → BigTable PUT, RefreshResult{FiredAt=t=4:50}</text>
+
+  <line x1="610" y1="335" x2="355" y2="335" stroke="#b06a00" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <polygon points="355,335 363,331 363,339" fill="#b06a00"/>
+  <text x="482" y="329" text-anchor="middle" font-size="11" fill="#b06a00" font-style="italic">state.AppendInLoopPing(record{FiredAt:t=4:50})</text>
+
+  <line x1="610" y1="363" x2="1145" y2="363" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="1145,363 1137,359 1137,367" fill="#b06a00"/>
+  <text x="877" y="357" text-anchor="middle" font-size="12" fill="#b06a00">refresh activity @ t=9:40 → BigTable PUT</text>
+
+  <line x1="610" y1="390" x2="355" y2="390" stroke="#b06a00" stroke-width="1.5" stroke-dasharray="3,2"/>
+  <polygon points="355,390 363,386 363,394" fill="#b06a00"/>
+  <text x="482" y="384" text-anchor="middle" font-size="11" fill="#b06a00" font-style="italic">state.AppendInLoopPing(record{FiredAt:t=9:40})</text>
+
+  <line x1="50" y1="413" x2="1240" y2="413" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- ITER 2 -->
+  <rect x="40" y="426" width="280" height="22" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="180" y="442" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">Iter 2 @ t=10 — after long tool, cache kept warm</text>
+
+  <line x1="120" y1="473" x2="875" y2="473" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="875,473 867,469 867,477" fill="#0b6bcb"/>
+  <text x="497" y="467" text-anchor="middle" font-size="12" fill="#0b6bcb">build PostHook input: prevAt = t=0 (snapshotted), advance state to t=10</text>
+
+  <line x1="120" y1="500" x2="875" y2="500" stroke="#0b6bcb" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="497" y="494" text-anchor="middle" font-size="11" fill="#0b6bcb" font-style="italic">CapPings = setup.Cap.Pings ++ state.inLoopPings (2 in_loop rows)</text>
+
+  <line x1="880" y1="528" x2="120" y2="528" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <polygon points="120,528 128,524 128,532" fill="#1b7a3f"/>
+  <text x="497" y="522" text-anchor="middle" font-size="12" fill="#1b7a3f" font-weight="600">attribution: window=(t=0, t=10], picks t=9:40 in_loop → decoupled, bill z</text>
+
+  <text x="497" y="545" text-anchor="middle" font-size="11" fill="#1b7a3f" font-style="italic">x = cost(t=4:50 ping) + cost(t=9:40 ping)</text>
+
+  <line x1="50" y1="568" x2="1240" y2="568" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- ITER 3 -->
+  <rect x="40" y="581" width="280" height="22" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="180" y="597" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">Iter 3 @ t=10:30 — short tool ran, no new pings</text>
+
+  <line x1="120" y1="628" x2="875" y2="628" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="875,628 867,624 867,632" fill="#0b6bcb"/>
+  <text x="497" y="622" text-anchor="middle" font-size="12" fill="#0b6bcb">build PostHook input: prevAt = t=10, advance state to t=10:30</text>
+
+  <line x1="880" y1="657" x2="120" y2="657" stroke="#1b7a3f" stroke-dasharray="2,2"/>
+  <polygon points="120,657 128,653 128,661" fill="#1b7a3f"/>
+  <text x="497" y="651" text-anchor="middle" font-size="12" fill="#1b7a3f" font-weight="600">attribution: window=(t=10, t=10:30], elapsed_under_ttl → bill y</text>
+
+  <text x="497" y="676" text-anchor="middle" font-size="11" fill="#555" font-style="italic">in_loop pings still in state.inLoopPings but outside this iter's window — not double-counted</text>
+
+  <text x="640" y="708" text-anchor="middle" font-size="12" fill="#1a1a1a" font-weight="600">→ per-iter window advancement eliminates double-counting without the IsFirstIteration gate</text>
+</svg>
+<div class="caption">Same workflow, three iters, one unified attribution path. iter 1 picks the most recent post_exit ping (terminal-state semantics, unchanged). iter 2 picks the most recent in_loop ping (new). iter 3's window starts at iter 2's CallTime so the iter-2 pings are no longer in scope — no double-count. <strong>The pings stay in <code>state.inLoopPings</code> for the workflow's lifetime; only the <em>window</em> moves.</strong></div>
+</div>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="races">
+<h2>7. Race conditions and edges</h2>
+
+<p>Surfaced during design grilling. None require new code beyond the design above — all resolve via the per-iter window semantic.</p>
+
+<table>
+  <thead><tr><th>#</th><th>Race / edge</th><th>Resolution</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>R1</td>
+      <td><strong>Ping fires between iter-N LLM-call-start and PostHook build.</strong> Possible if response latency is high.</td>
+      <td>FiredAt &gt; iter-N's CallTime → ping falls into iter (N+1)'s window. Correct attribution; nothing lost.</td>
+    </tr>
+    <tr>
+      <td>R2</td>
+      <td><strong><code>capRefreshLoop</code> fires concurrently with iter-(N+1)'s LLM-call dispatch.</strong></td>
+      <td>If ping's FiredAt &lt; iter-(N+1)'s CallTime → in iter-(N+1)'s window. If FiredAt &gt; iter-(N+1)'s CallTime → in iter-(N+2)'s window. Either way: claimed by exactly one iter.</td>
+    </tr>
+    <tr>
+      <td>R3</td>
+      <td><strong>capRefreshLoop sleeping during workflow exit.</strong></td>
+      <td><code>exec.Sleep</code> returns <code>context_cancelled</code>; loop terminates cleanly. Identical to today's behavior.</td>
+    </tr>
+    <tr>
+      <td>R4</td>
+      <td><strong>Continue-as-new boundary mid-tool.</strong> Elite CAN-rolls into a new workflow run; <code>state.inLoopPings</code> is lost in the transition.</td>
+      <td>Acceptable: pings persisted in BigTable but won't be in-memory after CAN. The new run's iter 1 has <code>setup.Cap.Pings</code> with <code>post_exit</code> only (LoadCapPings filter); in-loop pings from the pre-CAN tool execution are effectively forgotten. Margin loss bounded by CAN frequency (rare; only adaptive-thinking path). Could revisit if CAN-during-tool becomes common — for now, accept.</td>
+    </tr>
+    <tr>
+      <td>R5</td>
+      <td><strong>Subagent runs inside parent's tool.</strong> Parent's <code>capRefreshLoop</code> keeps firing against parent's prompt while the subagent has its own workflow + session.</td>
+      <td>Subagent has separate <code>sessionID</code>; its pings have separate BigTable row keys. Parent's in-loop pings land on parent's <code>state.inLoopPings</code> and get claimed by parent's next iter. No cross-contamination.</td>
+    </tr>
+    <tr>
+      <td>R6</td>
+      <td><strong>BigTable PUT fails after Anthropic call succeeds.</strong></td>
+      <td>Anthropic charged us; ping not persisted. But the workflow still calls <code>state.AppendInLoopPing</code> from the activity result — so in-flight attribution within this workflow still works. Only cross-workflow attribution (a future workflow's setup-time load) loses the ping. Better than terminal-state, where the same failure mode loses the ping entirely.</td>
+    </tr>
+    <tr>
+      <td>R7</td>
+      <td><strong>Tool exceeds <code>LongRunningMaxRefreshes</code>.</strong> Pings stop firing while tool still runs; cache may die before iter N+1.</td>
+      <td><code>PickCandidate</code> requires <code>CacheTTL</code> proximity to CallTime — stale pings are rejected → <code>no_qualifying_ping</code> → bills y. Margin opportunity missed; no incorrect billing. Tunable via config.</td>
+    </tr>
+    <tr>
+      <td>R8</td>
+      <td><strong>Profitability inversion: x &gt; (z − y).</strong> Theoretical at <code>LongRunningMaxRefreshes ≥ 8</code>; not a concern at the default 3–4.</td>
+      <td>Accepted risk per design decision: no gate. Watch <code>cap_attribution_margin_usd_sum</code> for negative values; tune <code>LongRunningMaxRefreshes</code> down if observed.</td>
+    </tr>
+    <tr>
+      <td>R9</td>
+      <td><strong>Replay determinism on activity result.</strong></td>
+      <td>FiredAt is captured inside the activity (<code>time.Now()</code>), recorded in workflow history. Replay reads the same value from history → workflow's <code>state.AppendInLoopPing</code> appends the same record at the same position. Deterministic.</td>
+    </tr>
+    <tr>
+      <td>R10</td>
+      <td><strong>Workflow versioning (TWD).</strong> In-flight workflows replay with old code (still has <code>IsFirstIteration</code>); new workflows have new code (no gate). No history-mismatch risk.</td>
+      <td>Pinned versioning per <a href="../../cortex/CLAUDE.md">cortex/CLAUDE.md "Workflow Versioning Policy"</a>. Field removal from <code>IterationContext</code> is safe — Go JSON unmarshalling silently drops unknown fields on the in-flight side if anything ever does cross-version.</td>
+    </tr>
+  </tbody>
+</table>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="code">
+<h2>8. Code changes (file by file)</h2>
+
+<p><strong>5 files, +20 / −10 lines net.</strong> All changes are local edits; no new files.</p>
+
+<h3>8.1 <code>core/cap/refresh.go</code> — one new field</h3>
+
+<pre><code>type RefreshResult struct {
+    Succeeded           bool
+    CacheHit            bool
+    CacheCreationTokens int
+    CacheReadTokens     int
+    CacheHitPct         float64
+    CostUSD             float64
+    RequestID           string
+    FiredAt             time.Time `json:"fired_at"`   // NEW — captured in activity
+}
+</code></pre>
+
+<h3>8.2 <code>core/workflows/cap/workflow.go</code> — populate <code>FiredAt</code></h3>
+
+<pre><code>func (w *Workflow) activityRefreshCacheAnchor(ctx context.Context, req capcfg.RefreshRequest) (*capcfg.RefreshResult, error) {
+    firedAt := time.Now()  // NEW
+    // ... existing work ...
+    return &capcfg.RefreshResult{
+        // ... existing fields ...
+        FiredAt: firedAt,  // NEW
+    }, nil
+}
+</code></pre>
+
+<h3>8.3 <code>core/cap/attribution.go</code> — drop two source filters</h3>
+
+<pre><code>// PickCandidate — DELETE the if-statement at line 57:
+// if p.Source != PingSourcePostExit { continue }   ← DELETE
+
+// SumPostExitPingCosts — rename and drop filter:
+// func SumPostExitPingCosts(pings []PingRecord, ...)   ← rename →
+func SumPingCosts(pings []PingRecord, after, upTo time.Time) float64 {
+    var total float64
+    for i := range pings {
+        p := &pings[i]
+        // if p.Source != PingSourcePostExit { continue }   ← DELETE
+        if !p.FiredAt.After(after) || p.FiredAt.After(upTo) { continue }
+        total += p.CostUSD
+    }
+    return total
+}
+</code></pre>
+
+<h3>8.4 <code>core/workflows/elite/state.go</code> — two new fields + four methods</h3>
+
+<pre><code>type State struct {
+    // ... existing ...
+    lastAssistantMsgAt time.Time
+    inLoopPings        []cap.PingRecord
+}
+
+func (s *State) GetLastAssistantMsgAt() time.Time   { return s.lastAssistantMsgAt }
+func (s *State) SetLastAssistantMsgAt(t time.Time)  { s.lastAssistantMsgAt = t }
+func (s *State) GetInLoopPings() []cap.PingRecord   { return s.inLoopPings }
+func (s *State) AppendInLoopPing(p cap.PingRecord)  { s.inLoopPings = append(s.inLoopPings, p) }
+</code></pre>
+
+<h3>8.5 <code>core/workflows/elite/cap.go</code> — append after successful refresh</h3>
+
+<pre><code>// In refreshCacheAnchorIfNeeded, after the activity returns Succeeded:
+state.AppendInLoopPing(cap.PingRecord{
+    JobID: req.JobID, SessionID: setup.Agent.SessionID,
+    RequestID: refreshReq.RequestID, Source: cap.PingSourceInLoop,
+    Model: setup.CurrentModel, CacheHit: result.CacheHit,
+    CacheReadTokens: result.CacheReadTokens, CacheCreationTokens: result.CacheCreationTokens,
+    CostUSD: result.CostUSD, FiredAt: result.FiredAt,
+})
+</code></pre>
+
+<h3>8.6 <code>core/workflows/elite/flow.go</code> — seed, read-advance-merge</h3>
+
+<pre><code>// Workflow startup (after setup load):
+state.SetLastAssistantMsgAt(setup.Cap.LastAssistantMsgAt)
+
+// At each PostHook build site (~line 950):
+prevAt := state.GetLastAssistantMsgAt()
+state.SetLastAssistantMsgAt(p.LLMCallStartedAt)
+mergedPings := append(append([]cap.PingRecord{}, setup.Cap.Pings...), state.GetInLoopPings()...)
+
+input := PostHookActivityInput{
+    // ... existing ...
+    CapPings: mergedPings,
+    Iteration: IterationContext{
+        // ... existing ...
+        PrevAssistantMsgAt: prevAt,
+        // IsFirstIteration: DELETED
+    },
+}
+</code></pre>
+
+<h3>8.7 <code>core/workflows/elite/activities.go</code> + <code>request.go</code> — delete the gate</h3>
+
+<pre><code>// activities.go:776 — DELETE the !IsFirstIteration short-circuit branch entirely.
+// resolveCapAttributionDelta becomes:
+func (w *Workflow) resolveCapAttributionDelta(ctx context.Context, input PostHookActivityInput) float64 {
+    if !input.CapEnabled { return 0 }
+    attribution := w.capSvc.ResolveAttribution(ctx, cap.ResolveInput{...})
+    // ... logging + delta computation unchanged ...
+}
+
+// request.go:497-500 — DELETE the IsFirstIteration field from IterationContext.
+</code></pre>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="failure">
+<h2>9. Failure modes (delta from parent doc)</h2>
+
+<p>All failure modes from the parent <a href="../cap-margin-capture/design.html#failure">section 12</a> still apply unchanged. Two new ones, both fail-safe-to-user:</p>
+
+<table>
+  <thead><tr><th>Failure</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>In-loop ping activity panics / errors mid-fire</td>
+      <td>Activity returns <code>Succeeded=false</code>; workflow does not append to <code>state.inLoopPings</code>; no margin claimed on next iter. Anthropic charged for the partial work (negligible). Identical to today's behavior for this failure path.</td>
+    </tr>
+    <tr>
+      <td><code>FiredAt</code> not populated by activity (bug / forgotten field)</td>
+      <td>Zero time → PickCandidate's <code>FiredAt.After(after)</code> returns false → ping never eligible → <code>no_qualifying_ping</code> → bills y. Margin opportunity missed; no incorrect billing. Unit test covers this.</td>
+    </tr>
+  </tbody>
+</table>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="reporting">
+<h2>10. Reporting (delta from parent)</h2>
+
+<p>No new metrics. The existing <code>cap.attribution.*</code> histograms already accept a <code>ping_source</code> label sourced from <code>PingRecord.Source</code> — in-loop attributions surface as <code>ping_source="in_loop"</code> slices on the same Grafana panels.</p>
+
+<h3>10.1 In-loop margin per hour</h3>
+<pre><code># PromQL
+sum(rate(cap_attribution_margin_usd_sum{ping_source="in_loop"}[5m])) * 3600
+</code></pre>
+
+<h3>10.2 In-loop decoupled rate (sanity)</h3>
+<pre><code>sum(rate(cap_attribution_total{reason="decoupled", ping_source="in_loop"}[5m]))
+/
+sum(rate(cap_attribution_total{ping_source="in_loop"}[5m]))
+</code></pre>
+
+<h3>10.3 Loki — per-iter audit on long-running tools</h3>
+<pre><code>{app=~"cortex.*agentsdk"}
+  |= "cap attribution resolved"
+  | json
+  | decoupled = "true"
+  | ping_source = "in_loop"
+</code></pre>
+
+</section>
+
+</main>
+</div>
+
+</body>
+</html>
