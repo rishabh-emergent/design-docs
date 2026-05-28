@@ -6,6 +6,7 @@ Extension of [cap-margin-capture](../cap-margin-capture/) to claim margin on the
 |---|---|---|
 | [design.html](./design.html) | End-to-end design — what's already shipped vs the two attribution gaps, the unified per-iter window, race-condition analysis, code changes, failure modes | [cortex#1548](https://github.com/emergentbase/cortex/pull/1548) |
 | [adr/0001-state-shape-for-in-loop-pings.md](./adr/0001-state-shape-for-in-loop-pings.md) | Why `state.inLoopPings` slice (Shape B) instead of mutating `setup.Cap.Pings` (Shape A) | — |
+| [in-loop-cap-qa-test-cases.xlsx](./in-loop-cap-qa-test-cases.xlsx) | Manual-QA test scenarios (15 cases, P0–P2), Cloud Run / Loki / BigTable / Postgres queries cheat sheet, log-field glossary | [cortex#1548](https://github.com/emergentbase/cortex/pull/1548) |
 
 ## What this is
 
