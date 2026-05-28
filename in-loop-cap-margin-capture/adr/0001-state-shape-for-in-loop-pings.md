@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Accepted |
 | **Date** | 2026-05-28 |
-| **PR** | cortex#TBD |
+| **PR** | [cortex#1548](https://github.com/emergentbase/cortex/pull/1548) |
 | **Supersedes** | — |
 
 ## Context

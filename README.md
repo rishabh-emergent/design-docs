@@ -27,5 +27,5 @@ design-docs/
 ## Index
 
 - [cap-margin-capture](./cap-margin-capture/) — Bill the user at as-if-cold-cache cost when CAP keeps the prompt cache alive past TTL. cortex#1411 (merged), cortex#1465 (attribution metrics, open).
-- [in-loop-cap-margin-capture](./in-loop-cap-margin-capture/) — Extends cap-margin-capture to claim margin on the LLM call following a long-running tool execution. Drops the iter-1 gate, advances the eligibility window per-iter, merges in-flight in_loop pings. cortex#TBD.
+- [in-loop-cap-margin-capture](./in-loop-cap-margin-capture/) — Extends cap-margin-capture to claim margin on the LLM call following a long-running tool execution. Drops the iter-1 gate, advances the eligibility window per-iter, merges in-flight in_loop pings. [cortex#1548](https://github.com/emergentbase/cortex/pull/1548).
 - [range-based-truncation-opus-4-7](./range-based-truncation-opus-4-7/) — Cache-TTL-aware pre-emptive truncation/summarisation for Opus 4.7 farm agents on 1M context. Avoids paying for cache invalidation twice. Works whether CAP is on or off; fully backward compatible with existing context config.
