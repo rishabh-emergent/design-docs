@@ -2,6 +2,8 @@
 
 Centralized design documentation for major features and changes across projects.
 
+**Writing a design doc?** Read [CLAUDE.md](./CLAUDE.md) first — it's the style guide that keeps these docs homogeneous (section ordering, SVG colour palette, when to use callouts, post-launch update conventions).
+
 ## Structure
 
 One folder per major feature/change:

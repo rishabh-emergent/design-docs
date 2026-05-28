@@ -107,6 +107,7 @@
     <li><a href="#dryruns">Dry runs</a></li>
     <li><a href="#dataflow">Data flow</a></li>
     <li><a href="#schema">Storage model</a></li>
+    <li><a href="#runtime-meta">Redis runtime meta</a></li>
     <li><a href="#code">Code changes</a></li>
     <li><a href="#failure">Failure modes</a></li>
     <li><a href="#reporting">Reporting</a></li>
@@ -781,6 +782,11 @@ But the way we bill users today means <strong>those savings flow through to the 
 <section id="schema">
 <h2>10. Storage model (BigTable column family + cortex telemetry)</h2>
 
+<div class="callout warn">
+<h4>Post-launch update (PR <a href="https://github.com/emergentbase/cortex/pull/1483">cortex#1483</a>, 2026-05-23)</h4>
+<p>v2 originally read the eligibility boundary and the cold-cache baseline from <code>messages</code> on every workflow setup. That saturated cortex-db CPU at 70–90% within hours. Both reads now live in a Redis hash <code>session:{sessionID}:meta</code> — one <code>HMGET</code> per setup, in parallel with the thread load. <strong>See <a href="#runtime-meta">section 11</a> for the full Redis-runtime-meta design and visualization.</strong> The BigTable <code>ping_data</code> column family described below is unchanged.</p>
+</div>
+
 <p>The design adds <strong>no new Postgres tables or columns anywhere</strong>. Two cortex-local storage locations carry the new state:</p>
 
 <ol>
@@ -854,10 +860,232 @@ But the way we bill users today means <strong>those savings flow through to the 
 </section>
 
 <!-- ============================================================ -->
-<section id="code">
-<h2>11. Code changes (cortex-only)</h2>
+<section id="runtime-meta">
+<h2>11. Redis runtime meta (PR <a href="https://github.com/emergentbase/cortex/pull/1483">cortex#1483</a>)</h2>
 
-<h3>11.1 <code>core/cap/service.go</code> — single Service abstraction</h3>
+<p>v2 shipped with two Postgres reads on <strong>every workflow setup</strong> — <code>GetPreviousAssistantMessageTime</code> (the CAP eligibility boundary, <code>MAX(created_at)</code> over <code>messages WHERE role='assistant'</code>) and <code>GetHeadMessageCacheReadTokens</code> (the cold-cache baseline, a JSONB scan on the session head message). Together they saturated <code>cortex-db</code> CPU at 70–90 % within hours. PR <a href="https://github.com/emergentbase/cortex/pull/1482">cortex#1482</a> commented out the call site as an emergency hot-fix; CAP attribution went dark until #1483 landed two days later.</p>
+
+<p>This section documents the replacement: <strong>both reads live in a single Redis hash, written on the hot path, read once at setup</strong>.</p>
+
+<h3>11.1 What moved and what didn't</h3>
+
+<table>
+  <thead><tr><th>Concern</th><th>Before (v2 / PR #1411)</th><th>After (PR #1483)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>CAP eligibility boundary (prev-assistant-msg time)</td>
+      <td>SQL: <code>SELECT MAX(created_at) FROM messages WHERE session_id=$1 AND role='assistant'</code> — fired per workflow setup AND per <code>activityPostHook</code> call</td>
+      <td>Redis hash field <code>last_assistant_msg_at</code>, written by elite at LLM-call start (<code>AdvanceAssistantBoundary=true</code>) and skipped by CAP pings</td>
+    </tr>
+    <tr>
+      <td>Cold-cache baseline (head-msg <code>cache_read_input_tokens</code>)</td>
+      <td>SQL: JSONB scan of the session head message's <code>usage</code> blob, ASC LIMIT 1 — fired per workflow setup</td>
+      <td>Redis hash field <code>system_prompt_cache_read_tokens</code>, written via explicit setter only when the system-prompt context boundary actually changes (init / handoff @ iter 0)</td>
+    </tr>
+    <tr>
+      <td>"Any LLM call happened" timestamp</td>
+      <td>(not tracked separately)</td>
+      <td>New Redis hash field <code>last_llm_call_at</code> — advanced by every LLM call, elite OR CAP ping. Used for cache-TTL timing and future non-CAP consumers</td>
+    </tr>
+    <tr>
+      <td>BigTable <code>ping_data</code> column family (one row per ping)</td>
+      <td>BigTable, 7-day TTL</td>
+      <td><strong>Unchanged</strong></td>
+    </tr>
+    <tr>
+      <td>PostHook payload to emergent</td>
+      <td>swapped <code>cost_usd</code> / <code>accumulated_cost</code> on decouple</td>
+      <td><strong>Unchanged</strong></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>11.2 Storage layout</h3>
+
+<p>One hash per session in the shared cortex Redis. Pure point-read / point-write — no scans, no sorted sets.</p>
+
+<pre><code>key:    session:{sessionID}:meta
+TTL:    365d sliding, refreshed on every write
+fields:
+  last_llm_call_at                 → int64 unix millis  (any LLM call, elite OR CAP ping)
+  last_assistant_msg_at            → int64 unix millis  (elite-driven assistant messages ONLY)
+  system_prompt_cache_read_tokens  → int32              (head-baseline cache_read tokens)
+  schema_version                   → int8               (currently 1)</code></pre>
+
+<div class="callout">
+<h4>Why two timestamp fields, not one</h4>
+<p>If a single field were updated by both elite and pings, CAP attribution would silently break: every workflow setup would see a ping as "the latest LLM call", the eligibility window <code>(prevAt, callTime]</code> would never contain pings, and decoupling would never fire. The original Postgres query intentionally excluded pings (they don't write to <code>messages</code>); the two-field design preserves that semantic.</p>
+</div>
+
+<h3>11.3 The baseline write trigger (the trap)</h3>
+
+<p><code>system_prompt_cache_read_tokens</code> is the <em>cold-cache cost subtraction</em> used by <code>CalculateColdCacheCost</code>. It must represent "<strong>cache_read for the first call that warmed this system-prompt prefix</strong>", not "cache_read for the most recent call".</p>
+
+<p>If every LLM call overwrote the field, the baseline would ratchet up as the session warms — and <code>z − y</code> would systematically under-claim margin (the calculator would subtract an inflated baseline from the call's own <code>cache_read</code>, producing a near-zero margin by construction).</p>
+
+<p>The field is therefore written by an <strong>explicit setter</strong> triggered only when the system-prompt context boundary actually changes:</p>
+
+<pre><code>// core/workflows/elite/request.go
+RecordCacheBaseline = (req.IsInitRequest || req.IsHandoff) && iterationNumber == 0</code></pre>
+
+<table>
+  <thead><tr><th>Trigger</th><th>Flag</th><th>Why this is a new system-prompt context</th></tr></thead>
+  <tbody>
+    <tr><td>Session creation (Neo → Elite first message)</td><td><code>Request.IsInitRequest</code></td><td>First call ever; system prompt freshly cached.</td></tr>
+    <tr><td>Summarisation handoff to the infinite agent</td><td><code>Request.IsHandoff</code></td><td>New workflow on a new agent → different system prompt → different cache key.</td></tr>
+  </tbody>
+</table>
+
+<p>Everything else — regular resume (same agent, new user message), iter 2..N of any workflow, <code>graceful_finish</code>, subagent calls, CAP refresh pings, in-workflow auto-compact / squashing — <strong>leaves the baseline untouched</strong>. The prior baseline carries over because the cached system-prompt prefix has not changed.</p>
+
+<h3>11.4 Hardcoded fallback (PR <a href="https://github.com/emergentbase/cortex/pull/1485">cortex#1485</a>)</h3>
+
+<p>Pre-existing sessions (born before #1483) have no Redis-set baseline, and brand-new sessions briefly look the same on iter 0 before the first response usage lands. To stop those sessions from degrading to <code>no_qualifying_ping</code> → bill-at-<code>y</code>, <code>EffectiveGlobalCacheBaseline</code> returns a hardcoded floor when the measured value is zero:</p>
+
+<pre><code>// core/cap/global_cache.go
+const DefaultGlobalCacheBaseline = 26000  // observed prod range: 21k–28k
+
+func EffectiveGlobalCacheBaseline(measured int) int {
+    if measured &gt; 0 { return measured }
+    return DefaultGlobalCacheBaseline
+}</code></pre>
+
+<p>The eligibility-reason <code>no_global_cache_baseline</code> still exists in the codebase but is now unreachable on the elite path — the fallback closes the gap. It's kept for legibility and tests.</p>
+
+<h3>11.5 Data-flow visualization</h3>
+
+<div class="figure">
+<svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, sans-serif" font-size="13" style="width:100%; max-width:1280px;">
+  <!-- 5 lifelines -->
+  <g stroke="#bbb" stroke-dasharray="3,3">
+    <line x1="120"  y1="80" x2="120"  y2="690"/>
+    <line x1="340"  y1="80" x2="340"  y2="690"/>
+    <line x1="600"  y1="80" x2="600"  y2="690"/>
+    <line x1="860"  y1="80" x2="860"  y2="690"/>
+    <line x1="1130" y1="80" x2="1130" y2="690"/>
+  </g>
+
+  <!-- Lifeline headers -->
+  <g font-weight="600" text-anchor="middle" font-size="14">
+    <rect x="60"   y="42" width="120" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="120"  y="64">User</text>
+    <rect x="270"  y="42" width="140" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="340"  y="64">Elite WF</text>
+    <rect x="525"  y="42" width="150" height="34" fill="#fff" stroke="#1a1a1a"/>
+    <text x="600"  y="64">CAP WF</text>
+    <rect x="785"  y="42" width="150" height="34" fill="#fff" stroke="#0b6bcb"/>
+    <text x="860"  y="64" fill="#0b6bcb">Redis (runtime_meta)</text>
+    <rect x="1050" y="42" width="160" height="34" fill="#fff" stroke="#b06a00"/>
+    <text x="1130" y="64" fill="#b06a00">BigTable (ping_data)</text>
+  </g>
+
+  <!-- PHASE A: workflow setup (cold) -->
+  <rect x="40" y="100" width="200" height="22" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="140" y="116" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">Phase A — workflow setup (cold)</text>
+
+  <line x1="120" y1="145" x2="335" y2="145" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="335,145 327,141 327,149" fill="#0b6bcb"/>
+  <text x="227" y="139" text-anchor="middle" font-size="12" fill="#0b6bcb">user message → resume workflow</text>
+
+  <!-- parallel goroutines: HMGET to Redis + range scan to BT -->
+  <line x1="340" y1="180" x2="855" y2="180" stroke="#0b6bcb" stroke-width="1.5"/>
+  <polygon points="855,180 847,176 847,184" fill="#0b6bcb"/>
+  <text x="597" y="174" text-anchor="middle" font-size="12" fill="#0b6bcb">HMGET session:{sessionID}:meta  (parallel goroutine)</text>
+
+  <line x1="855" y1="205" x2="340" y2="205" stroke="#0b6bcb" stroke-dasharray="2,2"/>
+  <polygon points="340,205 348,201 348,209" fill="#0b6bcb"/>
+  <text x="597" y="199" text-anchor="middle" font-size="12" fill="#0b6bcb" font-style="italic">{ last_llm_call_at, last_assistant_msg_at, system_prompt_cache_read_tokens }</text>
+
+  <line x1="340" y1="235" x2="1125" y2="235" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="1125,235 1117,231 1117,239" fill="#b06a00"/>
+  <text x="730" y="229" text-anchor="middle" font-size="12" fill="#b06a00">range scan cap_ping#{sessionID}#... (parallel goroutine)</text>
+
+  <line x1="1125" y1="260" x2="340" y2="260" stroke="#b06a00" stroke-dasharray="2,2"/>
+  <polygon points="340,260 348,256 348,264" fill="#b06a00"/>
+  <text x="730" y="254" text-anchor="middle" font-size="12" fill="#b06a00" font-style="italic">[]PingRecord since lastAssistantMsgAt</text>
+
+  <line x1="50" y1="285" x2="1270" y2="285" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- PHASE B: elite LLM call (assistant-boundary advance + fallback baseline) -->
+  <rect x="40" y="298" width="250" height="22" fill="#e8f5ec" stroke="#1b7a3f"/>
+  <text x="165" y="314" text-anchor="middle" font-size="12" font-weight="600" fill="#1b7a3f">Phase B — elite LLM call (assistant boundary advances)</text>
+
+  <line x1="340" y1="345" x2="855" y2="345" stroke="#1b7a3f" stroke-width="1.5"/>
+  <polygon points="855,345 847,341 847,349" fill="#1b7a3f"/>
+  <text x="597" y="339" text-anchor="middle" font-size="12" fill="#1b7a3f">RecordLLMCall { StartedAt=t, AdvanceAssistantBoundary=true,</text>
+  <text x="597" y="354" text-anchor="middle" font-size="12" fill="#1b7a3f">                SystemPromptCacheReadTokens=&amp;n  (only if init || handoff @ iter 0) }</text>
+
+  <line x1="340" y1="385" x2="855" y2="385" stroke="#1b7a3f" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="597" y="379" text-anchor="middle" font-size="11" fill="#1b7a3f" font-style="italic">pipelined HSET + EXPIRE 365d  (50 ms timeout)</text>
+
+  <line x1="50" y1="410" x2="1270" y2="410" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- PHASE C: CAP ping (only LastLLMCallAt advances) -->
+  <rect x="40" y="423" width="240" height="22" fill="#fff6e8" stroke="#b06a00"/>
+  <text x="160" y="439" text-anchor="middle" font-size="12" font-weight="600" fill="#b06a00">Phase C — CAP ping (~t+4m50s)</text>
+
+  <line x1="600" y1="470" x2="1125" y2="470" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="1125,470 1117,466 1117,474" fill="#b06a00"/>
+  <text x="862" y="464" text-anchor="middle" font-size="12" fill="#b06a00">PUT cap_ping row (cost_usd, cache_hit, fired_at)</text>
+
+  <line x1="600" y1="500" x2="855" y2="500" stroke="#b06a00" stroke-width="1.5"/>
+  <polygon points="855,500 847,496 847,504" fill="#b06a00"/>
+  <text x="727" y="494" text-anchor="middle" font-size="12" fill="#b06a00">RecordLLMCall { StartedAt=t+4m50s,</text>
+  <text x="727" y="509" text-anchor="middle" font-size="12" fill="#b06a00">                AdvanceAssistantBoundary=false }</text>
+
+  <line x1="600" y1="538" x2="855" y2="538" stroke="#b06a00" stroke-width="1" stroke-dasharray="3,2"/>
+  <text x="727" y="532" text-anchor="middle" font-size="11" fill="#b06a00" font-style="italic">writes last_llm_call_at only → eligibility boundary stays put</text>
+
+  <line x1="50" y1="563" x2="1270" y2="563" stroke="#ddd" stroke-dasharray="1,3"/>
+
+  <!-- PHASE D: PostHook resolves attribution from in-memory cache -->
+  <rect x="40" y="576" width="280" height="22" fill="#e6f0fa" stroke="#0b6bcb"/>
+  <text x="180" y="592" text-anchor="middle" font-size="12" font-weight="600" fill="#0b6bcb">Phase D — activityPostHook resolves from in-memory cache</text>
+
+  <text x="340" y="620" font-size="11" fill="#1a1a1a">In-memory: state.LastAssistantMsgAt (from Phase A HMGET)</text>
+  <text x="340" y="638" font-size="11" fill="#1a1a1a">             baseline = EffectiveGlobalCacheBaseline(meta.SystemPromptCacheReadTokens)</text>
+  <text x="340" y="656" font-size="11" fill="#1a1a1a">             pings    = setup.Cap.Pings (from Phase A BT range scan)</text>
+
+  <text x="340" y="682" font-size="12" font-weight="600" fill="#1b7a3f">→ ResolveAttribution() — zero DB I/O, pure Go over cached state</text>
+</svg>
+<div class="caption">The hot path makes <strong>zero database round-trips</strong> after Phase A. Two parallel goroutines at setup populate Redis (point read) and BigTable (range scan); both are wrapped in <code>ego.SafeExec</code> so a Redis miss or BT scan failure downgrades to bill-at-<code>y</code> without crashing the workflow. The CAP ping writes <em>only</em> <code>last_llm_call_at</code> so the elibility boundary remains pinned to the last elite call — without that asymmetry, attribution would silently fail.</div>
+</div>
+
+<h3>11.6 Failure semantics</h3>
+
+<table>
+  <thead><tr><th>Failure</th><th>Behavior</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Redis <code>HMGET</code> returns all-nil (key absent)</td>
+      <td>Returns zero-value <code>RuntimeMeta</code>. Consumer treats it as a miss → no decoupling this workflow run (<code>last_assistant_msg_at = 0</code> short-circuits eligibility). Existing sessions self-heal on the next elite call when <code>RecordLLMCall</code> writes the hash.</td>
+    </tr>
+    <tr>
+      <td>Redis <code>HMGET</code> errors (network / timeout, 100ms cap)</td>
+      <td>Same as above plus a <code>runtime_meta_read_errors_total</code> counter increment. Logged once per workflow.</td>
+    </tr>
+    <tr>
+      <td>Redis <code>HSET</code> pipeline errors (50ms cap)</td>
+      <td>Per-call write failure surfaces to caller. Elite logs and continues (write is best-effort — next call resyncs the field). CAP ping does the same.</td>
+    </tr>
+    <tr>
+      <td><code>system_prompt_cache_read_tokens = 0</code> (pre-Redis session OR write miss)</td>
+      <td><code>EffectiveGlobalCacheBaseline</code> returns the hardcoded <code>26000</code> fallback. Decoupling still fires. Conservative bias: 26k is the lower end of observed prod values (21k–28k), so margin is slightly under-claimed on agents with larger system prompts, never over-claimed.</td>
+    </tr>
+    <tr>
+      <td>Wrong-boundary write (CAP ping accidentally writes <code>last_assistant_msg_at</code>)</td>
+      <td>Prevented at the interface level: <code>LLMCallEvent.AdvanceAssistantBoundary</code> is a bool, and the CAP ping write site (<code>cap/workflow.go</code>) passes <code>false</code> explicitly. A typo here would silently disable decoupling for that session.</td>
+    </tr>
+  </tbody>
+</table>
+
+</section>
+
+<!-- ============================================================ -->
+<section id="code">
+<h2>12. Code changes (cortex-only)</h2>
+
+<h3>12.1 <code>core/cap/service.go</code> — single Service abstraction</h3>
 
 <p>The entire CAP runtime hangs off one struct exposing three methods. <code>Store</code> is the persistence contract; <code>internal/pgsql.CapStore</code> satisfies it by composing the PG store (for prev-msg lookup and head-message usage) with a dedicated BigTable client targeting the <code>ping_data</code> column family.</p>
 
@@ -880,7 +1108,7 @@ func NewService(store Store) *Service { return &Service{store: store} }
 func NewNoOpService() *Service { return &Service{} }
 </code></pre>
 
-<h3>11.2 <code>cap.Service.LoadContext</code> — parallel BT + baseline at setup</h3>
+<h3>12.2 <code>cap.Service.LoadContext</code> — parallel BT + baseline at setup</h3>
 
 <p>Pings + global-cache baseline load in parallel; each goroutine is wrapped in <code>ego.SafeExec</code> so a panic in either is recovered, logged, and downgraded to a partial result (empty pings or zero baseline → no decoupling this run, never a workflow crash).</p>
 
@@ -913,7 +1141,7 @@ func (s *Service) LoadContext(ctx context.Context, sessionID string) LoadContext
 }
 </code></pre>
 
-<h3>11.3 <code>internal/pgsql/cap_pings.go</code> — BigTable composite store</h3>
+<h3>12.3 <code>internal/pgsql/cap_pings.go</code> — BigTable composite store</h3>
 
 <p>The bounded range scan uses <code>$</code> (0x24) as the end-key sentinel, ensuring lexicographic exclusivity over <code>#</code> (0x23). Only <code>source = post_exit</code> rows are returned for attribution; in-loop pings are still persisted (for telemetry) but filtered out here.</p>
 
@@ -939,7 +1167,7 @@ func (s *CapStore) SavePing(ctx context.Context, sessionID string, record cap.Pi
 }
 </code></pre>
 
-<h3>11.4 <code>core/cap/attribution.go</code> — pure attribution math</h3>
+<h3>12.4 <code>core/cap/attribution.go</code> — pure attribution math</h3>
 
 <p>Pure functions over the in-memory ping list. No I/O, no Temporal activity. <code>Attribution</code> carries everything the structured log and metrics need.</p>
 
@@ -989,7 +1217,7 @@ func (s *Service) ResolveAttribution(ctx context.Context, in ResolveInput) Attri
 }
 </code></pre>
 
-<h3>11.5 <code>core/workflows/elite/activities.go</code> — activityPostHook</h3>
+<h3>12.5 <code>core/workflows/elite/activities.go</code> — activityPostHook</h3>
 
 <p>The CAP swap is gated on <code>BillableCostUSD &gt; 0</code> — guards against an unobservable z=0 underbill if the pricing calculator returns nothing on the decoupled path while still succeeding on y. The <code>cap.RecordAttribution</code> call (<a href="https://github.com/emergentbase/cortex/pull/1465">cortex#1465</a>) emits the new OTel histograms alongside the existing structured log.</p>
 
@@ -1022,7 +1250,7 @@ func (w *Workflow) activityPostHook(ctx context.Context, input PostHookActivityI
 }
 </code></pre>
 
-<h3>11.6 <code>core/workflows/elite/setup.go</code> — CapSetup bundle + V2 reconcile</h3>
+<h3>12.6 <code>core/workflows/elite/setup.go</code> — CapSetup bundle + V2 reconcile</h3>
 
 <p>Per-workflow CAP state is bundled into a <code>CapSetup</code> struct hung off <code>setup.Cap</code>. Because the <code>ResolveCapConfigV2</code> activity runs <em>after</em> initial setup, <code>setup.Cap.Enabled</code> must be reconciled in <code>flow.go</code> once the V2 config (with provider clamp + Unleash flag) is in hand.</p>
 
@@ -1047,7 +1275,7 @@ setupResult.Cap.Enabled =
 
 <p>Unleash now drives enablement directly — the prior <code>elite.force_cap_enabled</code> override has been removed. The provider clamp is unchanged (Anthropic only).</p>
 
-<h3>11.7 <code>pkg/agentsvc/hooks.go</code> — no schema change</h3>
+<h3>12.7 <code>pkg/agentsvc/hooks.go</code> — no schema change</h3>
 
 <p><strong>The PostHook payload to emergent does not carry a CAP-specific field</strong>. The audit blob initially planned for <code>traj_payload.cap</code> was dropped in favour of cortex-local telemetry (Loki + Prometheus). The wire contract between cortex and emergent stays bytewise compatible with pre-CAP — only <code>cost_usd</code> and <code>accumulated_cost</code> shift to z when decoupled.</p>
 
@@ -1066,7 +1294,7 @@ setupResult.Cap.Enabled =
 
 <!-- ============================================================ -->
 <section id="failure">
-<h2>12. Failure modes (fail-safe-to-user)</h2>
+<h2>13. Failure modes (fail-safe-to-user)</h2>
 
 <p>If anything in the attribution path errors out — DB unavailable, query timeout, pricing calculator hiccup — we fall back to billing the user at <strong>y</strong>. The user is never overcharged because of a bug.</p>
 
@@ -1117,18 +1345,18 @@ setupResult.Cap.Enabled =
 
 <!-- ============================================================ -->
 <section id="reporting">
-<h2>13. Reporting (Prometheus + Loki)</h2>
+<h2>14. Reporting (Prometheus + Loki)</h2>
 
 <p class="meta">The audit blob originally planned for <code>trajectories.traj_payload.cap</code> was dropped. Reporting now runs entirely off cortex telemetry: <strong>Prometheus</strong> (OTel metrics from <a href="https://github.com/emergentbase/cortex/pull/1465">cortex#1465</a>) for aggregates and dashboards, and <strong>Loki</strong> (structured logs) for per-call drill-downs and ad-hoc forensics.</p>
 
-<h3>13.1 Decoupled rate (headline KPI)</h3>
+<h3>14.1 Decoupled rate (headline KPI)</h3>
 <pre><code># PromQL — fraction of attribution calls that decoupled
 sum(rate(cap_attribution_total{reason="decoupled"}[5m]))
 /
 sum(rate(cap_attribution_total[5m]))
 </code></pre>
 
-<h3>13.2 Margin captured (USD per hour / per day)</h3>
+<h3>14.2 Margin captured (USD per hour / per day)</h3>
 <pre><code># PromQL — margin USD per hour, over a 5-minute rate window
 sum(rate(cap_attribution_margin_usd_sum[5m])) * 3600
 
@@ -1136,13 +1364,13 @@ sum(rate(cap_attribution_margin_usd_sum[5m])) * 3600
 sum(increase(cap_attribution_margin_usd_sum[24h]))
 </code></pre>
 
-<h3>13.3 Eligibility-reason breakdown</h3>
+<h3>14.3 Eligibility-reason breakdown</h3>
 <pre><code># PromQL — stacked timeseries by reason, sliced by model
 sum(rate(cap_attribution_total[5m])) by (reason, model)
 </code></pre>
 <p>If <code>no_qualifying_ping</code> rate is high, CAP isn't firing or ping <code>cache_hit_pct</code> is low — that's a CAP-tuning signal, not a billing-decoupling bug. Cross-check with <code>cap_refresh_cache_hit_pct_bucket</code>.</p>
 
-<h3>13.4 Billable distribution by reason</h3>
+<h3>14.4 Billable distribution by reason</h3>
 <pre><code># PromQL — p50/p99 of stamped CostUSD, per reason
 histogram_quantile(0.5,
   sum by (le, reason) (rate(cap_attribution_billable_usd_bucket[5m])))
@@ -1150,7 +1378,7 @@ histogram_quantile(0.99,
   sum by (le, reason) (rate(cap_attribution_billable_usd_bucket[5m])))
 </code></pre>
 
-<h3>13.5 Ping health (existing cap.refresh.* family)</h3>
+<h3>14.5 Ping health (existing cap.refresh.* family)</h3>
 <pre><code># Success rate — alert below 95%
 sum(rate(cap_refresh_total{status="success"}[5m]))
 /
@@ -1163,7 +1391,7 @@ histogram_quantile(0.5, sum by (le) (rate(cap_refresh_cache_hit_pct_bucket[5m]))
 sum(rate(cap_refresh_total{status="error"}[5m])) by (source, model)
 </code></pre>
 
-<h3>13.6 Per-call drill-down (Loki)</h3>
+<h3>14.6 Per-call drill-down (Loki)</h3>
 <pre><code>// LogQL — every decoupled call in the last hour, with full attribution
 {app=~"cortex.*agentsdk"}
   |= "cap attribution resolved"
@@ -1182,7 +1410,7 @@ sum(rate(cap_refresh_total{status="error"}[5m])) by (source, model)
   |= "&lt;JOB_ID&gt;"
 </code></pre>
 
-<h3>13.7 Long-horizon analytics (BigQuery export)</h3>
+<h3>14.7 Long-horizon analytics (BigQuery export)</h3>
 <p>The <code>ping_data</code> column family has <code>MaxAge = 7d</code>, so 30/90-day analytics need a daily export. Pipe <code>cap_ping#*</code> rows from BigTable into a BigQuery sink (or any object-store snapshot) for retrospective queries — orphan-ping ratios, per-user margin distributions across cycles, etc.</p>
 
 </section>
