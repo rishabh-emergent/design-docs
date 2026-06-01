@@ -39,15 +39,14 @@ Configurable minimum fraction of current context a truncation must remove to cou
 as effective (initial 0.10). New field on `range_threshold`; its presence (> 0) is
 the gate's enable signal — gate is dark when absent, preserving today's behavior.
 
-**Armed / window-exit**:
-`armed` is per-run state making the decision fire **once per window-exit**. Re-armed
-whenever context is ≤ `W_high`; consumed (disarmed) when the gate decides. A
-"window-exit" is the transition from ≤ `W_high` to > `W_high`. The hard-floor
-truncation arm is itself gated behind `armed`, so the `S > W_high & not-armed`
-case (already decided this exit) naturally **suppresses** truncation with no
-dedicated branch. That case is practically unreachable anyway: an effective
-truncate or a summarize shrinks the next call's usage, which re-arms on the
-following finish; the `auto_compact.threshold` (0.35) stays as a safety backstop.
+**Per-iteration re-decision**:
+The gate re-evaluates on every step finish — no `armed` flag, no `Suppress` action.
+The effectiveness check itself prevents wasteful repeated truncation: if a fresh
+truncation can no longer remove ≥ `min_removal_frac` of context or land back ≤
+`W_high`, the gate flips to **Summarize**. So a session above `W_high` may run
+several Truncate steps in a row (each one making real progress), and the moment
+Truncate stops being effective the gate switches to Summarize. The
+`auto_compact.threshold` (0.35) stays as a far-side safety backstop.
 
 **Truncate arm**:
 The existing `bulk_checkpoint` squash on its hard-floor path (`rangeThresholdHardFloor`).
@@ -82,8 +81,8 @@ gate's decision is honoured end-to-end.
 **`imageOnly` squash**:
 A squash request with `RangeThreshold` and `CompactionThreshold` zeroed so the
 activity's `decideSquashReason` can *only* return `ReasonImageOverflow`. Used by
-the **Boundary gate** under Suppress / Summarize when image-overflow cleanup is
-needed but the hard-floor truncation must NOT re-fire.
+the **Boundary gate** under Summarize when image-overflow cleanup is needed but
+the hard-floor truncation must NOT re-fire.
 
 ## Relationships
 
