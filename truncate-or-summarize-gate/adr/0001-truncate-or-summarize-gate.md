@@ -24,7 +24,9 @@ Above the operating-window top (`W_high` = the existing `range_threshold.upper`)
 
 - **No image-only squash mode.** An earlier revision had a separate `imageOnly` request flag to let image-overflow cleanup run during Summarize without re-triggering the hard floor. Removed: when gate picks Summarize, normal squash also runs (truncating before the summarize) and then summarize runs on top. Truncation is cheap (no LLM call) and the summarize result is the authoritative head — any pre-summarize truncation work is acceptable overhead. Simpler than coordinating a two-mode squash path.
 
-- **Misconfigured `Summarize` falls back to today's hard-floor squash.** If the gate selects Summarize but `setup.IsAutoCompactOff()` (auto-compact was never enabled for the agent), `maybeForceSummarize` returns false and the existing input-only predicate fires the bulk truncation as it would today. Logged at INFO. No special force-bypass needed because the activity's predicate already agrees with the gate's S.
+- **Misconfigured `Summarize` falls back to today's hard-floor squash.** If the gate selects Summarize but `setup.IsAutoCompactOff()` (auto-compact was never enabled for the agent), `needsSquashing` returns `forceSummarize=false` and the existing input-only predicate fires the bulk truncation as it would today. Logged at INFO. No special force-bypass needed because the activity's predicate already agrees with the gate's S.
+
+- **One decision call, not two.** Per PR review: the squash predicate and the gate's force-summarize signal are the two context-management decisions a step needs, so `needsSquashing(exec, setup, state, messages, now)` returns `(squash, forceSummarize bool)` together rather than the loop calling a separate `maybeForceSummarize` helper alongside it. Truncate semantics are unchanged: `squash = SquashPolicy != nil && shouldSquash(...)`.
 
 ## Consequences
 
