@@ -63,20 +63,8 @@ The post-truncation context size the PRD subtracts from `S`. In cortex it is mea
 by actually running pure `xllm.ApplySquash` with the pending bulk cutoff on the
 current messages — never a guessed fraction (PRD R6).
 
-**S (projected next-prompt size)**:
-Real-token size of the prompt the agent is about to send, *not* the size of the
-previous LLM call's input. Computed via `CompactionTokenCount(messages,
-systemPrompt, lastUsage)` = previous input + previous output + estimated trailing
-tool/user messages added since the last LLM call. Using input-only would miss
-boundary crossings caused by the just-finished turn (e.g. large tool result that
-landed after `lastUsage` was sampled).
-
-**`forceReason` (Truncate signal)**:
-The gate's projected-S view diverges from the squash activity's input-only
-`decideSquashReason`. When the gate picks Truncate, the dispatch sets
-`forceReason = ReasonRangeThresholdHardFloor` on the squash request; the activity
-treats it as the authoritative reason and bypasses its own token check, so the
-gate's decision is honoured end-to-end.
+**S (input-only)**:
+Real-token size of the previous LLM call's input. Computed via `contextTokens(messages, systemPrompt, lastUsage)` — same view the squash activity's `decideSquashReason` uses, so a BoundaryTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration can push the *next* prompt above W_high without the gate noticing this turn; the gate catches it on the iteration AFTER (when LastUsage reflects the bigger call). Bounded one-iteration lag; self-corrects.
 
 **`imageOnly` squash**:
 A squash request with `RangeThreshold` and `CompactionThreshold` zeroed so the

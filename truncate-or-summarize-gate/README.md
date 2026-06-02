@@ -15,11 +15,11 @@ This adds a **boundary gate**: on every finish where context exceeds `W_high`, i
 ## Code locations (cortex-only)
 
 - **Schema**: `pkg/agentsdk/context.go` — one new field `RangeThresholdConfig.MinRemovalFrac` (presence > 0 is the enable signal).
-- **Decision**: `core/xcontext/boundary_action.go` (NEW) — pure `DecideBoundaryAction`; `core/xcontext/tiered.go` carries `MinRemovalFrac` onto the resolved policy. `core/xcontext/squash.go` gains `NeedsImageOverflowSquash` helper + `SquashConfig.ForceReason` field.
+- **Decision**: `core/xcontext/boundary_action.go` (NEW) — pure `DecideBoundaryAction`; `core/xcontext/tiered.go` carries `MinRemovalFrac` onto the resolved policy. `core/xcontext/squash.go` gains `NeedsImageOverflowSquash` helper.
 - **Wiring**: `core/workflows/elite/setup.go` — copies the field onto `SquashRangeThresholdPolicy`; `IsBoundaryGateActive()` helper.
 - **Loop dispatch**: `core/workflows/elite/flow.go` — calls the gate, dispatches to existing truncate/summarize paths; force-truncate signal honors the gate's decision regardless of the input-only predicate; skips speculative summary pre-computation when active.
 - **Forced summarize**: `core/workflows/elite/compact.go` — `maybeApplyAutoCompact` gains a `force bool` that bypasses only its 0.35 `NeedsCompact` check (still respects `HasEnoughMessages`).
-- **Image-only squash + force-truncate signal**: `core/workflows/elite/squash.go` (`BuildSquashRequest`), `core/workflows/elite/flow.go` (`applySquashing`), and `core/workflows/elite/request.go` (`ApplyAndPersistSquashRequest.ForceReason`). The activity's existing `xcontext.ApplySquash` honors both via `SquashConfig`.
+- **Image-only squash**: `core/workflows/elite/squash.go` (`BuildSquashRequest`) + `core/workflows/elite/flow.go` (`applySquashing`) take an `imageOnly bool` that zeros threshold inputs so the activity can only return `ReasonImageOverflow`.
 - **State**: no new state. The gate is a pure function of the current iteration's inputs.
 - **Persistence**: `internal/pgsql/agents.go` — new field rides the existing `range_threshold` jsonb round-trip.
 
