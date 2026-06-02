@@ -66,11 +66,6 @@ current messages — never a guessed fraction (PRD R6).
 **S (input-only)**:
 Real-token size of the previous LLM call's input. Computed via `contextTokens(messages, systemPrompt, lastUsage)` — same view the squash activity's `decideSquashReason` uses, so a BoundaryTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration can push the *next* prompt above W_high without the gate noticing this turn; the gate catches it on the iteration AFTER (when LastUsage reflects the bigger call). Bounded one-iteration lag; self-corrects.
 
-**`imageOnly` squash**:
-A squash request with `RangeThreshold` and `CompactionThreshold` zeroed so the
-activity's `decideSquashReason` can *only* return `ReasonImageOverflow`. Used by
-the **Boundary gate** under Summarize when image-overflow cleanup is needed but
-the hard-floor truncation must NOT re-fire.
 
 ## Relationships
 
