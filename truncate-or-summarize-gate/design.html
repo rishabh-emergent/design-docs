@@ -113,10 +113,10 @@ those truncations reclaim almost nothing yet still re-process the full prompt �
 delays the summarization actually needed.
 </p>
 <p>
-This change adds a <span class="term">boundary gate</span>: on every step-finish where context
+This change adds a <span class="term">truncation-gain optimization</span>: on every step-finish where context
 exceeds <span class="term">W_high</span>, it computes what the pending truncation
 <em>would actually remove</em> and chooses — <strong>truncate</strong> if that removal is
-effective (≥&nbsp;<code>min_removal_frac</code> of context <em>and</em> lands back inside the window),
+effective (≥&nbsp;<code>gain_threshold</code> of context <em>and</em> lands back inside the window),
 otherwise <strong>summarize</strong> immediately. The gate is pure — no per-run state — and only
 fires where range-based truncation is already on.
 </p>
@@ -200,7 +200,7 @@ truncation was futile and summarized then.</p>
 Insert a decision at the moment the hard floor would fire. On every finish where
 <code>S &gt; W_high</code>, run the pending truncation <em>for real</em> on the current messages,
 measure how much it removes, and choose: if the removal is <span class="term">effective</span>
-(removes ≥&nbsp;<code>min_removal_frac</code> of context <em>and</em> lands ≤&nbsp;<span class="term">W_high</span>)
+(removes ≥&nbsp;<code>gain_threshold</code> of context <em>and</em> lands ≤&nbsp;<span class="term">W_high</span>)
 the hard-floor truncation proceeds as today; otherwise summarization fires immediately. The
 gate is a pure function of the current iteration's inputs — no per-run state. While a long
 session is above <code>W_high</code>, the gate re-decides each iteration: it will keep choosing
@@ -251,12 +251,12 @@ when) the gate selects it. No new truncation or summarization machinery is writt
 <table>
 <thead><tr><th>Term</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><span class="term">S</span></td><td>Real-token size of the previous LLM call's input — <code>contextTokens(messages, systemPrompt, lastUsage)</code>. Same view as the squash activity's <code>decideSquashReason</code>, so a BoundaryTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration is caught on the iteration AFTER (one-iteration lag, self-corrects).</td></tr>
+<tr><td><span class="term">S</span></td><td>Real-token size of the previous LLM call's input — <code>contextTokens(messages, systemPrompt, lastUsage)</code>. Same view as the squash activity's <code>decideSquashReason</code>, so a GainActionTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration is caught on the iteration AFTER (one-iteration lag, self-corrects).</td></tr>
 <tr><td><span class="term">W_high</span></td><td>Top of the operating window. Reuses <code>range_threshold.upper</code> (0.325 ⇒ 325K on a 1M window). The gate's decision boundary.</td></tr>
 <tr><td><span class="term">W_low</span></td><td>Bottom of the window. Reuses <code>range_threshold.lower</code> (0.14 ⇒ 140K). Drives the cache-invalidation arm; the gate's own math never reads it.</td></tr>
-<tr><td><span class="term">min_removal_frac</span></td><td>New knob (initial 0.10). Minimum fraction of <em>current</em> context a truncation must remove to count as effective. Its presence (&gt; 0) is the gate's enable signal.</td></tr>
-<tr><td><span class="term">effective truncation</span></td><td>A pending truncation that removes ≥ <code>min_removal_frac</code> <strong>and</strong> lands post-truncation context ≤ <span class="term">W_high</span>.</td></tr>
-<tr><td><span class="term">boundary gate</span></td><td>The truncate-vs-summarize arbiter, re-evaluated fresh on every finish above <span class="term">W_high</span>. Pure function of current inputs — no per-run state.</td></tr>
+<tr><td><span class="term">gain_threshold</span></td><td>New knob (initial 0.10). Minimum fraction of <em>current</em> context a truncation must remove to count as effective. Its presence (&gt; 0) is the gate's enable signal.</td></tr>
+<tr><td><span class="term">effective truncation</span></td><td>A pending truncation that removes ≥ <code>gain_threshold</code> <strong>and</strong> lands post-truncation context ≤ <span class="term">W_high</span>.</td></tr>
+<tr><td><span class="term">truncation-gain optimization</span></td><td>The truncate-vs-summarize arbiter, re-evaluated fresh on every finish above <span class="term">W_high</span>. Pure function of current inputs — no per-run state.</td></tr>
 </tbody>
 </table>
 </section>
@@ -267,10 +267,10 @@ when) the gate selects it. No new truncation or summarization machinery is writt
 
 <h3>6.1 The state machine</h3>
 <p>Evaluated on every iteration finish when the gate is active
-(<code>range_threshold</code> present <em>and</em> <code>min_removal_frac &gt; 0</code>):</p>
+(<code>range_threshold</code> present <em>and</em> <code>gain_threshold &gt; 0</code>):</p>
 
 <div class="figure">
-<svg viewBox="0 0 880 280" role="img" aria-label="Boundary gate decision">
+<svg viewBox="0 0 880 280" role="img" aria-label="Truncation-gain optimization decision">
   <!-- decision: S <= W_high ? -->
   <rect x="330" y="20" width="220" height="46" rx="6" fill="#fff" stroke="#666"/>
   <text x="440" y="48" text-anchor="middle" font-size="13">S ≤ W_high ?</text>
@@ -306,7 +306,7 @@ when) the gate selects it. No new truncation or summarization machinery is writt
     </marker>
   </defs>
 </svg>
-<div class="caption">Three actions, no `armed` flag, no Suppress branch. While context stays above <span class="term">W_high</span>, the gate re-decides each iteration — picking <strong>Truncate</strong> as long as a fresh truncation can reclaim ≥ <code>min_removal_frac</code> AND land below <code>W_high</code>, and flipping to <strong>Summarize</strong> the moment that stops being true.</div>
+<div class="caption">Three actions, no `armed` flag, no Suppress branch. While context stays above <span class="term">W_high</span>, the gate re-decides each iteration — picking <strong>Truncate</strong> as long as a fresh truncation can reclaim ≥ <code>gain_threshold</code> AND land below <code>W_high</code>, and flipping to <strong>Summarize</strong> the moment that stops being true.</div>
 </div>
 
 <h3>6.2 Effectiveness — measured, not estimated (PRD R6)</h3>
@@ -316,16 +316,16 @@ The decision rests on what truncation <em>actually</em> removes. We run the real
 pending <code>bulk_checkpoint</code> cutoff on the <em>current</em> messages (which already reflect
 prior truncations), then compute:
 </p>
-<p class="formula">removal_frac = (est_pre − est_post) / est_pre</p><br>
+<p class="formula">gain = (est_pre − est_post) / est_pre</p><br>
 <p class="formula">post_trunc&nbsp;&nbsp;= S × (est_post / est_pre)</p><br>
-<p class="formula">effective&nbsp;&nbsp;&nbsp;= removal_frac ≥ min_removal_frac&nbsp; AND&nbsp; post_trunc ≤ W_high</p>
+<p class="formula">effective&nbsp;&nbsp;&nbsp;= gain ≥ gain_threshold&nbsp; AND&nbsp; post_trunc ≤ W_high</p>
 
 <div class="callout">
 <h4>Why the ratio is in estimate-space but post_trunc is in real tokens</h4>
-<p><em>S is the previous LLM call's input size in real tokens (from <code>LastUsage</code>); a post-truncation size can only come from cortex's char/4 estimator (no tokenizer inside deterministic workflow code). Mixing the two incoherently would let the effectiveness verdict disagree with the trigger at the boundary. So we take <code>removal_frac</code> as a pure ratio of estimator output (the estimator's systematic bias cancels) and scale the real <code>S</code> by the survival ratio to get <code>post_trunc</code> — keeping it in the same real-token units as <code>W_high</code>. A true token count would need an LLM round-trip: synchronous latency + replay nondeterminism, a non-starter under Temporal.</em></p>
+<p><em>S is the previous LLM call's input size in real tokens (from <code>LastUsage</code>); a post-truncation size can only come from cortex's char/4 estimator (no tokenizer inside deterministic workflow code). Mixing the two incoherently would let the effectiveness verdict disagree with the trigger at the boundary. So we take <code>gain</code> as a pure ratio of estimator output (the estimator's systematic bias cancels) and scale the real <code>S</code> by the survival ratio to get <code>post_trunc</code> — keeping it in the same real-token units as <code>W_high</code>. A true token count would need an LLM round-trip: synchronous latency + replay nondeterminism, a non-starter under Temporal.</em></p>
 </div>
 <p>If the cutoff cannot advance (nothing new to truncate), the transform removes ~0 ⇒
-<code>removal_frac → 0 &lt; min_removal_frac</code> ⇒ SUMMARIZE. That is the desired outcome: when
+<code>gain → 0 &lt; gain_threshold</code> ⇒ SUMMARIZE. That is the desired outcome: when
 truncation is exhausted, summarize.</p>
 
 <h3>6.3 Reference pseudocode → cortex mapping</h3>
@@ -334,8 +334,8 @@ truncation is exhausted, summarize.</p>
   if S <= W_high:                                               // W_high = range_threshold.upper * ctxWindow
       action = PROCEED                                          // existing cache-aware squash runs as today
   else:
-      removal_frac, post_trunc = measure(pending bulk truncation on current msgs)
-      effective = removal_frac >= min_removal_frac AND post_trunc <= W_high
+      gain, post_trunc = measure(pending bulk truncation on current msgs)
+      effective = gain >= gain_threshold AND post_trunc <= W_high
       action = effective ? TRUNCATE : SUMMARIZE
 
 CALLER (elite/flow.go) dispatches:
@@ -349,7 +349,7 @@ CALLER (elite/flow.go) dispatches:
 <section id="dryruns">
 <h2>7. Dry runs</h2>
 <p>All on a <strong>1M</strong> window: <code>W_low</code>=140K, <code>W_high</code>=325K,
-<code>min_removal_frac</code>=0.10, <code>auto_compact.threshold</code>=350K. Assume
+<code>gain_threshold</code>=0.10, <code>auto_compact.threshold</code>=350K. Assume
 <code>est_pre ≈ S</code> for readability.</p>
 
 <h3>7.1 In-window — behaviour unchanged</h3>
@@ -365,7 +365,7 @@ CALLER (elite/flow.go) dispatches:
 <tr><th>quantity</th><th>value</th></tr>
 <tr><td>S</td><td>360K (frac 0.36, just exited)</td></tr>
 <tr><td>pending truncation</td><td>est_post = 310K (a fat recent tool result is truncatable)</td></tr>
-<tr><td>removal_frac</td><td>(360−310)/360 = <strong>0.139</strong> ≥ 0.10 ✓</td></tr>
+<tr><td>gain</td><td>(360−310)/360 = <strong>0.139</strong> ≥ 0.10 ✓</td></tr>
 <tr><td>post_trunc</td><td>360 × (310/360) = <strong>310K</strong> ≤ 325K ✓</td></tr>
 <tr><td>decision</td><td><span class="pill good">TRUNCATE</span>. Next finish S≈310K ≤ W_high → PROCEED.</td></tr>
 </table>
@@ -375,7 +375,7 @@ CALLER (elite/flow.go) dispatches:
 <tr><th>quantity</th><th>value</th></tr>
 <tr><td>S</td><td>335K (frac 0.335, between W_high and 0.35)</td></tr>
 <tr><td>pending truncation</td><td>est_post = 330K (only a few KB of new tool output is truncatable)</td></tr>
-<tr><td>removal_frac</td><td>(335−330)/335 = <strong>0.015</strong> &lt; 0.10 ✗</td></tr>
+<tr><td>gain</td><td>(335−330)/335 = <strong>0.015</strong> &lt; 0.10 ✗</td></tr>
 <tr><td>decision</td><td><span class="pill bad">SUMMARIZE</span> now. Forced through <code>maybeApplyAutoCompact</code> even though 335K &lt; 350K.</td></tr>
 </table>
 <div class="callout good"><p>This is the whole point: at 335K we'd otherwise truncate ~0.5% per step up to 350K. The gate
@@ -383,22 +383,22 @@ summarizes immediately instead.</p></div>
 
 <h3>7.4 Consecutive above-window iterations → fresh decisions each time</h3>
 <table class="calc-table">
-<tr><th>iter</th><th>S</th><th>pending truncation</th><th>removal_frac / post_trunc</th><th>decision</th></tr>
+<tr><th>iter</th><th>S</th><th>pending truncation</th><th>gain / post_trunc</th><th>decision</th></tr>
 <tr><td>N</td><td>360K</td><td>est_post = 305K (big tool result removable)</td><td>0.153 ≥ 0.10 ✓ · 305K ≤ 325K ✓</td><td><span class="pill good">TRUNCATE</span></td></tr>
 <tr><td>N+1</td><td>335K (output + new tool result added)</td><td>est_post = 285K (more bulk available)</td><td>0.149 ≥ 0.10 ✓ · 285K ≤ 325K ✓</td><td><span class="pill good">TRUNCATE</span></td></tr>
 <tr><td>N+2</td><td>328K</td><td>est_post = 325K (bulk cutoff exhausted)</td><td>0.009 &lt; 0.10 ✗</td><td><span class="pill bad">SUMMARIZE</span></td></tr>
 </table>
-<p>Each iteration above <span class="term">W_high</span> is judged on its own merit. The gate stays on Truncate as long as truncation is genuinely effective, and switches to Summarize the moment a fresh attempt can no longer reclaim ≥ <code>min_removal_frac</code>. No flag bookkeeping required.</p>
+<p>Each iteration above <span class="term">W_high</span> is judged on its own merit. The gate stays on Truncate as long as truncation is genuinely effective, and switches to Summarize the moment a fresh attempt can no longer reclaim ≥ <code>gain_threshold</code>. No flag bookkeeping required.</p>
 </section>
 
 <!-- ============================================================ -->
 <section id="dataflow">
 <h2>8. Data flow</h2>
 <div class="figure">
-<svg viewBox="0 0 900 380" role="img" aria-label="One iteration with the boundary gate">
+<svg viewBox="0 0 900 380" role="img" aria-label="One iteration with the truncation-gain optimization">
   <!-- lifelines -->
   <text x="120" y="28" text-anchor="middle" font-size="12.5" font-weight="600">elite loop (flow.go)</text>
-  <text x="400" y="28" text-anchor="middle" font-size="12.5" font-weight="600">DecideBoundaryAction (xcontext)</text>
+  <text x="400" y="28" text-anchor="middle" font-size="12.5" font-weight="600">DecideGainAction (xcontext)</text>
   <text x="690" y="28" text-anchor="middle" font-size="12.5" font-weight="600">existing mechanisms</text>
   <line x1="120" y1="40" x2="120" y2="360" stroke="#555" stroke-dasharray="3 3"/>
   <line x1="400" y1="40" x2="400" y2="360" stroke="#555" stroke-dasharray="3 3"/>
@@ -438,7 +438,7 @@ summarizes immediately instead.</p></div>
     </marker>
   </defs>
 </svg>
-<div class="caption">The gate is a pure call returning one of three actions; the loop dispatches to the <em>existing</em> truncate / summarize paths. New wiring is just the dispatch and the <code>force</code> flag into auto-compact. Gate's S aligns with the activity's view so BoundaryTruncate is honoured naturally — no force-bypass, no image-only request flag.</div>
+<div class="caption">The gate is a pure call returning one of three actions; the loop dispatches to the <em>existing</em> truncate / summarize paths. New wiring is just the dispatch and the <code>force</code> flag into auto-compact. Gate's S aligns with the activity's view so GainActionTruncate is honoured naturally — no force-bypass, no image-only request flag.</div>
 </div>
 </section>
 
@@ -463,31 +463,31 @@ type RangeThresholdConfig struct {
     Lower          float64       `json:"lower" yaml:"lower"`
     Upper          float64       `json:"upper" yaml:"upper"`
     CacheTTLGuard  time.Duration `json:"cache_ttl_guard" yaml:"cache_ttl_guard"`
-    MinRemovalFrac float64       `json:"min_removal_frac,omitempty" yaml:"min_removal_frac,omitempty"`
+    GainThreshold float64       `json:"gain_threshold,omitempty" yaml:"gain_threshold,omitempty"`
 }
-// Validate(): if MinRemovalFrac != 0 → must be in (0,1).</code></pre>
+// Validate(): if GainThreshold != 0 → must be in (0,1).</code></pre>
 
-<h3>10.2 Policy + decision — <code>core/xcontext/tiered.go</code>, new <code>core/xcontext/boundary_action.go</code>, and <code>core/xcontext/squash.go</code></h3>
+<h3>10.2 Policy + decision — <code>core/xcontext/tiered.go</code>, new <code>core/xcontext/truncation_gain.go</code>, and <code>core/xcontext/squash.go</code></h3>
 <pre><code>// tiered.go: carry the knob onto the resolved policy
 type RangeThresholdPolicy struct {
     Lower, Upper            float64
     CacheTTL, CacheTTLGuard time.Duration
-    MinRemovalFrac          float64        // NEW — &gt;0 enables the boundary gate
+    GainThreshold          float64        // NEW — &gt;0 enables the truncation-gain optimization
 }
 
-// boundary_action.go (NEW): pure, table-testable decision
-type BoundaryAction int
+// truncation_gain.go (NEW): pure, table-testable decision
+type GainAction int
 const (
-    BoundaryProceed BoundaryAction = iota  // S ≤ W_high — let existing squash decide
-    BoundaryTruncate                       // S > W_high, pending truncation is effective
-    BoundarySummarize                      // S > W_high, pending truncation is not effective
+    GainActionProceed GainAction = iota  // S ≤ W_high — let existing squash decide
+    GainActionTruncate                       // S > W_high, pending truncation is effective
+    GainActionSummarize                      // S > W_high, pending truncation is not effective
 )
 
-func DecideBoundaryAction(in BoundaryInput) BoundaryDecision { /* §6.1–6.2 */ }
+func DecideGainAction(in GainInput) GainDecision { /* §6.1–6.2 */ }
 
 // squash.go: no new exports; existing decideSquashReason naturally agrees with the gate
 //            (both use contextTokens / input-only S)</code></pre>
-<div class="callout"><p><em><code>boundary_action.go</code> sits next to <code>tiered.go</code> and <code>squash.go</code> in the same package, reusing <code>contextTokens</code>, <code>estimateTokens</code>, <code>BulkTruncateBeforeIndex</code> and <code>xllm.ApplySquash</code> — no helper is duplicated, no new package is introduced (identical posture to <code>margin.go</code>).</em></p></div>
+<div class="callout"><p><em><code>truncation_gain.go</code> sits next to <code>tiered.go</code> and <code>squash.go</code> in the same package, reusing <code>contextTokens</code>, <code>estimateTokens</code>, <code>BulkTruncateBeforeIndex</code> and <code>xllm.ApplySquash</code> — no helper is duplicated, no new package is introduced (identical posture to <code>margin.go</code>).</em></p></div>
 
 <h3>10.3 Wiring — <code>core/workflows/elite/setup.go</code></h3>
 <p>The block that builds <code>SquashRangeThresholdPolicy</code> from
@@ -495,36 +495,34 @@ func DecideBoundaryAction(in BoundaryInput) BoundaryDecision { /* §6.1–6.2 */
 assignment.</p>
 
 <h3>10.4 Loop dispatch — <code>core/workflows/elite/flow.go</code></h3>
-<pre><code>// Two lines added to runIteration. All gate logic in maybeForceSummarize (elite/squash.go,
-// alongside decideBoundary and shouldSquash).
-forceSummarize := maybeForceSummarize(exec, setup, state, messages)
+<pre><code>// One call per iteration. needsSquashing returns both decisions.
+shouldSquash, forceSummarize := needsSquashing(exec, setup, state, messages, squashEvalTime)
 
-if needsSquashing(setup.SquashPolicy, setup, state, messages, squashEvalTime) {
+if shouldSquash {
     squash = w.applySquashing(exec, req, setup, agent, state, messages, squashEvalTime)
     if squash != nil { messages = squash.Messages }
 }
 
 // ... auto-compact (force=forceSummarize) runs next ...</code></pre>
 
-<pre><code>// elite/squash.go: package helper
-func maybeForceSummarize(exec WorkflowExecutor, setup *SetupResult, state *State,
-    messages []xllm.Message) bool {
-    if !setup.IsBoundaryGateActive() {
-        return false
-    }
+<pre><code>// elite/squash.go: one helper returns both decisions.
+func needsSquashing(exec WorkflowExecutor, setup *SetupResult, state *State,
+    messages []xllm.Message, now time.Time) (squash, forceSummarize bool) {
+    squash = setup.SquashPolicy != nil && shouldSquash(setup, state, messages, now)
+
+    if !setup.IsTruncationGainOptimizationActive() { return }
     log := exec.Logger()
-    d := decideBoundary(setup, state, messages)
-    log.Info("boundary gate", "action", d.Action.String(), "s", d.S, "w_high", d.WHigh,
-        "post_trunc", d.PostTrunc, "removal_frac", d.RemovalFrac)
-    if d.Action != xcontext.BoundarySummarize {
-        return false
-    }
+    d := decideGainAction(setup, state, messages)
+    log.Info("truncation gain optimization", "action", d.Action.String(), "s", d.S, "w_high", d.WHigh,
+        "post_trunc", d.PostTrunc, "gain", d.Gain)
+    if d.Action != xcontext.GainActionSummarize { return }
     if setup.IsAutoCompactOff() {
-        log.Info("boundary gate summarize fallback: auto_compact disabled, falling back to hard-floor squash")
-        return false
+        log.Info("truncation gain optimization summarize fallback: auto_compact disabled, falling back to hard-floor squash")
+        return
     }
-    log.Info("boundary gate summarize armed")
-    return true
+    log.Info("truncation gain optimization summarize armed")
+    forceSummarize = true
+    return
 }</code></pre>
 <div class="callout"><p><em>The gate is stateless. <code>forceSummarize</code> bridges the gate's "summarize at 0.325" decision to auto-compact's natural 0.35 threshold. Nothing else added at the dispatch layer; INFO-only logging mirrors the rest of the elite package.</em></p></div>
 <div class="callout warn"><p><em>When gate picks Summarize, the existing squash predicate still fires (S > W_high). So the iteration truncates first, then summarizes on top. Truncation is cheap (no LLM call) and summarize's compacted message is the authoritative head — the brief overlap is acceptable. Avoids the two-mode squash plumbing an earlier revision tried.</em></p></div>
@@ -539,7 +537,7 @@ session with ≤ <code>last_n</code> messages can't be asked to summarize nothin
 
 <h3>10.6 No speculative pre-computation when the gate is active</h3>
 <pre><code>// flow.go:~620 — the gate may pick TRUNCATE, so a pre-computed summary would be wasted spend.
-if !setup.IsBoundaryGateActive() && state.SummaryComputationFuture() == nil {
+if !setup.IsTruncationGainOptimizationActive() && state.SummaryComputationFuture() == nil {
     if f := w.maybeStartSummaryComputation(...); f != nil { state.SetSummaryComputationFuture(f) }
 }</code></pre>
 <div class="callout"><p><em>The gate forces summarize synchronously only when it actually selects it. We
@@ -552,7 +550,7 @@ belt-and-suspenders rather than load-bearing.</em></p></div>
 <h3>10.8 Persistence — <code>internal/pgsql/agents.go</code></h3>
 <p>The jsonb writer/reader for the agent config already round-trips <code>range_threshold</code>; the
 new field rides along inside the same object. Confirm the marshal/unmarshal covers
-<code>min_removal_frac</code> (one line each) and regenerate mocks if any querier signature is touched
+<code>gain_threshold</code> (one line each) and regenerate mocks if any querier signature is touched
 (none expected).</p>
 
 <h3>10.9 Opt-in — experiment patch (no YAML in repo)</h3>
@@ -560,12 +558,12 @@ new field rides along inside the same object. Confirm the marshal/unmarshal cove
 patched in via the existing Unleash experiment — there is no boolean flag and no committed agent YAML.
 The gate rides the <em>same</em> experiment, which now also:</p>
 <ul>
-  <li>adds <code>range_threshold.min_removal_frac: 0.10</code>;</li>
+  <li>adds <code>range_threshold.gain_threshold: 0.10</code>;</li>
   <li>ensures <code>auto_compact</code> is enabled (<code>compact_near_overflow</code>, threshold 0.35,
   a <code>last_n</code>, and a <code>summary_prompt_name</code>) so the SUMMARIZE arm can fire;</li>
   <li>leaves <code>summary_computation_threshold</code> unset.</li>
 </ul>
-<div class="callout good"><p>Because the gate keys off <code>min_removal_frac &gt; 0</code>, the code ships
+<div class="callout good"><p>Because the gate keys off <code>gain_threshold &gt; 0</code>, the code ships
 <strong>dark</strong>: until the experiment adds the field, even range-truncation jobs keep today's
 unconditional hard floor. Flipping the field on is the entire rollout switch.</p></div>
 </section>
@@ -576,14 +574,14 @@ unconditional hard floor. Flipping the field on is the entire rollout switch.</p
 <table>
 <thead><tr><th>Failure</th><th>Behavior</th></tr></thead>
 <tbody>
-<tr><td>Gate disabled (no <code>min_removal_frac</code>)</td><td>Gate never runs; range gate + auto-compact behave exactly as today.</td></tr>
-<tr><td>Pending truncation removes nothing (cutoff can't advance)</td><td><code>removal_frac → 0 &lt; min_removal_frac</code> → SUMMARIZE. Correct: truncation is exhausted.</td></tr>
+<tr><td>Gate disabled (no <code>gain_threshold</code>)</td><td>Gate never runs; range gate + auto-compact behave exactly as today.</td></tr>
+<tr><td>Pending truncation removes nothing (cutoff can't advance)</td><td><code>gain → 0 &lt; gain_threshold</code> → SUMMARIZE. Correct: truncation is exhausted.</td></tr>
 <tr><td>Truncate fires but doesn't fully clear W_high (projection error, new output/tool tokens between iterations)</td><td>Next iteration re-evaluates fresh. If a fresh truncation is still effective → Truncate again. If the cutoff is now exhausted → Summarize. No locked-in state to recover from.</td></tr>
 <tr><td>Gate picks SUMMARIZE but <code>auto_compact</code> is not enabled (misconfigured)</td><td><code>maybeForceSummarize</code> returns false; the existing hard-floor squash fires as today instead of silently no-oping. Logged at INFO.</td></tr>
 <tr><td>Image-overflow under SUMMARIZE</td><td>The existing squash predicate fires on the same iteration (S &gt; W_high triggers hard-floor, which also handles image overflow). Image cleanup happens alongside the forced summarize. The truncation work is "wasted" relative to the summarize that lands on top, but bulk truncation has no LLM cost.</td></tr>
 <tr><td>Sudden spike: previous output + trailing tool result pushes the NEXT prompt above W_high in a single iteration</td><td>Gate's S is input-only (matches activity's view), so the spike isn't caught this iteration. Next iteration's LastUsage reflects the bigger call, and the gate fires Truncate/Summarize then. Worst case: one oversized LLM call (~+65K tokens at the boundary). Acceptable trade for the single-view architecture.</td></tr>
 <tr><td>Resume / <code>ContinueAsNew</code> mid-session above window</td><td>Gate re-evaluates fresh on the first post-resume finish — same as any other finish. No special-casing needed.</td></tr>
-<tr><td>Estimator skew makes <code>post_trunc</code> wrong near boundary</td><td>Ratio cancels systematic bias (estimator under-counts cancel between <code>est_pre</code> and <code>est_post</code>); residual error is sub-percent of window and self-corrects next finish. Tunable via <code>min_removal_frac</code>.</td></tr>
+<tr><td>Estimator skew makes <code>post_trunc</code> wrong near boundary</td><td>Ratio cancels systematic bias (estimator under-counts cancel between <code>est_pre</code> and <code>est_post</code>); residual error is sub-percent of window and self-corrects next finish. Tunable via <code>gain_threshold</code>.</td></tr>
 </tbody>
 </table>
 </section>
@@ -595,25 +593,25 @@ unconditional hard floor. Flipping the field on is the entire rollout switch.</p
 <table>
 <thead><tr><th>Log message</th><th>When</th><th>Key fields</th></tr></thead>
 <tbody>
-<tr><td><code>"boundary gate"</code></td><td>Every iteration while the gate is active.</td><td><code>action</code>, <code>s</code>, <code>w_high</code>, <code>post_trunc</code>, <code>removal_frac</code></td></tr>
-<tr><td><code>"boundary gate summarize armed"</code></td><td>Gate picked Summarize and is dispatching the forced auto-compact.</td><td>—</td></tr>
-<tr><td><code>"boundary gate summarize fallback: auto_compact disabled, falling back to hard-floor squash"</code></td><td>Misconfigured: Summarize selected but auto-compact is off. Falls back to today's hard-floor squash.</td><td>—</td></tr>
+<tr><td><code>"truncation-gain optimization"</code></td><td>Every iteration while the gate is active.</td><td><code>action</code>, <code>s</code>, <code>w_high</code>, <code>post_trunc</code>, <code>gain</code></td></tr>
+<tr><td><code>"truncation-gain optimization summarize armed"</code></td><td>Gate picked Summarize and is dispatching the forced auto-compact.</td><td>—</td></tr>
+<tr><td><code>"truncation-gain optimization summarize fallback: auto_compact disabled, falling back to hard-floor squash"</code></td><td>Misconfigured: Summarize selected but auto-compact is off. Falls back to today's hard-floor squash.</td><td>—</td></tr>
 </tbody>
 </table>
 <p>Paste-ready LogQL:</p>
-<pre><code># How often the gate picks each arm (tune min_removal_frac from this ratio)
+<pre><code># How often the gate picks each arm (tune gain_threshold from this ratio)
 sum by (action) (
-  count_over_time({app="cortex-agentsdk"} |= "boundary gate" | logfmt [1h])
+  count_over_time({app="cortex-agentsdk"} |= "truncation-gain optimization" | logfmt [1h])
 )
 
 # Sessions where SUMMARIZE fired below 0.35 (the new behaviour)
-{app="cortex-agentsdk"} |= "boundary gate" | logfmt | action="BoundarySummarize" | s < 350000
+{app="cortex-agentsdk"} |= "truncation-gain optimization" | logfmt | action="GainActionSummarize" | s < 350000
 
 # Misconfigured summarize fallbacks (should be zero in steady state)
 {app="cortex-agentsdk"} |= "summarize fallback: auto_compact disabled"</code></pre>
 <div class="callout warn"><p><em>The initial 0.10 / 0.325 / 0.14 values are starting points (PRD: "require validation
 and tuning against production behavior"). The <code>action</code> split above is the primary tuning
-signal — if SUMMARIZE dominates immediately at the boundary, raise <code>min_removal_frac</code> or
+signal — if SUMMARIZE dominates immediately at the boundary, raise <code>gain_threshold</code> or
 re-examine <code>preserve_last_n</code>.</em></p></div>
 </section>
 

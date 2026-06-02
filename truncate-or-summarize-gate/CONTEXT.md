@@ -23,18 +23,18 @@ Bottom of the operating window. Maps to existing `range_threshold.lower` (e.g. 0
 ≈ 140K). Drives the existing cache-invalidation truncation arm; the gate's own
 decision math never reads it.
 
-**Boundary gate**:
+**Truncation-gain optimization**:
 The truncate-or-summarize decision made at the first step-finish after context
 exceeds `W_high`. Not a new trigger — it arbitrates which of the two existing
 mechanisms (truncation vs summarization) fires.
 _Avoid_: "tier 2", "summarization trigger" (the gate may pick either arm).
 
 **Effective truncation**:
-A pending truncation that BOTH (a) removes ≥ `min_removal_frac` of current context
+A pending truncation that BOTH (a) removes ≥ `gain_threshold` of current context
 AND (b) lands post-truncation context ≤ `W_high`. The gate truncates only when
 truncation is effective; otherwise it summarizes.
 
-**min_removal_frac**:
+**gain_threshold**:
 Configurable minimum fraction of current context a truncation must remove to count
 as effective (initial 0.10). New field on `range_threshold`; its presence (> 0) is
 the gate's enable signal — gate is dark when absent, preserving today's behavior.
@@ -42,7 +42,7 @@ the gate's enable signal — gate is dark when absent, preserving today's behavi
 **Per-iteration re-decision**:
 The gate re-evaluates on every step finish — no `armed` flag, no `Suppress` action.
 The effectiveness check itself prevents wasteful repeated truncation: if a fresh
-truncation can no longer remove ≥ `min_removal_frac` of context or land back ≤
+truncation can no longer remove ≥ `gain_threshold` of context or land back ≤
 `W_high`, the gate flips to **Summarize**. So a session above `W_high` may run
 several Truncate steps in a row (each one making real progress), and the moment
 Truncate stops being effective the gate switches to Summarize. The
@@ -64,15 +64,15 @@ by actually running pure `xllm.ApplySquash` with the pending bulk cutoff on the
 current messages — never a guessed fraction (PRD R6).
 
 **S (input-only)**:
-Real-token size of the previous LLM call's input. Computed via `contextTokens(messages, systemPrompt, lastUsage)` — same view the squash activity's `decideSquashReason` uses, so a BoundaryTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration can push the *next* prompt above W_high without the gate noticing this turn; the gate catches it on the iteration AFTER (when LastUsage reflects the bigger call). Bounded one-iteration lag; self-corrects.
+Real-token size of the previous LLM call's input. Computed via `contextTokens(messages, systemPrompt, lastUsage)` — same view the squash activity's `decideSquashReason` uses, so a GainActionTruncate decision is honoured naturally by the activity's own predicate. Trade-off: a sudden output + trailing spike in one iteration can push the *next* prompt above W_high without the gate noticing this turn; the gate catches it on the iteration AFTER (when LastUsage reflects the bigger call). Bounded one-iteration lag; self-corrects.
 
 
 ## Relationships
 
-- The **Boundary gate** intercepts only the **Truncate arm**'s hard-floor case
+- The **Truncation-gain optimization** intercepts only the **Truncate arm**'s hard-floor case
   (`S > W_high`); the cache-invalidation arm inside `[W_low, W_high)` is unchanged.
 - A gate decision selects exactly one of **Truncate arm** XOR **Summarize arm**.
-- **min_removal_frac** present ⇒ **Boundary gate** active ⇒ requires `range_threshold`
+- **gain_threshold** present ⇒ **Truncation-gain optimization** active ⇒ requires `range_threshold`
   present (so the gate only runs where range-based truncation runs).
 - **Effective truncation** false ⇒ **Summarize arm**; true ⇒ **Truncate arm**.
 
