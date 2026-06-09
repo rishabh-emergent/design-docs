@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Alchemy NFT API v3 owned NFTs",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I22-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses correct v3 endpoint path /nft/v3/{apiKey}/getNFTsForOwner with appropriate params (owner, pageSize, withMetadata, excludeFilters, pageKey). Internally consistent with v3 base URL throughout. Minor: response field names like 'media' with rawUrl/gatewayUrl mix older 'media' object naming with v3's 'image' object, but extractor still gets a runnable shape.",
+    "executability": "Fenced blocks parse; imports defined; httpx async usage correct. Two files use os.getenv for ALCHEMY_API_KEY at import time but main.py loads dotenv AFTER importing alchemy_service, meaning env may be None at module load \u2014 one non-obvious fix needed. No sandbox-infeasible patterns.",
+    "completeness": "All six pieces present: (a) signup URL + dashboard steps, (b) pip install bash block, (c) explicit .env template with ALCHEMY_API_KEY and ALCHEMY_BASE_URL, (d) backend code in models.py/alchemy_service.py/main.py, (e) N/A (FastAPI-only spec), (f) pytest test command. Env var names consistent.",
+    "citation_anchoring": "Multiple official alchemy.com/docs URLs cited, inline reference markers [1][3][6][7] placed near relevant code/pitfalls. Canonical official domain used."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3800,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling \u2014 internally consistent v3 usage with version claimed, scored 4 on correctness. Minor load_dotenv ordering issue affects executability.",
+  "_judge_latency_s": 14.962324142456055,
+  "_judge_input_tokens": 14396,
+  "_judge_output_tokens": 810
+}

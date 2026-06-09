@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Anthropic Messages + tool_use + cache_control",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I18-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Model name 'claude-opus-4-8' appears fabricated (not a real Anthropic model identifier; current names are e.g. claude-opus-4-20250514, claude-3-5-sonnet-20241022). Also uses a top-level `cache_control={'type': 'ephemeral'}` kwarg on client.messages.create which is not a valid SDK parameter \u2014 cache_control is set inline on content blocks/tools, not as a request-level argument. These are core API misuses.",
+    "executability": "Fenced blocks parse, imports present, but two runtime breakers: (1) bogus model id will 404, (2) `cache_control=` kwarg on messages.create will raise TypeError/be rejected by API. Also `cache_control` placed on tool_use assistant block is not a valid placement. Multiple non-obvious fixes required.",
+    "completeness": "All six pieces present: install bash, env var (ANTHROPIC_API_KEY) listed and referenced, backend code in fenced blocks, models, test command (pytest). No frontend needed (FastAPI-only). Env var names consistent. Some duplicated streaming/non-streaming logic but acceptable.",
+    "citation_anchoring": "Cites platform.claude.com/docs/...prompt-caching (close to canonical docs.anthropic.com) and an anthropics GitHub repo; rest are third-party blogs (requesty, markaicode, callsphere, langchain). Mix of one quasi-official + several third-party, scattered inline."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3600,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable). Internal consistency is decent but model name 'claude-opus-4-8' is implausible and request-level cache_control kwarg is not part of the anthropic-python SDK signature \u2014 these are internal-inconsistency/hallucination signals lowering correctness.",
+  "_judge_latency_s": 15.439105987548828,
+  "_judge_input_tokens": 14167,
+  "_judge_output_tokens": 938
+}

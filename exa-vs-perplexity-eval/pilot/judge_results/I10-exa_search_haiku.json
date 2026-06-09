@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Supabase auth v2",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I10-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current signInWithPassword (v2), getSession, onAuthStateChange. JWT verification with HS256 and audience='authenticated' is consistent. Explicitly contrasts v1 signIn as deprecated. Internally consistent and version-claimed.",
+    "executability": "All fenced blocks parse. Minor issue: Auth.jsx buttons inside a <form> with no type=button will submit form on click, but handlers call preventDefault. python-jose installs fine. No sandbox-infeasible patterns (no ngrok, sudo, etc).",
+    "completeness": "All 6 pieces present: (a) key acquisition via dashboard Settings>API Keys, (b) pip/npm install blocks, (c) explicit .env templates for both, (d) FastAPI backend code, (e) React frontend code, (f) pytest test command. Env var names consistent across listing and references.",
+    "citation_anchoring": "Multiple official supabase.com/docs URLs cited at end ([1],[2],[3],[5]); also third-party (markaicode, divjoy). Inline [2]/[4] markers reference code sections. Placement mostly at end but inline markers near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "supabase.auth.signInWithPassword"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "Strong playbook. Pip install lacks pinned versions despite constraint (c) request, but env vars and method names are correct and consistent.",
+  "_judge_latency_s": 12.780606985092163,
+  "_judge_input_tokens": 10255,
+  "_judge_output_tokens": 782
+}

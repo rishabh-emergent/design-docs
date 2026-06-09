@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Paytm All-in-One Web SDK",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I05-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: uses securegw-stage.paytm.in, /theia/api/v1/initiateTransaction, paytmchecksum library, and CheckoutJS bridge pattern \u2014 all consistent with known Paytm All-in-One flow. No version claim, but self-consistent across backend/frontend.",
+    "executability": "Code blocks parse. Issues: PAYTM_MID hardcoded as 'YOUR_TEST_MID' on frontend (not from env), missing .env template file, no onload handler on script (acknowledged in pitfalls but not fixed in code). Test command not in fenced bash block following a Test header. No sandbox-infeasible commands.",
+    "completeness": "(a) acquisition steps present; (b) install commands present; (c) env vars referenced (PAYTM_MID, PAYTM_MERCHANT_KEY) but NO explicit .env template block \u2014 listed only in prose; (d) backend code present; (e) frontend code present; (f) test procedure described but no single runnable test command in a bash block. Env var mismatch: frontend hardcodes MID instead of using env. Cap at 3.",
+    "citation_anchoring": "Two paytm links cited (dashboard.paytm.com, business.paytm.com/docs/test-instruments). business.paytm.com/docs is the canonical official domain. No deep link to initiateTransaction docs near the relevant backend code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1300,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable). Playbook is internally consistent with no version claim \u2192 CF=4. No explicit .env template block and frontend hardcodes MID \u2192 completeness capped at 3.",
+  "_judge_latency_s": 13.632982015609741,
+  "_judge_input_tokens": 7340,
+  "_judge_output_tokens": 868
+}

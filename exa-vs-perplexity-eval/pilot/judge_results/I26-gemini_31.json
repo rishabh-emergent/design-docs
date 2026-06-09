@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "UploadThing v6 file upload (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I26-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent v6 usage: createUploadthing, createRouteHandler, generateUploadButton/Dropzone, UPLOADTHING_SECRET/APP_ID, explicit v6 version pin. MIME-keyed config with maxFileSize/maxFileCount is consistent with v6 API surface. Docs unavailable; consistent + explicit version => 4.",
+    "executability": "All fenced blocks parse. Uses ~/ path alias which may not be configured by default in a Next.js project (one non-obvious fix needed). Otherwise imports/symbols defined. No sandbox-infeasible patterns.",
+    "completeness": "(a) API key acquisition with URL+menu \u2713 (b) install in bash \u2713 (c) env template with exact names \u2713 (d) backend code \u2713 (e) frontend code \u2713 (f) test procedures present but no single runnable command\u2014manual steps. Close to full.",
+    "citation_anchoring": "Only links to uploadthing.com dashboard root; no docs URLs anchored near code. No canonical docs domain present for UploadThing in rubric list, but only marketing/dashboard link provided."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 950,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable). Test step is procedural rather than a single bash command, slight ding on completeness piece (f) but other pieces strong. ~/ alias is a mild executability risk.",
+  "_judge_latency_s": 13.588103771209717,
+  "_judge_input_tokens": 6610,
+  "_judge_output_tokens": 789
+}

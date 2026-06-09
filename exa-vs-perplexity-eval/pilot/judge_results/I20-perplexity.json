@@ -1,0 +1,36 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Solana @solana/web3.js v2 transfer",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I20-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 1,
+    "completeness": 2,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Playbook claims to use @solana/kit / web3.js v2 functional API on the frontend but the backend Python service uses legacy patterns (solana-py Client, get_recent_blockhash) and never actually uses createSolanaRpc/sendAndConfirmTransactionFactory anywhere. Frontend imports `Keypair, PublicKey, address` from @solana/kit \u2014 PublicKey is a v1 export, not v2. Internal inconsistency between claimed v2 usage and actual code.",
+    "executability": "Multiple critical bugs: Hash.from_bytes(bytes.fromhex(blockhash_resp[...]['blockhash'])) \u2014 blockhash is base58, not hex, will throw. Keypair.from_bytes(bytes.fromhex(SERVER_PRIVATE_KEY)) on a base58 key will fail. send_raw_transaction signature is wrong (TxOpts as 2nd positional arg). Reconstructing legacy Transaction by appending signatures and assigning message is invalid. solana-py get_recent_blockhash is deprecated. Frontend code references `initiateTransfer` returning `result.transaction_id` but TransferResponse type is never defined. Huge playbook truncated mid-test file. Not extractable as runnable.",
+    "completeness": ".env.example present (a). pip/npm install commands present with versions (b, c). Backend code present (d). Frontend code present (e). Test command never given as a single ```bash block under a Test heading \u2014 only sprawling test files (f missing). Massive duplication of the same code blocks (twice for backend, twice for frontend). Output is truncated. Multiple conflicting versions of same files will confuse the extractor.",
+    "citation_anchoring": "Only numeric reference markers like [1][8][36] with no actual URLs anywhere. No canonical docs.solana.com or solana-labs.github.io URLs cited. Fails official-docs anchoring."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [
+      "new Connection() pattern via solana-py Client equivalent; PublicKey import from @solana/kit"
+    ],
+    "freshness_traps_matched_current": [
+      "createSolanaRpc mentioned in prose"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 17000,
+  "rubric_notes": "Playbook is extremely long, heavily duplicated, and truncated mid-sentence. Claims v2/kit usage but backend never uses createSolanaRpc; uses legacy solana-py with several incorrect API calls (hex-decoding base58 blockhash, broken transaction reconstruction). Multiple non-trivial bugs that an extractor cannot fix.",
+  "_judge_latency_s": 20.539423942565918,
+  "_judge_input_tokens": 38779,
+  "_judge_output_tokens": 1155
+}

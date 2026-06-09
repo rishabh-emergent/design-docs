@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Cloudflare R2 presigned PUT",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I25-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: boto3 S3 client with endpoint_url, signature_version=s3v4, ClientMethod='put_object' with Bucket/Key/ContentType params, ExpiresIn \u2014 all standard and self-consistent. No version stamp but pattern is well-established.",
+    "executability": "Code is split across multiple fenced blocks referencing each other via `from .config import app, s3_client, settings` which doesn't match a single extractable file. Pydantic v1 style BaseSettings import (`from pydantic import BaseSettings`) is broken in pydantic 2.7 (pinned in requirements) \u2014 needs pydantic-settings. UploadURLResponse referenced before defined module-wise. Multiple non-trivial fixes needed.",
+    "completeness": "(a) R2 token acquisition described with menu path; (b) pip install via requirements.txt but no explicit `pip install -r requirements.txt` bash block, npm install present; (c) .env template with exact names matches code; (d) backend code present but fragmented; (e) React component present; (f) no explicit Test section with runnable command \u2014 only narrative about pytest/curl. Missing runnable test command.",
+    "citation_anchoring": "Numeric citations [1][6][9] etc. throughout but no actual URLs given. No canonical docs URLs (developers.cloudflare.com/r2, boto3 docs) are present as links. Citations function as placeholders only."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "Very long, repetitive narrative. Code blocks reference cross-module imports that the deterministic extractor cannot resolve into a single runnable file. Pydantic BaseSettings import is broken with pinned pydantic==2.7.0.",
+  "_judge_latency_s": 13.8560631275177,
+  "_judge_input_tokens": 28432,
+  "_judge_output_tokens": 884
+}

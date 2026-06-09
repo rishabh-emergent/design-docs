@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "wagmi v2 + viem connect + sign (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I21-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses wagmi v2 idioms (useReadContract, query.enabled, createConfig, cookieStorage, metaMask connector). USDC address on Base (0x833589fCD6eDb6E08f4c7c32D4f71b54bDa02913) is correct. However, useConnect return shape shown (isLoading, pendingConnector) is wagmi v1 \u2014 in v2 it's isPending/variables. Internal inconsistency lowers score under long-tail handling.",
+    "executability": "Multiple fenced code blocks across many files but no consolidated install command block (install command only described in prose: 'analogous to npm install...'). useConnect destructures isLoading/pendingConnector which don't exist in wagmi v2 \u2014 TypeScript/runtime issues. Test file uses any cast to work around mock shape. No single bash install block extractable.",
+    "completeness": "(a) no API keys needed and acknowledged; (b) install commands NOT in a ```bash block, only described in prose \u2014 critical gap for extractor; (c) no .env template block (env vars only discussed); (d/e) component code present in fenced blocks; (f) test command not provided as bash block. Missing extractable install and test commands.",
+    "citation_anchoring": "Citations are bracketed numeric references [n] with no URLs. No canonical official docs URLs (wagmi.sh, viem.sh, docs.base.org) actually written out. Fails official-docs anchoring."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8500,
+  "rubric_notes": "Very long, prose-heavy. Install commands and test commands not in extractable bash blocks. useConnect API shape appears to mix v1/v2. Citations are numeric-only without URLs.",
+  "_judge_latency_s": 16.757458925247192,
+  "_judge_input_tokens": 27850,
+  "_judge_output_tokens": 808
+}

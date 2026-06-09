@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "MercadoPago Checkout Pro (LatAm)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I08-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: mercadopago.SDK(token), sdk.preference().create(), JS v2 SDK with new MercadoPago(key, {locale}) and mp.checkout({preference:{id}}). x-signature ts/v1 HMAC-SHA256 format matches widely documented MP webhook scheme. No version explicitly claimed but methods are self-consistent.",
+    "executability": "All fenced blocks parse. Backend has imports and env loading; webhook handler may fail validation in practice because data.id is read from query_params but MP sends it that way for webhooks, so plausible. Frontend depends on script tag in index.html which is documented. No sandbox-infeasible patterns (no ngrok/sudo).",
+    "completeness": "(a) credentials acquisition URL+menu given; (b) pip & npx install in bash; (c) env template with MP_ACCESS_TOKEN, MP_WEBHOOK_SECRET, REACT_APP_MERCADOPAGO_PUBLIC_KEY, REACT_APP_API_BASE_URL \u2014 referenced consistently in code; (d) backend main.py complete; (e) React component complete; (f) test procedure described but no single runnable test command in a bash block \u2014 slight gap, still 5 acceptable.",
+    "citation_anchoring": "Multiple official mercadopago.com.ar/developers URLs placed inline next to relevant code/config sections, plus GitHub SDK link. Matches canonical domain pattern for MercadoPago official docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling: internally consistent SDK method names and webhook signature scheme, no version string but methods coherent => CF=4. No explicit final test bash command but testing procedures provided.",
+  "_judge_latency_s": 14.93116307258606,
+  "_judge_input_tokens": 10634,
+  "_judge_output_tokens": 913
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Flutterwave Standard (Nigeria)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I07-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints POST /v3/payments and GET /v3/transactions/{id}/verify with Bearer secret key match Flutterwave v3 Standard documented patterns. Redirect handling with tx_ref/transaction_id/status query params is consistent. Internally self-consistent; no deprecated patterns flagged. Note: constraints requested 'rave-python current' but playbook deliberately avoids rave_python in favor of httpx \u2014 defensible but diverges from stated stack.",
+    "executability": "Fenced Python and TSX blocks are syntactically valid. Pydantic v2 BaseSettings uses deprecated 'class Config' style with env_file rather than model_config (works with warning in pydantic-settings v2). Field(..., env='...') likewise older pattern. No sandbox-infeasibility patterns (no ngrok/sudo). Install command is described in prose ('can be installed by running pip install...') rather than in a clean ```bash block, which hurts deterministic extraction.",
+    "completeness": "(a) API key acquisition described (dashboard \u2192 Settings \u2192 API Keys); (b) install command embedded in prose, not a clean bash block \u2014 partial; (c) .env.example present with exact names matching code (FLW_PUBLIC_KEY, FLW_SECRET_KEY, FLW_BASE_URL, FRONTEND_URL, VITE_BACKEND_URL); (d) backend code complete in fenced python block; (e) frontend code complete in tsx blocks (api.ts, App.tsx, main.tsx); (f) test command (uvicorn main:app --reload --port 8000, npm run dev) described in prose, not in a dedicated ```bash test block. Env vars listed vs referenced match.",
+    "citation_anchoring": "Citations are bracketed numeric references ([4][8][18] etc.) with no actual URLs. No canonical developer.flutterwave.com URLs are placed near code or even at the end. No fabricated URLs but also no resolvable official docs links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8200,
+  "rubric_notes": "Playbook is extremely long with significant prose duplication across sections 4\u20138. Install commands and test commands are buried in prose rather than dedicated bash blocks, which degrades deterministic extraction. Citations are numeric-only with no URLs, materially hurting citation_anchoring.",
+  "_judge_latency_s": 17.28480887413025,
+  "_judge_input_tokens": 26269,
+  "_judge_output_tokens": 1066
+}

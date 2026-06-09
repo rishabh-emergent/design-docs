@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Alchemy NFT API v3 owned NFTs",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I22-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses v3 endpoint eth-mainnet.g.alchemy.com/nft/v3/{key}/getNFTsForOwner with owner, withMetadata, pageSize params. V3 schema correctly references image.cachedUrl/originalUrl and contract.openSeaMetadata.floorPrice; internally consistent and explicitly v3 (not v2). docs_unavailable=true; long-tail handling: consistent + version claimed \u2192 4.",
+    "executability": "All fenced blocks parse; imports are complete; pip install line has duplicate httpx (harmless). Mock test patches httpx.AsyncClient.get but uses sync mock return - works with TestClient since response.json/raise_for_status are awaited as coroutines... actually code awaits client.get; mock returns non-coroutine, which would fail. Minor fix needed in test.",
+    "completeness": "All six pieces present: (a) API key acquisition with dashboard URL, (b) pip install bash, (c) .env template with ALCHEMY_API_KEY, (d) backend FastAPI code, (e) no frontend but stack is FastAPI-only, (f) pytest test command. Env var names consistent.",
+    "citation_anchoring": "Only one link to dashboard.alchemy.com (signup page), no link to docs.alchemy.com/reference/getnftsforowner-v3. No official docs URL near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1050,
+  "rubric_notes": "Long-tail handling applied for docs_unavailable. Test mock has minor async issue but extractor would still write runnable main.py.",
+  "_judge_latency_s": 13.033397912979126,
+  "_judge_input_tokens": 6750,
+  "_judge_output_tokens": 776
+}

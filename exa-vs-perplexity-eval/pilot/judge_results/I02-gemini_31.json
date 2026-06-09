@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Lemon Squeezy hosted checkout",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I02-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoint POST https://api.lemonsqueezy.com/v1/checkouts with vnd.api+json content-type and JSON:API structure is internally consistent. HMAC SHA256 with X-Signature header for webhook verification matches known Lemon Squeezy pattern. No version date claim but methods are self-consistent.",
+    "executability": "Testing section includes ngrok http 8000 which is flagged as sandbox-infeasible. Code blocks parse cleanly, imports resolved, but ngrok caps executability at 2. Also npm install syntax 'axios>=1.7.2' is invalid (npm uses @ not >=), would fail extraction.",
+    "completeness": "All six pieces present: API key acquisition with menu paths, pip/npm installs, .env.example with exact var names matching code references, backend code, frontend code, and test procedure. Env vars listed match those referenced in code. No test command in fenced bash block though \u2014 test step is prose.",
+    "citation_anchoring": "No URLs to docs.lemonsqueezy.com or any official documentation included anywhere in the playbook. No citations at all."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http 8000"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1450,
+  "rubric_notes": "npm install with >= version syntax is invalid (npm requires @version); minor extraction issue. ngrok caps executability at 2.",
+  "_judge_latency_s": 12.082314014434814,
+  "_judge_input_tokens": 7807,
+  "_judge_output_tokens": 690
+}

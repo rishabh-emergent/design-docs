@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "MercadoPago Checkout Pro (LatAm)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I08-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "SDK usage mercadopago.SDK(token), sdk.preference().create(), sdk.payment().get(id) is internally consistent with long-tail Python SDK patterns. React SDK uses initMercadoPago and Wallet brick with preferenceId, also consistent. No version pinned; docs_unavailable so scored on internal consistency (consistent but no version claimed).",
+    "executability": "Code is split across many partial snippets (config.py, main.py, models.py, schemas.py, mercadopago_client.py) with no consolidated runnable file. References undefined `engine` and `datetime` in background task. Sandbox-infeasibility patterns present: ngrok mentioned repeatedly, and 'install the ngrok agent (for example, via Homebrew on macOS)' \u2014 caps EXECUTABILITY at 2.",
+    "completeness": "(a) credential acquisition URL given (mercadopago.com/mla/account/credentials); (b) pip install commands present but not consolidated in single bash block; (c) env var names mentioned in prose (MP_ACCESS_TOKEN, VITE_MP_PUBLIC_KEY, VITE_API_BASE_URL, BACKEND_BASE_URL) but Settings class uses lowercase mp_access_token etc.; env-vars-in-prose mismatch likely. (d) backend code fragmented; (e) frontend code present; (f) no concrete runnable test command \u2014 only 'uvicorn main:app --reload' mentioned in prose. Cap at 3 due to env mismatch and missing test command.",
+    "citation_anchoring": "Citations are bracketed numeric refs [2][8][23] etc. with no resolvable URLs to developers.mercadopago.com. No canonical official docs URL placed near code. Only one URL appears (mercadopago.com/mla/account/credentials) which is a dashboard, not docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok",
+      "Homebrew"
+    ],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable). Heavy prose, fragmented code, ngrok dependence, and lack of consolidated runnable artifacts make this poor for deterministic extraction.",
+  "_judge_latency_s": 15.757893085479736,
+  "_judge_input_tokens": 24456,
+  "_judge_output_tokens": 976
+}

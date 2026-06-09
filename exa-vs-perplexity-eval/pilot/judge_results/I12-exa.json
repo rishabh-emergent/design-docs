@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Better-Auth social + magic link (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I12-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent better-auth API surface (betterAuth, prismaAdapter, toNextJsHandler, nextCookies, createAuthClient, authClient.signIn.social/magicLink). However, magic link is configured under `email.magicLink` rather than as a plugin in the `plugins` array, which contradicts the playbook's own pitfall #2 noting MagicLink must be registered as a plugin. Also `npx auth@latest generate` looks like a hallucinated CLI (real is `npx @better-auth/cli`).",
+    "executability": "Fenced code blocks parse syntactically. Issues: middleware.ts uses untyped `req` in TS without NextRequest type, getSessionCookie typically requires the request's cookies/headers (signature may differ), and the magic-link config placement may cause runtime endpoint 404s. No sandbox-infeasible patterns (no ngrok/sudo). Likely 1-2 non-obvious fixes required.",
+    "completeness": "All six pieces present: (a) Google OAuth acquisition steps with console URL, (b) install bash blocks, (c) .env template with exact var names matching code (BETTER_AUTH_SECRET, BETTER_AUTH_URL, GOOGLE_CLIENT_ID/SECRET, DATABASE_URL), (d) server code (lib/auth.ts, route handler, middleware), (e) frontend (sign-in page, dashboard), (f) test commands via Jest examples though no single explicit `npm test` runnable command block. Env vars listed match those referenced in code.",
+    "citation_anchoring": "Multiple links to better-auth.com/docs (official) placed inline near relevant code blocks (Next.js integration, magic-link plugin, options). Also cites developers.google.com/identity (official Google). Some third-party (GitHub issues, StackOverflow, MSW, Jest) but these are appropriate supporting refs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2600,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling \u2014 internally consistent with version-less but coherent API usage, minor inconsistency between magic-link config (email.magicLink) and the playbook's own pitfall about plugin registration drops correctness from 4 to 3.",
+  "_judge_latency_s": 16.891204833984375,
+  "_judge_input_tokens": 11835,
+  "_judge_output_tokens": 994
+}

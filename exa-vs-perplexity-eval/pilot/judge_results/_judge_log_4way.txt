@@ -1,0 +1,164 @@
+Judging 58 new playbooks (Shape A absolute, incremental)...
+  I02/gemini_31: C&F=4 EX=2 CP=4 CT=1 (12.1s)
+  I03/gemini_31: C&F=4 EX=4 CP=4 CT=2 (13.6s)
+  I02/exa_search_haiku: C&F=4 EX=2 CP=3 CT=4 (13.7s)
+  I01/exa_search_haiku: C&F=4 EX=2 CP=4 CT=5 (14.8s)
+  I01/gemini_31: C&F=4 EX=4 CP=5 CT=3 (14.9s)
+  I03/exa_search_haiku: C&F=1 EX=2 CP=3 CT=2 (17.4s)
+  I04/exa_search_haiku: C&F=2 EX=3 CP=4 CT=3 (14.6s)
+  I04/gemini_31: C&F=2 EX=2 CP=4 CT=2 (13.9s)
+  I06/exa_search_haiku: C&F=2 EX=2 CP=3 CT=2 (13.4s)
+  I05/gemini_31: C&F=4 EX=3 CP=3 CT=3 (13.6s)
+  I06/gemini_31: C&F=3 EX=2 CP=4 CT=2 (11.3s)
+  I05/exa_search_haiku: C&F=2 EX=2 CP=3 CT=4 (17.3s)
+  I07/gemini_31: C&F=3 EX=4 CP=4 CT=1 (12.5s)
+  I08/gemini_31: C&F=4 EX=2 CP=4 CT=2 (12.0s)
+  I07/exa_search_haiku: C&F=4 EX=4 CP=5 CT=3 (14.8s)
+  I09/gemini_31: C&F=4 EX=4 CP=5 CT=3 (12.4s)
+  I09/exa_search_haiku: C&F=3 EX=3 CP=5 CT=4 (15.1s)
+  I08/exa_search_haiku: C&F=4 EX=3 CP=4 CT=1 (16.2s)
+  I10/gemini_31: C&F=4 EX=5 CP=4 CT=2 (11.2s)
+  I10/exa_search_haiku: C&F=4 EX=4 CP=5 CT=4 (12.8s)
+  I11/gemini_31: C&F=4 EX=4 CP=5 CT=1 (13.8s)
+  I11/exa_search_haiku: C&F=3 EX=2 CP=3 CT=4 (16.6s)
+  I12/gemini_31: C&F=4 EX=4 CP=5 CT=2 (14.2s)
+  I12/exa_search_haiku: C&F=4 EX=3 CP=4 CT=3 (15.1s)
+  I13/gemini_31: C&F=4 EX=4 CP=4 CT=2 (13.0s)
+  I13/exa_search_haiku: C&F=4 EX=3 CP=4 CT=2 (14.7s)
+  I14/exa_search_haiku: C&F=4 EX=2 CP=5 CT=4 (13.3s)
+  I15/gemini_31: C&F=4 EX=4 CP=5 CT=3 (13.1s)
+  I14/gemini_31: C&F=4 EX=2 CP=4 CT=2 (14.0s)
+  I15/exa_search_haiku: C&F=2 EX=2 CP=4 CT=3 (15.3s)
+  I16/gemini_31: C&F=4 EX=2 CP=4 CT=1 (10.3s)
+  I16/exa_search_haiku: C&F=3 EX=3 CP=4 CT=4 (16.8s)
+  I17/gemini_31: C&F=3 EX=4 CP=5 CT=2 (12.4s)
+  I18/exa_search_haiku: C&F=2 EX=2 CP=4 CT=3 (15.4s)
+  I17/exa_search_haiku: C&F=3 EX=3 CP=5 CT=4 (17.1s)
+  I18/gemini_31: C&F=4 EX=4 CP=5 CT=3 (13.9s)
+  I19/exa_search_haiku: C&F=3 EX=2 CP=4 CT=4 (18.7s)
+  I19/gemini_31: C&F=4 EX=4 CP=5 CT=2 (14.9s)
+  I20/gemini_31: C&F=4 EX=3 CP=3 CT=1 (12.6s)
+  I21/gemini_31: C&F=4 EX=4 CP=5 CT=1 (12.4s)
+  I21/exa_search_haiku: C&F=4 EX=4 CP=5 CT=3 (14.9s)
+  I20/exa_search_haiku: C&F=2 EX=2 CP=3 CT=3 (18.7s)
+  I22/exa_search_haiku: C&F=4 EX=4 CP=5 CT=5 (15.0s)
+  I22/gemini_31: C&F=4 EX=4 CP=5 CT=2 (13.0s)
+  I23/gemini_31: C&F=4 EX=4 CP=5 CT=2 (13.2s)
+  I23/exa_search_haiku: C&F=3 EX=2 CP=3 CT=4 (16.1s)
+  I24/exa_search_haiku: C&F=4 EX=4 CP=5 CT=5 (14.2s)
+  I24/gemini_31: C&F=4 EX=4 CP=4 CT=3 (13.8s)
+  I25/gemini_31: C&F=4 EX=4 CP=5 CT=1 (12.6s)
+  I25/exa_search_haiku: C&F=4 EX=3 CP=5 CT=5 (14.0s)
+  I26/exa_search_haiku: C&F=4 EX=3 CP=4 CT=5 (14.6s)
+  I26/gemini_31: C&F=4 EX=4 CP=5 CT=2 (13.6s)
+  I27/exa_search_haiku: C&F=3 EX=3 CP=4 CT=5 (13.9s)
+  I27/gemini_31: C&F=4 EX=4 CP=4 CT=2 (15.8s)
+  I28/exa_search_haiku: C&F=3 EX=4 CP=3 CT=4 (13.1s)
+  I28/gemini_31: C&F=4 EX=4 CP=4 CT=1 (13.3s)
+  I29/gemini_31: C&F=4 EX=4 CP=4 CT=1 (11.3s)
+  I29/exa_search_haiku: C&F=4 EX=4 CP=5 CT=4 (14.8s)
+
+=== 3-WAY AGGREGATE ===
+{
+  "n_integrations_total": 29,
+  "n_scored_by_provider": {
+    "exa": 29,
+    "perplexity": 29,
+    "exa_search_haiku": 29,
+    "gemini_31": 29
+  },
+  "dim_averages": {
+    "exa": {
+      "correctness_and_freshness": 3.24,
+      "executability": 2.69,
+      "completeness": 3.93,
+      "citation_anchoring": 4.31
+    },
+    "perplexity": {
+      "correctness_and_freshness": 3.34,
+      "executability": 2.52,
+      "completeness": 3.34,
+      "citation_anchoring": 1.79
+    },
+    "exa_search_haiku": {
+      "correctness_and_freshness": 3.21,
+      "executability": 2.83,
+      "completeness": 4.07,
+      "citation_anchoring": 3.66
+    },
+    "gemini_31": {
+      "correctness_and_freshness": 3.83,
+      "executability": 3.55,
+      "completeness": 4.38,
+      "citation_anchoring": 1.9
+    }
+  },
+  "pairwise": {
+    "exa_vs_perplexity": {
+      "wins_A": 25,
+      "wins_B": 0,
+      "TIE": 4,
+      "skipped": 0
+    },
+    "exa_search_haiku_vs_perplexity": {
+      "wins_A": 23,
+      "wins_B": 3,
+      "TIE": 3,
+      "skipped": 0
+    },
+    "gemini_31_vs_perplexity": {
+      "wins_A": 19,
+      "wins_B": 2,
+      "TIE": 8,
+      "skipped": 0
+    },
+    "exa_search_haiku_vs_exa": {
+      "wins_A": 4,
+      "wins_B": 9,
+      "TIE": 16,
+      "skipped": 0
+    },
+    "gemini_31_vs_exa": {
+      "wins_A": 7,
+      "wins_B": 22,
+      "TIE": 0,
+      "skipped": 0
+    },
+    "gemini_31_vs_exa_search_haiku": {
+      "wins_A": 10,
+      "wins_B": 15,
+      "TIE": 4,
+      "skipped": 0
+    }
+  },
+  "totals": {
+    "exa": {
+      "total_cost_dollars": 21.73,
+      "avg_cost_dollars": 0.7492,
+      "avg_chars": 20067,
+      "avg_latency_s": 209.8,
+      "ok_count": 29
+    },
+    "perplexity": {
+      "total_cost_dollars": 27.74,
+      "avg_cost_dollars": 0.9567,
+      "avg_chars": 68546,
+      "avg_latency_s": 212.5,
+      "ok_count": 29
+    },
+    "exa_search_haiku": {
+      "total_cost_dollars": 2.79,
+      "avg_cost_dollars": 0.0963,
+      "avg_chars": 20957,
+      "avg_latency_s": 47.0,
+      "ok_count": 29
+    },
+    "gemini_31": {
+      "total_cost_dollars": 1.14,
+      "avg_cost_dollars": 0.0394,
+      "avg_chars": 7671,
+      "avg_latency_s": 45.7,
+      "ok_count": 29
+    }
+  }
+}

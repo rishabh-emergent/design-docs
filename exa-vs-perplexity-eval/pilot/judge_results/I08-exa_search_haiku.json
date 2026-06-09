@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "MercadoPago Checkout Pro (LatAm)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I08-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: uses mercadopago.SDK(token), sdk.preference().create(body), sdk.payment().get(id) \u2014 these match the mercadopago-python v2/v3 surface. Pins mercadopago==3.0.0 (version claimed). Webhook signature scheme ts=...,v1=... matches MP's documented format. No deprecated traps for this stack.",
+    "executability": "Fenced blocks parse. Uses pydantic-settings but only pip installs pydantic (missing pydantic-settings dependency). config.py imports from pydantic_settings \u2014 will fail at import. PaymentSuccess.jsx and PaymentFailure components are written in the SAME fenced block with two file headers, which the deterministic extractor will write to one file, breaking exports. No sandbox-infeasible commands (no ngrok/sudo).",
+    "completeness": "(a) acquisition URL + menu present; (b) bash installs present; (c) env template present with explicit names; (d) backend code present (multiple files); (e) frontend code present; (f) test command present (pytest). Truncated at end ('http://localhost:' cut off) but test command appears earlier. Two React components in one fenced block is a structural defect.",
+    "citation_anchoring": "No actual URLs to mercadopago.com developer docs cited. Bracketed numeric references [1][2][3][6][10] appear without a resolved bibliography. Only mercadopago.com.ar account/panel URLs present, not documentation pages. No canonical docs URL anchored near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 4200,
+  "rubric_notes": "docs_unavailable=true \u2192 applied long-tail handling: internally consistent + pinned version \u2192 4 on correctness. Truncated final bash block and two-components-one-fence are extractor hazards. Bracketed citations without resolved URLs do not count as anchoring.",
+  "_judge_latency_s": 16.223501205444336,
+  "_judge_input_tokens": 14568,
+  "_judge_output_tokens": 868
+}

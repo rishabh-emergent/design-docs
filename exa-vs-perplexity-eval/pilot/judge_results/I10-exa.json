@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Supabase auth v2",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I10-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 5,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses signInWithPassword (v2 current), signUp, getSession, onAuthStateChange \u2014 all v2 idioms. No deprecated signIn() trap. FastAPI verifies JWT via HS256 with SUPABASE_JWT_SECRET, which matches Supabase's documented JWT approach.",
+    "executability": "Pip install line has unquoted >= specifiers (e.g., uvicorn>=0.18.0) which shells will misinterpret as redirection; needs quoting. backend.main import in tests requires backend to be a package (no __init__.py mentioned). onAuthStateChange destructures {data: subscription} then calls subscription?.unsubscribe() \u2014 actual shape is {data: {subscription}}, so unsubscribe will not fire. Otherwise code parses and runs.",
+    "completeness": "All six pieces present: (a) dashboard acquisition path, (b) bash install commands, (c) .env.example with exact names matching code references, (d) FastAPI backend, (e) full React frontend across multiple files, (f) pytest test command. Env var names consistent between template and code.",
+    "citation_anchoring": "Multiple official supabase.com/docs and fastapi.tiangolo.com URLs placed inline near relevant code sections, not just at end. Canonical domain match."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "supabase.auth.signInWithPassword"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3400,
+  "rubric_notes": "Unquoted >= in pip install line is a real shell hazard; onAuthStateChange destructuring bug is a minor v2 API misuse but does not affect happy-path sign-in.",
+  "_judge_latency_s": 13.102739810943604,
+  "_judge_input_tokens": 14082,
+  "_judge_output_tokens": 834
+}

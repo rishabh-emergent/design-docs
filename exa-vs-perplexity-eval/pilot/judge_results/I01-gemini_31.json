@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Payment Element (one-time + sub)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I01-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current stripe.PaymentIntent.create, stripe.Subscription.create with payment_behavior='default_incomplete' and expand=['latest_invoice.payment_intent'], and Webhook.construct_event \u2014 all internally consistent with stripe-python v8+. No deprecated traps matched. No explicit version stamp but methods are self-consistent.",
+    "executability": "Fenced blocks parse cleanly. Minor: frontend uses process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY but no frontend .env example is provided; user must infer. Backend imports all defined. No sandbox-infeasible patterns (stripe CLI is optional/dev).",
+    "completeness": "All six pieces present: (a) key acquisition with dashboard URL+menu, (b) pip/npm in bash blocks, (c) .env.example with exact names matching code (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, FRONTEND_URL, SUBSCRIPTION_PRICE_ID all referenced), (d) backend main.py, (e) frontend Checkout.js, (f) test command via stripe listen + uvicorn + npm start. Frontend REACT_APP_ var not in .env.example but backend env is consistent.",
+    "citation_anchoring": "Links to dashboard.stripe.com and stripe.com/docs/stripe-cli \u2014 these are official Stripe domains but docs.stripe.com is the canonical docs root. Placed inline near relevant steps. No fabricated URLs but sparse anchoring near code blocks."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "stripe.checkout.Session.create not used; PaymentIntent/Subscription flow current"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1150,
+  "rubric_notes": "Frontend env var REACT_APP_STRIPE_PUBLISHABLE_KEY referenced but not in backend .env.example \u2014 acceptable since it's a frontend var, but a frontend .env example would strengthen completeness. Stripe CLI install is dev tooling, not a sandbox blocker.",
+  "_judge_latency_s": 14.908576965332031,
+  "_judge_input_tokens": 7534,
+  "_judge_output_tokens": 940
+}

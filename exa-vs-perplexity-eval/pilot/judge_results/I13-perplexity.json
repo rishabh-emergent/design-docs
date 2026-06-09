@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Instagram Login Business (Graph)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I13-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current Instagram API with Instagram Login: instagram_business_basic and instagram_business_content_publish scopes, graph.instagram.com endpoints, www.instagram.com/oauth/authorize, ig_exchange_token, v22.0. Explicitly notes Basic Display deprecation. Internally consistent with version (v22.0) claimed.",
+    "executability": "Code blocks are syntactically valid Python and JS. One minor oddity: the query-string construction uses a convoluted httpx.QueryParams trick per key rather than urlencode, but it works. All imports defined. No sandbox-infeasible patterns (no ngrok/brew/sudo). Frontend uses npx create-react-app which is heavy but feasible.",
+    "completeness": "All six pieces present: (a) acquisition described via Meta App Dashboard (light on URL specifics), (b) pinned pip/npm installs in bash, (c) .env.example with exact var names matching Settings class, (d) backend main.py complete, (e) frontend App.js complete, (f) pytest test command. Env vars listed match those referenced in code.",
+    "citation_anchoring": "Citations are numeric brackets [2][22][24] etc. with no URLs visible. No canonical official docs URLs (developers.facebook.com/docs/instagram-platform) cited directly. References appear to be third-party/unspecified. No fabricated URLs but no anchored official URLs either."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "instagram_business_basic",
+      "graph.instagram.com/v22.0"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 6800,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Internally consistent with explicit v22.0 version claim, scoring 4 on correctness. Citation anchoring weak due to bracketed numeric refs without resolvable URLs.",
+  "_judge_latency_s": 17.579826831817627,
+  "_judge_input_tokens": 19333,
+  "_judge_output_tokens": 915
+}

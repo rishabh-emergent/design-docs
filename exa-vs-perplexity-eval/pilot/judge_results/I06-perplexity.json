@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Xendit virtual account",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I06-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Playbook mixes two inconsistent SDK patterns: `xendit.set_api_key(...)` + `ApiClient()` (newer 7.x style) AND `from xendit import Xendit; x = Xendit(api_key=...); x.VirtualAccount.create(...)` (legacy 1.x style). The actual VA creation code uses the legacy `Xendit(api_key=...).VirtualAccount` pattern which is not how current xendit-python 7.x works. No version is pinned in install commands. Internal inconsistency + unverifiable claims.",
+    "executability": "Install command shown as prose (`pip install git+https://github.com/xendit/xendit-python.git`) rather than in a clean ```bash block with all deps. The VA creation code imports both `xendit` and `from xendit import Xendit` but never uses set_api_key consistently; `Xendit` class likely does not exist in current SDK leading to ImportError. Also recommends ngrok for webhook testing \u2014 sandbox-infeasibility pattern matched (caps EXECUTABILITY at 2).",
+    "completeness": "(a) account/key acquisition described in prose, no clear menu path with URL; (b) install instructions scattered in prose, no single bash block; (c) env vars present in a text block (XENDIT_SECRET_KEY, XENDIT_WEBHOOK_TOKEN, ENVIRONMENT); (d) backend code present across multiple files; (e) frontend code present (Checkout.tsx, OrderStatus.tsx, client.ts); (f) NO explicit test command block. Heavy duplication/verbose prose. Missing runnable test command is critical.",
+    "citation_anchoring": "Citations are bracket-numbered references ([1], [4], [27], etc.) with no resolvable URLs in the text. The canonical domain developers.xendit.co is never explicitly cited as a URL. No official docs URLs placed near code blocks."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "docs_unavailable=true: applied long-tail handling. Internal SDK usage is inconsistent (mixes ApiClient pattern with legacy Xendit class pattern) and no version pinned \u2014 scored 2 on correctness. Ngrok mention triggers sandbox-infeasibility cap on executability. Missing explicit test command and bash install block hurts completeness. Bracketed citations without URLs are effectively unanchored.",
+  "_judge_latency_s": 17.510261058807373,
+  "_judge_input_tokens": 29181,
+  "_judge_output_tokens": 1120
+}

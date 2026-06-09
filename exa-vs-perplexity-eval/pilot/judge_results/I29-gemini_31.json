@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Open-Meteo forecast + historical",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I29-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints used (geocoding-api.open-meteo.com/v1/search, api.open-meteo.com/v1/forecast with past_days, hourly=temperature_2m, timezone=auto) are internally consistent and match well-known Open-Meteo conventions. No version claim, but consistent.",
+    "executability": "Backend code is syntactically valid and runnable. Frontend uses CRA + axios fine. Minor: no .env needed since Open-Meteo is keyless; no sandbox-infeasible patterns detected.",
+    "completeness": "(a) N/A - no API key required, explicitly stated; (b) install commands present; (c) no env vars needed; (d) backend code present; (e) frontend code present; (f) test procedure described but no single runnable test command in a bash block.",
+    "citation_anchoring": "No URLs to official Open-Meteo docs (open-meteo.com/en/docs) provided anywhere in the playbook."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 950,
+  "rubric_notes": "Keyless API; (a) and (c) of completeness rubric are satisfied by absence-with-explanation. Test step lacks fenced bash command but procedure is clear.",
+  "_judge_latency_s": 11.264615058898926,
+  "_judge_input_tokens": 6784,
+  "_judge_output_tokens": 702
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Anthropic Messages + tool_use + cache_control",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I18-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses AsyncAnthropic().messages.create with stream=True, system as list of blocks with cache_control, tools with cache_control - all internally consistent with current anthropic-python SDK. Model claude-3-5-sonnet-20241022 is a real released model. Version claim not explicit but methods self-consistent.",
+    "executability": "Fenced bash and python blocks parse cleanly; imports present; AsyncAnthropic auto-reads env var. Minor: event.model_dump_json() works on anthropic stream events (they're pydantic). Should run with one env var set. No sandbox blockers.",
+    "completeness": "(a) API key acquisition with URL + menu path \u2713; (b) pip install in bash \u2713; (c) .env template with ANTHROPIC_API_KEY \u2713; (d) backend code in fenced python \u2713; (e) frontend N/A (FastAPI only stack); (f) test curl command \u2713. All extractable, env var names match.",
+    "citation_anchoring": "Only one link - Anthropic Console (console.anthropic.com), which is account portal not docs.anthropic.com. No official docs URL near code blocks discussing cache_control or tool_use."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 850,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied - internally consistent code with real model ID scores 4 on correctness. No deprecated patterns detected.",
+  "_judge_latency_s": 13.938759803771973,
+  "_judge_input_tokens": 6157,
+  "_judge_output_tokens": 716
+}

@@ -1,0 +1,34 @@
+Loaded 7 integrations. Starting 14 parallel API calls (bounded concurrency 4)...
+[I02] Lemon Squeezy hosted checkout — starting both providers...
+[I07] Flutterwave Standard (Nigeria) — starting both providers...
+[I10] Supabase auth v2 — starting both providers...
+[I13] Instagram Login Business (Graph) — starting both providers...
+[I10] done. exa=OK (192.9s, 23696 ch) | pplx=OK (201.9s, 71315 ch)
+[I17] OpenAI Responses API + SSE — starting both providers...
+[I07] done. exa=OK (220.2s, 21441 ch) | pplx=OK (206.4s, 65922 ch)
+[I20] Solana @solana/web3.js v2 transfer — starting both providers...
+[I13] done. exa=OK (283.6s, 23352 ch) | pplx=OK (140.0s, 43371 ch)
+[I24] Google Maps Places API (New) — starting both providers...
+[I02] done. exa=OK (193.3s, 22500 ch) | pplx=OK (289.8s, 68376 ch)
+[I24] done. exa=OK (230.0s, 19594 ch) | pplx=OK (169.4s, 52691 ch)
+[I17] done. exa=OK (219.4s, 22438 ch) | pplx=OK (355.8s, 81525 ch)
+[I20] done. exa=OK (273.9s, 28578 ch) | pplx=OK (394.2s, 99146 ch)
+
+=== Stage 1 done ===
+{
+  "elapsed_s": 614.4352829456329,
+  "n_integrations": 7,
+  "by_provider": {
+    "exa": {
+      "ok": 7,
+      "avg_latency_s": 230.4851177079337,
+      "avg_chars": 23085.571428571428,
+      "total_cost_dollars": 5.0684775
+    },
+    "perplexity": {
+      "ok": 7,
+      "avg_latency_s": 251.04944791112626,
+      "avg_chars": 68906.57142857143
+    }
+  }
+}

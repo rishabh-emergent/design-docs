@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mapbox GL JS v3 + Directions",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I23-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Mapbox GL JS v3 init and Directions v5 endpoint (/directions/v5/{profile}/{coords}) are internally consistent. However, the prompt requires the 'new session-token billing approach' and the playbook explicitly hand-waves session tokens in Pitfall 6 ('doesn't require explicit session token setup'), which contradicts the canonical constraint. Also, using sk.* (secret) tokens for Directions is atypical\u2014public pk.* tokens are used; this is a supporting-call inaccuracy.",
+    "executability": "Backend FastAPI endpoint declares `origin: tuple` and `destination: tuple` as request body params without a Pydantic model\u2014FastAPI will treat them as query params or 422 them. Frontend posts via axios with `params:` (query string) sending arrays, which won't deserialize into Python tuples cleanly; test curl sends JSON body which the endpoint won't parse. These are non-obvious fixes. No sandbox-infeasible patterns (no ngrok/brew/sudo).",
+    "completeness": "(a) acquisition URL present; (b) install bash present; (c) env template present (VITE_MAPBOX_ACCESS_TOKEN, VITE_API_URL, MAPBOX_SECRET_TOKEN all referenced); (d) backend code present; (e) frontend code present; (f) test command present (curl). No requirements.txt content given but pip command shown. Env vars listed match references. All six pieces present, but conflicting curl JSON vs axios query params reduces score.",
+    "citation_anchoring": "Official docs.mapbox.com cited ([8]) along with several third-party/GitHub sources. Citations clustered at end with inline bracket references near sections. Mix of official + third-party."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2700,
+  "rubric_notes": "Session-token billing requirement essentially ignored; curl test body vs axios params mismatch creates extractor confusion.",
+  "_judge_latency_s": 16.05113410949707,
+  "_judge_input_tokens": 11348,
+  "_judge_output_tokens": 898
+}

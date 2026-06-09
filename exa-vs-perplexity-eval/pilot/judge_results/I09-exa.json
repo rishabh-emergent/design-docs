@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Clerk clerkMiddleware (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I09-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current clerkMiddleware from @clerk/nextjs/server (not deprecated authMiddleware). ClerkProvider, SignedIn/SignedOut, UserButton, SignIn component usage consistent. Minor concern: instructs naming middleware file 'proxy.ts' which is unusual (Next.js convention is middleware.ts); also marks root layout 'use client' which conflicts with metadata patterns but is allowed.",
+    "executability": "Fenced blocks parse. However, middleware file name 'proxy.ts' will NOT be picked up by Next.js \u2014 only middleware.ts at root/src is recognized. Also app/layout.tsx marked 'use client' wraps ClerkProvider which works but is non-standard. auth() destructuring of isAuthenticated is acceptable in current API. Multiple non-obvious fixes needed.",
+    "completeness": "(a) API key acquisition with dashboard URL present; (b) install commands in bash; (c) env var template with exact names (NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY, CLERK_SECRET_KEY); (d) server route code present; (e) frontend components present; (f) test commands (jest install + cypress described) present but no single runnable test command. Env vars listed match those referenced.",
+    "citation_anchoring": "Multiple official clerk.com/docs URLs placed inline near relevant code sections (quickstart, middleware reference, social connections, env variables). Canonical domain used throughout."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "clerkMiddleware"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2200,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied \u2014 internally consistent with version claims. Significant executability concern: 'proxy.ts' naming instruction breaks Next.js middleware detection; extractor would write a non-functional middleware file.",
+  "_judge_latency_s": 14.288133144378662,
+  "_judge_input_tokens": 9888,
+  "_judge_output_tokens": 927
+}

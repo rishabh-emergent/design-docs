@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Open-Meteo forecast + historical",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I29-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints api.open-meteo.com/v1/forecast and geocoding-api.open-meteo.com/v1/search with params hourly=temperature_2m, past_days, forecast_days, timezone=auto are consistent and match well-known Open-Meteo API surface. Internally consistent with no version claim; docs_unavailable applies.",
+    "executability": "Code blocks are syntactically valid Python/JSX. However backend code uses relative imports (from .config) without showing package structure (no __init__.py or directory layout), pydantic BaseSettings import is from pydantic (v1) but FastAPI standard installs pydantic v2 where BaseSettings moved to pydantic_settings \u2014 would cause ImportError. Multiple fix points needed.",
+    "completeness": "(a) no API keys needed - acknowledged; (b) install bash blocks present; (c) .env template present (VITE_API_BASE_URL, backend env); (d) backend code present; (e) frontend code present; (f) test commands shown but no explicit single 'run tests' bash block under a Test header. Mostly complete but split across many sections.",
+    "citation_anchoring": "Citations are bare bracketed numbers like [1][6][7] with no URLs. No official docs URLs (open-meteo.com/en/docs, fastapi.tiangolo.com) are explicitly written. Fails canonical URL requirement."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "Very long, verbose prose-heavy playbook. Pydantic v1 BaseSettings is a likely runtime trap on fresh installs. Citations are numeric refs without URLs, severely hurting anchoring.",
+  "_judge_latency_s": 13.971826076507568,
+  "_judge_input_tokens": 23920,
+  "_judge_output_tokens": 864
+}

@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Google Maps Places API (New)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I24-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses the correct new endpoint places.googleapis.com/v1/places:autocomplete with X-Goog-Api-Key and X-Goog-FieldMask headers. Internally consistent; method names and headers align with Places API (New) conventions.",
+    "executability": "Fenced blocks parse cleanly. Backend imports are complete; frontend uses crypto.randomUUID (browser-native). Minor issue: no .env.example block per se (only a .env example), and frontend setup uses create-react-app which is now legacy but still runs. No sandbox-infeasible patterns.",
+    "completeness": "(a) API key acquisition with menu path \u2713; (b) install commands in bash \u2713; (c) env var GOOGLE_MAPS_API_KEY shown in env block \u2713; (d) FastAPI backend code \u2713; (e) React component \u2713; (f) test command (uvicorn + manual /docs test) \u2713 though test is partly manual. No duplicate samples; env vars consistent.",
+    "citation_anchoring": "Only one link to Google Cloud Console; no link to canonical developers.google.com/maps documentation placed near code. No fabricated URLs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "places.googleapis.com/v1/places:autocomplete"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1100,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Playbook is internally consistent and uses the new v1 endpoint correctly, scoring 4 on correctness. Citation weak \u2014 only console.cloud.google.com referenced, no docs URL.",
+  "_judge_latency_s": 13.759405136108398,
+  "_judge_input_tokens": 7020,
+  "_judge_output_tokens": 825
+}

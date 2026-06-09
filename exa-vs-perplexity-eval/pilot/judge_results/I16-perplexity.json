@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Telegram Bot inline keyboard + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I16-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: setWebhook with secret_token, X-Telegram-Bot-Api-Secret-Token header verification, sendMessage/editMessageText/answerCallbackQuery, inline_keyboard nested arrays all match standard Bot API. No version date stated but API is stable. Long-tail handling: consistent throughout.",
+    "executability": "Code split across multiple files (config.py, models.py, telegram_client.py, keyboards.py, main.py, tests/test_webhook.py) which extractor may concatenate. Pydantic Config uses allow_population_by_field_name (v1 syntax) \u2014 may break under Pydantic v2. main.py 'continued' blocks rely on imports/globals from prior fence (datetime imported inside continued block, Dict imported only in earlier client). Tests reference TELEGRAM_WEBHOOK_SECRET which could be None. No sandbox-infeasibility patterns matched (mentions ngrok/Pinggy descriptively but not as required setup).",
+    "completeness": "(a) BotFather acquisition described; (b) pip install bash block present; (c) .env template with exact var names; (d) backend code in fenced blocks; (e) no frontend (N/A for bot); (f) test command implicit (pytest) but no explicit '## Test' bash block with command. Multiple file paths in code comments may confuse extractor; env vars consistent.",
+    "citation_anchoring": "Citations are bare numeric refs [20][2][9] with no URLs. No canonical core.telegram.org/bots/api URL anchored anywhere. No fabricated URLs but no official URLs either."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8500,
+  "rubric_notes": "Multi-file structure with file path comments is a common extractor hazard; deterministic script may write all blocks to single file. Pydantic v1 Config syntax (allow_population_by_field_name, extra='ignore' as class attrs) is a real freshness concern under Pydantic v2 but not in the deterministic trap list.",
+  "_judge_latency_s": 22.16133999824524,
+  "_judge_input_tokens": 26932,
+  "_judge_output_tokens": 983
+}

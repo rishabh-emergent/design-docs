@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mixpanel /import + Query API",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I28-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints used are internally consistent: POST https://api.mixpanel.com/import with project_id and strict=1, service account HTTP Basic auth, /2.0/engage with filter_by_cohort and session_id pagination, /2.0/cohorts/list. These match common Mixpanel API patterns; no version claims violate canonical traps. docs_unavailable -> long-tail: consistent, no version contradictions.",
+    "executability": "Code blocks parse but have multiple non-obvious issues: app/main.py imports api_router from app.api.router which is not defined; circular imports (app.api.endpoints.events imports from app.main which itself imports the router); MixpanelClient mapper file's relative import `.models.events` is incorrect path; Settings instantiation in tests passes fields without APP_ prefix while env_prefix='APP_' is set; no single coherent file layout consumable by a sed/awk extractor. No sandbox-infeasible patterns (no ngrok/sudo).",
+    "completeness": "(a) Service account acquisition described in prose, not as URL + menu steps; (b) install commands present in bash blocks (split across multiple); (c) env var names appear in Settings class but not as an explicit .env template, and prefix APP_ is mentioned only in prose \u2014 mismatch risk between listed and referenced; (d) backend code extensively present though spread across many files; (e) no frontend (acceptable for FastAPI-only); (f) no clear runnable test command (pytest invocation not given in a bash block). Significant prose duplication.",
+    "citation_anchoring": "Citations are bare numbered references like [1][3][17] with no URLs. No canonical mixpanel.com/docs or developer.mixpanel.com URLs cited anywhere. Cannot verify any official docs anchor."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 11500,
+  "rubric_notes": "Very long, prose-heavy report style. Extractor would struggle: multi-file layout with cross-file imports, no consolidated .env template, no test command in bash fence. APP_ env_prefix in Settings vs raw field names used in tests is a real mismatch.",
+  "_judge_latency_s": 17.476199865341187,
+  "_judge_input_tokens": 29166,
+  "_judge_output_tokens": 1012
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mixpanel /import + Query API",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I28-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "docs_unavailable=true; internal consistency is strong \u2014 uses api.mixpanel.com/import with project_id+service account basic auth, $insert_id deduplication, and mixpanel.com/api/query/engage with form-encoded body. Method names and endpoints are self-consistent though no version date is stamped.",
+    "executability": "Fenced Python blocks parse; imports complete. Minor issue: test file imports MIXPANEL_IMPORT_URL/MIXPANEL_QUERY_URL from main but main.py uses 'from config import *' \u2014 these names re-export, so likely fine. respx not in install list (only pytest/pytest-asyncio), so tests would fail to import without one extra pip install.",
+    "completeness": "(a) acquisition steps present with menu path; (b) bash install present; (c) env var template named (MIXPANEL_PROJECT_ID, MIXPANEL_SA_USER, MIXPANEL_SA_SECRET) but no .env example block \u2014 they appear only in config.py via os.getenv; (d) backend code complete; (e) frontend N/A for FastAPI-only use case; (f) test file present but no explicit test command shown. Missing respx in install list is a small env mismatch.",
+    "citation_anchoring": "No URLs cited anywhere in the playbook \u2014 no links to developer.mixpanel.com or any docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1200,
+  "rubric_notes": "Long-tail handling applied: internally consistent + no explicit version date, scored 4 on correctness. Citation anchoring is 1 due to zero URLs.",
+  "_judge_latency_s": 13.254897117614746,
+  "_judge_input_tokens": 7474,
+  "_judge_output_tokens": 835
+}

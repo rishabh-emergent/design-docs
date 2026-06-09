@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Auth0 New Universal Login + RBAC",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I11-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent use of @auth0/auth0-react v2 API (loginWithRedirect, getAccessTokenSilently, authorizationParams with audience), RS256 JWKS validation via python-jose, and RBAC permissions claim. No version stamp but methods are self-consistent throughout.",
+    "executability": "Multiple non-trivial issues: rbac.py imports CurrentUser twice and references get_current_user without importing it (NameError); modules use relative imports (from .config) but no package __init__ shown; uvicorn command 'app:app' conflicts with 'from app.app import app' package layout in tests; jwt-decode v4 uses named export, not default. Extractor would write multi-file Python without clear package structure. No sandbox blockers (no ngrok/sudo) but several fixes needed.",
+    "completeness": "(a) Auth0 dashboard navigation described but no direct URLs; (b) install commands present; (c) env var template present for both backend and frontend; (d) backend code present across multiple files; (e) frontend code present; (f) test command implied (pytest) but no explicit single test command in a fenced block following a Test header. Env var names consistent between listing and code. Heavy prose duplication and conclusion repetition.",
+    "citation_anchoring": "Citations are bracketed numeric refs [1]-[41] with no actual URLs. No auth0.com/docs URLs anchored near code. Cannot verify any official doc link."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 12500,
+  "rubric_notes": "docs_unavailable=true: long-tail handling applied \u2014 internally consistent, no version stamp, scored 4 on correctness. Citations are numeric refs without URLs, scoring low on anchoring. Multi-file structure with ambiguous package layout hurts executability.",
+  "_judge_latency_s": 14.55953311920166,
+  "_judge_input_tokens": 32724,
+  "_judge_output_tokens": 903
+}

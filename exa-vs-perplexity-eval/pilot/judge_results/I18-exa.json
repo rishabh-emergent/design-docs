@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Anthropic Messages + tool_use + cache_control",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I18-exa",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Model name 'claude-opus-4-8' is fabricated/non-standard. cache_control is shown as a top-level kwarg to messages.create, which is incorrect \u2014 cache_control is placed on content blocks (system blocks, tool definitions, message content), not as a top-level parameter. tool_use roundtrip is mostly right but the cache_control top-level usage is a fabricated API surface.",
+    "executability": "Circular import: endpoints.py imports from main, and main imports router from endpoints. cache_control top-level kwarg will raise TypeError/400. DummyStream test mocks AsyncMock(return_value=DummyStream()) won't behave as an async context manager when awaited via 'async with'. Model name is invalid. Multiple non-trivial fixes required.",
+    "completeness": "(a) key acquisition mentioned with URL; (b) install bash present; (c) no explicit .env template file with KEY=VALUE block \u2014 env vars only referenced in Pydantic Settings class; (d) backend code present; (e) no frontend (FastAPI only, acceptable); (f) test files present but no explicit single test command in a bash block under a Test header. Env-var listed-vs-referenced borderline (ANTHROPIC_API_KEY referenced, no explicit template).",
+    "citation_anchoring": "Cites platform.claude.com and docs.anthropic.com-adjacent URLs (platform.claude.com is non-canonical; docs.anthropic.com is canonical). Mix of GitHub repo, support pages, and a dev.to blog. Citations placed inline near code. No fabricated obvious URLs but platform.claude.com domain is suspect vs canonical docs.anthropic.com."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2900,
+  "rubric_notes": "docs_unavailable=true: applied long-tail handling. Internal inconsistencies (cache_control top-level vs block-level claims in same playbook; fabricated model name 'claude-opus-4-8'; circular import) prevent high score. platform.claude.com appears to be a non-canonical/hallucinated alternative to docs.anthropic.com.",
+  "_judge_latency_s": 15.56417202949524,
+  "_judge_input_tokens": 12368,
+  "_judge_output_tokens": 1015
+}

@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Connect Express",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I03-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses stripe-python v8 StripeClient pattern. However, request_options={'stripe_account': ...} on payment_intents.create is not the correct API; in stripe-python v8 StripeClient, per-request options use a second options argument, not a kwarg named request_options. Also uses stripe.error.StripeError and stripe.Webhook.construct_event which are still valid in v8 but mixing StripeClient with module-level Webhook is inconsistent. Core flow (accounts.create type=express, account_links.create, application_fee_amount) is correct.",
+    "executability": "Multiple fenced code blocks across different files; no single runnable assembly. Missing main.py with app + CORS middleware setup despite discussion. Missing requirements.txt as a bash block. The request_options kwarg is likely to raise TypeError at runtime. Frontend mixes .ts/.tsx in .js-tagged blocks. No single test command. Multiple non-obvious fixes required.",
+    "completeness": "(a) API key acquisition described in prose but no explicit dashboard URL/menu path; (b) no ```bash install command block present \u2014 major gap; (c) env vars defined in Settings class but no .env template block; (d) backend code present in fragments; (e) frontend code present; (f) test code shown but no runnable test command in bash block. Missing install commands and env template are critical.",
+    "citation_anchoring": "Uses numbered citations [1][6][18] etc. with no URLs visible. No canonical docs.stripe.com URLs anchored near code. Citations are opaque reference numbers without resolvable links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "stripe.checkout.Session.create pattern not used but accounts.create is current"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Playbook is internally consistent and claims stripe-python>=8 but the request_options kwarg pattern is suspect. Heavy prose with numbered citations lacking URLs hurts citation anchoring. Major gap: no ```bash install block and no .env template block, which the extractor cannot recover.",
+  "_judge_latency_s": 16.131597995758057,
+  "_judge_input_tokens": 24355,
+  "_judge_output_tokens": 998
+}

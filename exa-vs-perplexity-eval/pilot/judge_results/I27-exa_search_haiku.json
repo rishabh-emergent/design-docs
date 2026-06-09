@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PostHog flags + capture",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I27-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Client-side posthog-js init, useFeatureFlagEnabled, PostHogProvider, and posthog-python Posthog().identify/capture are all internally consistent and match known PostHog API patterns. However, server-side posthog_client.evaluate_flags(...).is_enabled(...) is non-standard (actual API is get_feature_flag / feature_enabled), and sync_mode kwarg is suspicious. Token names use _PROJECT_TOKEN whereas PostHog conventionally calls it project API key, minor.",
+    "executability": "Code blocks parse. Backend main.py uses datetime.now() without importing datetime \u2014 runtime NameError. Optional flag endpoint uses likely-wrong method names. main.jsx has 'defaults: 2026-01-30' which is unusual but not fatal. No sandbox-infeasible patterns.",
+    "completeness": "All six pieces present: install commands, env templates for both sides, backend code, frontend code, test curl/dev commands, key acquisition steps. Env var names consistent between listed and referenced. Minor duplication in Common Pitfalls.",
+    "citation_anchoring": "Multiple official posthog.com/docs URLs anchored inline near relevant code (e.g., [1][3] near init, [12] near python). No fabricated domains."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1750,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Internally consistent with version claim (posthog==7.16.1). Backend signup handler missing datetime import is the main executability blocker.",
+  "_judge_latency_s": 13.875130891799927,
+  "_judge_input_tokens": 8618,
+  "_judge_output_tokens": 829
+}

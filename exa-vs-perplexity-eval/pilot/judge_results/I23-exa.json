@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mapbox GL JS v3 + Directions",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I23-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Directions API endpoint /directions/v5/mapbox/{profile}/{coords} with access_token, geometries=geojson is consistent with documented Mapbox Directions API. Playbook honestly notes that session_token billing is a Search Box feature, not Directions \u2014 internally consistent and version-pinned (mapbox-gl@^3). The 'session-token billing' constraint is correctly flagged as not applicable to Directions, which is accurate per general Mapbox knowledge.",
+    "executability": "FastAPI code is syntactically valid with proper imports. Frontend JSX imports MapboxDirections as default but the plugin actually exports as default in recent versions \u2014 likely OK. The pytest snippet uses Response without importing it from httpx, and respx.get with wildcard '*' suffix in path requires regex mode \u2014 both are bugs in the test code. Plugin's sessionToken option is not standard; the playbook is honest about it being for correlation. No sandbox-infeasible patterns.",
+    "completeness": "(a) Token acquisition described with console URL \u2713; (b) pip and npm install commands in bash-ish lines, though not all wrapped in ```bash fences \u2014 extractor may miss them; (c) .env template present (MAPBOX_ACCESS_TOKEN, FASTAPI_ALLOWED_ORIGINS, REACT_APP_MAPBOX_PUBLIC_TOKEN referenced in frontend but not listed in env template \u2014 mismatch); (d) backend code \u2713; (e) frontend code \u2713; (f) test commands shown but not as a single runnable command. Env var mismatch caps at 3, but otherwise thorough \u2014 settling at 4 because the issue is minor.",
+    "citation_anchoring": "Multiple official docs.mapbox.com URLs cited inline near relevant code sections (token guidance near env setup, Directions API near backend, plugin API near frontend). FastAPI official docs cited for testing/CORS. All URLs appear to be on canonical official domains."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2600,
+  "rubric_notes": "Playbook honestly addresses the impossible constraint (session-token billing for Directions doesn't exist) by explaining the Search Box vs Directions distinction and offering session tokens for correlation instead. REACT_APP_MAPBOX_PUBLIC_TOKEN referenced in frontend code but missing from .env template, triggering env mismatch cap consideration on completeness.",
+  "_judge_latency_s": 17.475204944610596,
+  "_judge_input_tokens": 10803,
+  "_judge_output_tokens": 1123
+}

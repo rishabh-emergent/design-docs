@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Paytm All-in-One Web SDK",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I05-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: Initiate Transaction endpoint /theia/api/v1/initiateTransaction, Transaction Status /v3/order/status, CheckoutJS init/invoke pattern, txnToken/TXN_TOKEN all match Paytm conventions. No version explicitly claimed but method names are self-consistent across backend and frontend code blocks.",
+    "executability": "PaytmChecksum is imported via 'from PaytmChecksum import PaytmChecksum' with no pip install command shown anywhere \u2014 extractor has no install line for it. No requirements list at all. Also requires ngrok for callback testing (mentioned in prose, not as command). React component uses process.env.REACT_APP_* but no .env file extractable for frontend was scoped clearly. Multiple non-trivial fixes needed.",
+    "completeness": "(a) Acquisition guidance vague ('Paytm dashboard, developer settings') \u2014 no explicit URL. (b) NO pip install or npm install bash blocks anywhere \u2014 major gap. (c) env template present for both backend .env and frontend .env. (d) backend code present. (e) frontend code present. (f) No test command in a bash block \u2014 only prose about testing. Missing install commands and test command.",
+    "citation_anchoring": "Citations are bare bracketed numbers like [2][10][30] with no URLs, no domain references. No canonical Paytm docs URLs (developer.paytm.com or business.paytm.com/docs) appear anywhere as actual links. Effectively no anchored citations."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "Very long, prose-heavy. No bash install blocks despite multiple code files. ngrok mentioned in prose but not as executable command \u2014 still flagged as sandbox concern. docs_unavailable=true so freshness scored on internal consistency (good).",
+  "_judge_latency_s": 15.09079909324646,
+  "_judge_input_tokens": 29865,
+  "_judge_output_tokens": 928
+}

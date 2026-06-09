@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Instagram Login Business (Graph)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I13-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses correct current scopes instagram_business_basic and instagram_business_content_publish. However, uses graph.facebook.com/v17.0 for business account lookup (older version, current is v21.0) and the authorization endpoint api.instagram.com/oauth/authorize is somewhat outdated vs current www.instagram.com/oauth/authorize for IG Login flows. Token exchange flow generally consistent.",
+    "executability": "Code blocks parse. Backend callback is a GET that redirects, but frontend callback POSTs JSON to the same backend endpoint \u2014 these are inconsistent and the POST won't work against the GET endpoint. Tokens stored by user_id but lookup uses string keys inconsistently. Tests reference real network calls. Not sandbox-blocked but requires multiple fixes.",
+    "completeness": "All six pieces present: install bash, env template, backend code, frontend code, test command, API key acquisition. However, backend GET callback vs frontend POST callback is a conflicting sample. Env vars listed match those referenced. REACT_APP_BACKEND_CALLBACK is referenced but the backend doesn't expose a POST endpoint matching it.",
+    "citation_anchoring": "Multiple official developers.facebook.com/docs/instagram-platform URLs cited inline near relevant code sections (auth endpoint, token exchange, refresh). Canonical official domain used throughout."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "instagram_business_basic"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "Backend GET callback contradicts frontend POST \u2014 conflicting flow samples. Uses Graph API v17.0 (older but not in deterministic trap list). Scopes are current.",
+  "_judge_latency_s": 14.486945867538452,
+  "_judge_input_tokens": 13098,
+  "_judge_output_tokens": 868
+}

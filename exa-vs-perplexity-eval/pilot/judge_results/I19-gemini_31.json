@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "ElevenLabs websocket streaming TTS",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I19-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "docs_unavailable=true; LONG-TAIL handling. Playbook is internally consistent: pcm_24000 query param matches AudioContext sampleRate=24000, Int16 little-endian decode is standard for ElevenLabs PCM, stream-input endpoint and xi_api_key init message match known patterns. Model eleven_turbo_v2_5 and voice ID are plausible. No version date claimed \u2192 score 4 per long-tail rule.",
+    "executability": "FastAPI and React blocks are syntactically valid. Backend uses websockets + asyncio.gather correctly. Frontend correctly initializes AudioContext on user gesture. Minor: receive_text loop has no explicit break on disconnect besides exception, and asyncio.gather may not cleanly cancel sibling task \u2014 non-trivial but runnable. No sandbox-infeasible patterns (no ngrok/brew/sudo).",
+    "completeness": "(a) API key acquisition with URL+menu path \u2713; (b) pip and npx install bash blocks \u2713; (c) .env template with ELEVENLABS_API_KEY matching code reference \u2713; (d) backend main.py \u2713; (e) frontend App.js \u2713; (f) uvicorn + npm start test commands \u2713. All six pieces present.",
+    "citation_anchoring": "Inline [1] and [2] markers appear but no actual URLs are provided for them. No links to elevenlabs.io/docs. Only the elevenlabs.io homepage is linked (for signup), which is not the docs domain. No official docs URL cited."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1500,
+  "rubric_notes": "Citation markers [1][2] without resolvable URLs are filler. Long-tail handling applied for correctness.",
+  "_judge_latency_s": 14.944064140319824,
+  "_judge_input_tokens": 7911,
+  "_judge_output_tokens": 897
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "wagmi v2 + viem connect + sign (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I21-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent wagmi v2 API: createConfig, WagmiProvider, useAccount/useConnect/useDisconnect/useSignMessage/useReadContract with `query.enabled`, injected/walletConnect connectors. Version pins 2.14/2.21 are plausible v2-era. USDC contract on Base Sepolia (0x036C...CF7e) matches Circle's published address.",
+    "executability": "All fenced blocks are valid TS/bash. Components correctly marked 'use client'. One minor: code reads USDC on baseSepolia.id but uses mainnet USDC contract referenced for base mainnet would differ \u2014 playbook uses Sepolia consistently. No sandbox-infeasible patterns (no ngrok/sudo). Test file uses jest/testing-library which isn't installed in deps \u2014 minor fix needed.",
+    "completeness": "(a) WalletConnect projectId acquisition URL given; (b) install bash present; (c) env vars (NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID) listed and referenced consistently; (d) no backend (not needed for client-only Web3); (e) frontend code complete; (f) test command (npm run dev) and jest example present. All six pieces extractable.",
+    "citation_anchoring": "Citations are mostly third-party blogs (Medium, c-sharpcorner, markaicode). Some semi-official (docs.base.org, docs.metamask.io, docs.cdp.coinbase.com) present. Official wagmi.sh only cited as v1 legacy URL. All citations at end, not anchored near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Playbook is internally consistent with wagmi v2 API surface and explicit version pins, supporting score 4 on correctness.",
+  "_judge_latency_s": 14.854021072387695,
+  "_judge_input_tokens": 10853,
+  "_judge_output_tokens": 943
+}

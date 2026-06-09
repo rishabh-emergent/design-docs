@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "OpenAI Responses API + SSE",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I17-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 5,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "client.responses.create with stream=True and event.type=='response.output_text.delta' / 'response.completed' is internally consistent with the documented Responses API streaming surface. However, openai==1.5.0 is pinned \u2014 the Responses API requires openai>=1.50 era SDK; 1.5.0 predates it and would fail (no .responses attribute). Also usage fields on Responses API are typically input_tokens/output_tokens with input_tokens_details.cached_tokens, not cache_read_tokens/cache_creation_tokens (that's Anthropic-style). Docs unavailable, but internal version inconsistency lowers score.",
+    "executability": "Fenced blocks parse cleanly. Backend likely fails at runtime due to openai==1.5.0 lacking client.responses. SSE parsing in React splits on \\n\\n but TextDecoder chunks may split events across reads (no buffer). No sandbox-infeasible patterns (ngrok/brew/sudo). Frontend is in a separate Vite project dir, which is conventional.",
+    "completeness": "All six pieces present: (a) API key acquisition with URL+steps, (b) pinned pip versions in requirements.txt + bash install, (c) .env example with OPENAI_API_KEY, (d) main.py + config.py backend code, (e) React hook + component + App + CSS, (f) curl + npm run dev + python test_integration.py test commands. Env var names consistent.",
+    "citation_anchoring": "Cites developers.openai.com/api/docs/guides/streaming-responses and migrate-to-responses (official OpenAI docs domain) inline with reference markers near relevant code, plus third-party blogs. Mix of official + third-party, mostly at end with inline numeric refs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2700,
+  "rubric_notes": "openai==1.5.0 pin is likely a hallucinated version \u2014 Responses API needs ~1.50+. Cache token field names look Anthropic-flavored rather than OpenAI Responses (cached_tokens via input_tokens_details). Docs unavailable so scored on internal consistency; version mismatch with API surface is the main correctness issue.",
+  "_judge_latency_s": 17.125396013259888,
+  "_judge_input_tokens": 11329,
+  "_judge_output_tokens": 965
+}

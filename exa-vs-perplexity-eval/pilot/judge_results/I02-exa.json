@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Lemon Squeezy hosted checkout",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I02-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses Lemon Squeezy API v1 /checkouts (here /checkout_sessions - actual endpoint is /v1/checkouts in LS docs) with Bearer auth and application/vnd.api+json \u2014 mostly consistent. HMAC-SHA256 webhook verification with X-Signature header is correct. Endpoint name /v1/checkout_sessions appears inaccurate (LS uses /v1/checkouts), but internal consistency is decent.",
+    "executability": "Test procedures explicitly require ngrok tunnel for webhook testing, which is a sandbox-infeasibility pattern. Also pins lemonsqueezy==0.2.0 PyPI package but never imports/uses it in code. React versions pinned. Code blocks are syntactically valid Python/JSX/TS.",
+    "completeness": "All six pieces present: (a) API key acquisition described, (b) pip install in bash block, (c) .env.example with names matching code, (d) backend server.py complete, (e) React frontend complete, (f) test commands present. Env var names consistent between .env and code.",
+    "citation_anchoring": "Numerous docs.lemonsqueezy.com citations placed near relevant code sections (signing, API, Lemon.js, Test Mode) \u2014 canonical official domain used throughout."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "Endpoint /v1/checkout_sessions is likely incorrect (LS uses /v1/checkouts), but docs_unavailable=true so applying internal-consistency long-tail rule. Ngrok mention in testing caps executability at 2. lemonsqueezy==0.2.0 package is installed but unused \u2014 minor wasted install.",
+  "_judge_latency_s": 13.954009771347046,
+  "_judge_input_tokens": 13372,
+  "_judge_output_tokens": 881
+}

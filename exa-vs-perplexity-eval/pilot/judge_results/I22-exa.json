@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Alchemy NFT API v3 owned NFTs",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I22-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints use v3 paths (eth-mainnet.g.alchemy.com/nft/v3/{apiKey}/getNFTsForOwner and getFloorPrice) consistently; pageKey pagination and media extraction logic are internally consistent. docs_unavailable=true so long-tail handling applies; consistent with version claim \u2192 4.",
+    "executability": "main.py uses asyncio.gather but never imports asyncio \u2192 NameError at runtime. Also mutates shared params dict across pagination loop (works but fragile). Tests use monkeypatch on alchemy_client module functions, but main.py imports them by name so patching the module attribute won't affect main's bound references \u2014 test would still hit real API. Multiple non-obvious fixes.",
+    "completeness": "(a) API key acquisition URL present; (b) pip install bash block present; (c) .env template with ALCHEMY_API_KEY present and matches settings; (d) backend code in fenced blocks; (e) frontend N/A for FastAPI-only; (f) test command implied via pytest but no explicit 'pytest' bash command under a Test heading. Env var names consistent.",
+    "citation_anchoring": "Multiple official alchemy.com/docs and fastapi.tiangolo.com URLs placed inline near relevant code sections; canonical domains used."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "Missing 'import asyncio' in main.py is a clear executability bug; monkeypatch strategy is incorrectly applied (should patch app.main references). No explicit test command block.",
+  "_judge_latency_s": 16.105119943618774,
+  "_judge_input_tokens": 12259,
+  "_judge_output_tokens": 764
+}

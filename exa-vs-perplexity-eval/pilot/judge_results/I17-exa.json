@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "OpenAI Responses API + SSE",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I17-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses openai Python client with AsyncOpenAI and responses.create(stream=True), and correct event types like response.output_text.delta and response.completed \u2014 internally consistent. However, AsyncOpenAI constructor uses api_base= kwarg which is incorrect (the openai v1+ client uses base_url=); this would raise on init. React version pinned to ^19.2.7 is questionable but plausible.",
+    "executability": "FastAPI code likely fails at AsyncOpenAI(api_base=...) \u2014 wrong kwarg. Also `await openai_client.responses.create(..., stream=True)` returns a stream object that should be iterated as async context manager in some SDK versions. SSE blocks parse OK, React code is syntactically valid. Sandbox-feasible (no ngrok/sudo). Multiple non-obvious fixes needed.",
+    "completeness": "(a) API key acquisition not explicitly walked through with URL; (b) pip/npm install present; (c) .env.example present with exact var names matching code; (d) backend code complete; (e) frontend code complete; (f) test commands present (pytest + jest). Acquisition guidance light.",
+    "citation_anchoring": "Cites platform.openai.com/docs (official), fastapi.tiangolo.com, MDN, PyPI/npm. Official OpenAI docs URL cited near streaming code. Mix of official and third-party, placed throughout."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Internal consistency good but api_base vs base_url is a real SDK kwarg bug that would break runtime.",
+  "_judge_latency_s": 14.940541982650757,
+  "_judge_input_tokens": 12875,
+  "_judge_output_tokens": 854
+}

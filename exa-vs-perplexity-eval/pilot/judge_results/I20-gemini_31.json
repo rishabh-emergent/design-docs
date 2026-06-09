@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Solana @solana/web3.js v2 transfer",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I20-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses v2 functional API: createSolanaRpc, createSolanaRpcSubscriptions, sendAndConfirmTransactionFactory, pipe, compileTransaction, getTransferSolInstruction from @solana-program/system \u2014 all consistent with v2 surface. No v1 Connection used. Internally consistent.",
+    "executability": "Frontend has hardcoded 'YOUR_SERVER_PUBLIC_KEY' and 'YOUR_DESTINATION_PUBLIC_KEY' placeholders that will fail at runtime (address() throws on invalid base58). Also the signatures injection pattern (Object.freeze on compiledTransaction) may not match v2's expected FullySignedTransaction shape exactly. Backend is fine. Multiple non-obvious fixes needed.",
+    "completeness": "(a) Env acquisition described loosely (generate keypair); (b) install commands present; (c) .env.example present with SERVER_PRIVATE_KEY_B58; (d) backend code present; (e) frontend code present but with placeholder pubkeys; (f) test command present. Placeholders in frontend code constitute a critical gap per constraint (c) 'no placeholder TODOs'.",
+    "citation_anchoring": "No official docs URLs cited. Only a Solana Explorer link for validation, which is not documentation."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "createSolanaRpc()"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1300,
+  "rubric_notes": "docs_unavailable=true; long-tail handling: consistent v2 usage and clear v2 vs v1 distinction supports a 4. Placeholders in frontend violate the canonical 'no placeholder' constraint, hurting completeness and executability.",
+  "_judge_latency_s": 12.634316682815552,
+  "_judge_input_tokens": 7273,
+  "_judge_output_tokens": 884
+}

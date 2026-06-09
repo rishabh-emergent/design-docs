@@ -1,0 +1,17 @@
+{
+  "elapsed_s": 1280.4382109642029,
+  "n_integrations": 29,
+  "by_provider": {
+    "exa": {
+      "ok": 29,
+      "avg_latency_s": 209.8431508212254,
+      "avg_chars": 20067.655172413793,
+      "total_cost_dollars": 21.7262475
+    },
+    "perplexity": {
+      "ok": 29,
+      "avg_latency_s": 212.49036825936417,
+      "avg_chars": 68546.1724137931
+    }
+  }
+}

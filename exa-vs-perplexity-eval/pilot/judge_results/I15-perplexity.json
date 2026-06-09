@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Discord OAuth2 + bot slash command",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I15-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints used (discord.com/api/v10, /oauth2/token, /users/@me, /users/@me/guilds, /applications/{app_id}/guilds/{guild_id}/commands) and Ed25519 signature verification pattern via PyNaCl are internally consistent with documented Discord API patterns. Scopes identify+guilds and applications.commands correctly referenced. No version claim with date, but consistent throughout.",
+    "executability": "Code is spread across many separate fenced blocks (config.py, main.py, auth.py, models.py, discord_commands.py, interactions.py) with cross-imports; extractor writing each to a file would mostly work, but main.py snippet imports register_guild_slash_commands from discord_commands which is only implied. No requirements.txt block, no /health endpoint defined though test_healthcheck assumes it. Multiple non-obvious fixes needed. Mentions ngrok for dev (sandbox infeasibility pattern) but only as discussion, not a required command.",
+    "completeness": "(a) Credential acquisition described in prose (Developer Portal steps) but no explicit URLs; (b) install commands described in prose, no ```bash block with pip install; (c) env vars referenced in Settings class but no explicit .env template block; (d) backend code present in fragments; (e) frontend code present; (f) test snippets present but no single runnable test command. Multiple critical gaps: no bash install block, no .env template, no consolidated test command.",
+    "citation_anchoring": "Citations are bare numeric refs [1][2][12] etc. with no URLs. No canonical discord.com/developers/docs URLs anchored near code. Cannot verify any official docs URL was cited."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "ngrok mentioned in prose as dev option, not as a required executable command, so EXECUTABILITY not auto-capped at 2. Major weakness is lack of bash install block, .env template, and absence of any URL citations despite extensive numeric reference style.",
+  "_judge_latency_s": 16.41721224784851,
+  "_judge_input_tokens": 27331,
+  "_judge_output_tokens": 963
+}

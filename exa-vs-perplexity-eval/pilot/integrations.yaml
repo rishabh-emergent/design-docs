@@ -1,0 +1,102 @@
+# 7 pilot integrations — Stage-2 picks from main report (deterministic seed 20260609)
+# Each entry mirrors the constraint snippet schema from eval-harness-design.md §2.1
+- id: I02
+  name: Lemon Squeezy hosted checkout
+  stratum: payments-global
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Lemon Squeezy"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: One-time digital product purchase via Lemon Squeezy hosted checkout with signed webhook verification on order_created.
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+    lemonsqueezy.py current.
+
+- id: I07
+  name: Flutterwave Standard (Nigeria)
+  stratum: payments-regional
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Flutterwave"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Flutterwave Standard checkout for Nigerian NGN cards + mobile money with transaction verification on redirect.
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+    rave-python current.
+
+- id: I10
+  name: Supabase auth v2
+  stratum: auth
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Supabase Auth"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Supabase email/password auth using @supabase/supabase-js v2.x (NOT v1's signIn).
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+    FastAPI verifies JWT with project JWT secret.
+
+- id: I13
+  name: Instagram Login Business (Graph)
+  stratum: social/msg
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Instagram Login Business"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Login with Instagram for a Business/Creator account via Instagram Login (Instagram Graph API), scopes instagram_business_basic and instagram_business_content_publish. NOT the deprecated Instagram Basic Display API.
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+
+- id: I17
+  name: OpenAI Responses API + SSE
+  stratum: AI/ML
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "OpenAI Responses API streaming"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: OpenAI Responses API (the newer endpoint, NOT Chat Completions) with server-sent-events streaming to the React client, displaying token-by-token output AND final usage block (input/output/cache tokens).
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+
+- id: I20
+  name: Solana @solana/web3.js v2 transfer
+  stratum: web3
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Solana web3.js v2 SOL transfer"
+  constraints: |
+    Template stack: FastAPI backend (server-signed) + React.
+    Use case: Send a SOL transfer transaction using @solana/web3.js >=2.0 (functional/tree-shakable API with createSolanaRpc, NOT v1's new Connection).
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+
+- id: I24
+  name: Google Maps Places API (New)
+  stratum: geo/maps
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Google Maps Places API New autocomplete"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Address autocomplete using Google Maps Places API (New) — v1 endpoint at places.googleapis.com/v1/places:autocomplete, NOT the legacy Places API.
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.

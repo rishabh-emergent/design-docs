@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Google Maps Places API (New)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I24-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses correct v1 endpoint https://places.googleapis.com/v1/places:autocomplete with X-Goog-Api-Key and X-Goog-FieldMask headers, JSON body with input and sessionToken \u2014 all consistent with Places API (New). Internally consistent across modules.",
+    "executability": "Code blocks parse; fastapi==0.135.1 is a suspicious/likely-nonexistent pinned version (latest stable is in 0.11x range as of 2024), which could cause pip install to fail. Otherwise imports defined, no sandbox blockers.",
+    "completeness": "All six pieces present: API key acquisition with Cloud Console steps, pinned pip/npm installs in bash blocks, complete .env.example, backend code (config, schemas, client, main), frontend code (hook, component, App, index), and test commands (curl + pytest + npm test). Env vars listed match referenced.",
+    "citation_anchoring": "Numbered citation references [1][2][7] etc. appear throughout but no actual URLs are provided anywhere in the playbook \u2014 no canonical developers.google.com/maps URLs cited."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Internal consistency is strong and version-claimed (Places API New v1), supporting a 4 on correctness. Citations are bare numeric markers with no URLs \u2014 fails canonical anchor test, score 1. Pinned fastapi==0.135.1 is dubious but not catastrophic; capped executability at 4.",
+  "_judge_latency_s": 13.361178874969482,
+  "_judge_input_tokens": 22145,
+  "_judge_output_tokens": 825
+}

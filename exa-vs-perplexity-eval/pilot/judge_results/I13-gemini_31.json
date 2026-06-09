@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Instagram Login Business (Graph)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I13-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current instagram_business_basic and instagram_business_content_publish scopes (not deprecated Basic Display). Uses graph.instagram.com and v21.0 endpoints. Auth URL uses instagram.com/oauth/authorize which is current. Internally consistent.",
+    "executability": "Fenced blocks parse cleanly. pip install lacks version pins (constraint b violation, minor). Backend imports complete. Frontend uses CRA setup which is sandbox-feasible. No ngrok/sudo patterns.",
+    "completeness": "(a) credential acquisition described with URL+menu, (b) install bash present but unpinned versions, (c) .env.example present with exact names matching code, (d) backend code complete, (e) frontend code complete, (f) test procedure present but no single bash test command. Five of six fully met.",
+    "citation_anchoring": "Only one link to developers.facebook.com dashboard (not docs). No links to developers.facebook.com/docs/instagram-platform near code blocks."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "instagram_business_basic",
+      "graph.instagram.com/v21.0"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1500,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable). Internally consistent with version claim, scoring 4 on correctness. Constraint (b) version pins not met but extractor would still install latest.",
+  "_judge_latency_s": 13.033358097076416,
+  "_judge_input_tokens": 7729,
+  "_judge_output_tokens": 759
+}

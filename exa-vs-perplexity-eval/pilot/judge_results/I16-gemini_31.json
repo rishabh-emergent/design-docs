@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Telegram Bot inline keyboard + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I16-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: setWebhook with secret_token, X-Telegram-Bot-Api-Secret-Token header, sendMessage, answerCallbackQuery, inline_keyboard structure all match Telegram Bot API conventions. No version claim but self-consistent.",
+    "executability": "Python code is syntactically valid with proper imports. However, testing procedure mandates ngrok (sandbox-infeasibility pattern), which caps EXECUTABILITY at 2.",
+    "completeness": "(a) acquisition steps present, (b) pip install in bash, (c) .env template with TELEGRAM_BOT_TOKEN and TELEGRAM_SECRET_TOKEN matching code references, (d) backend code present, (e) no frontend (N/A for Telegram bot), (f) test is curl + manual Telegram interaction rather than automated runnable command.",
+    "citation_anchoring": "No official docs URLs cited (core.telegram.org/bots/api missing). Zero citations."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1100,
+  "rubric_notes": "Telegram bot has no frontend so piece (e) is N/A. ngrok requirement caps executability at 2 per harness rule.",
+  "_judge_latency_s": 10.346009731292725,
+  "_judge_input_tokens": 6771,
+  "_judge_output_tokens": 723
+}

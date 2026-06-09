@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Auth0 New Universal Login + RBAC",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I11-exa",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "The FastAPI backend imports 'from fastapi_plugin.fast_api_client import Auth0FastAPI' which is not the actual package import path for auth0-fastapi-api (pip install name vs import name inconsistency). The Auth0FastAPI class and require_auth(scopes=...) API surface looks plausible but the import path is inconsistent with the installed pip package 'auth0-fastapi-api', suggesting a hallucinated module structure. React SDK usage (useAuth0, getAccessTokenSilently, authorizationParams) is consistent and current.",
+    "executability": "React blocks are syntactically valid. The FastAPI app.py has a broken import ('fastapi_plugin.fast_api_client') that will cause ImportError at runtime \u2014 extractor writes it verbatim. Also a custom dependency uses Depends(lambda: require_permission('write:messages')) which is invalid since require_permission itself has a Depends parameter, and the lambda won't resolve it. No test command provided. No sandbox-infeasibility flags.",
+    "completeness": "(a) acquisition described; (b) install bash blocks present; (c) env var template present with matching names; (d) backend code present (but buggy); (e) frontend code present; (f) NO runnable test command (Cypress snippet is partial). Missing the test command piece \u2014 5 of 6.",
+    "citation_anchoring": "Multiple official auth0.com/docs URLs cited inline next to relevant code sections (React Quickstart, FastAPI Quickstart, Enable RBAC, Token Best Practices). Canonical domain auth0.com/docs used consistently. No fabricated URLs detected."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "docs_unavailable=true: applied long-tail handling. Internal consistency is mostly OK but the Python import path 'fastapi_plugin.fast_api_client' contradicts the installed 'auth0-fastapi-api' pip package, a critical extractor-fatal bug. No version pinning. Missing explicit test command caps completeness.",
+  "_judge_latency_s": 14.438931226730347,
+  "_judge_input_tokens": 11729,
+  "_judge_output_tokens": 930
+}

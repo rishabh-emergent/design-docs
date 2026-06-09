@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "UploadThing v6 file upload (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I26-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent v6 API usage: createUploadthing, createRouteHandler, generateUploadButton/Dropzone, UPLOADTHING_TOKEN env var, file.ufsUrl, FileRouter type. Version 6.x claimed and methods consistent throughout. Long-tail handling: consistent + version = 4.",
+    "executability": "Main code blocks parse cleanly. However, app/layout.tsx is shown in three different overlapping variants (basic, with CSS-before-globals, with NextSSRPlugin) which the deterministic extractor would write all/last verbatim, potentially overwriting. ngrok pitfall mentioned in prose but not in a primary install/test bash block. Some non-obvious fixes required.",
+    "completeness": "All six pieces present: (a) API key acquisition with URL/menu steps; (b) install bash block; (c) env template UPLOADTHING_TOKEN matches reference; (d) backend core.ts + route.ts; (e) frontend components + utils; (f) test commands present though more checklist than automated. Duplicate layout.tsx variants reduce score slightly.",
+    "citation_anchoring": "docs.uploadthing.com official URLs cited inline [1][2][13] near relevant code sections, plus full source list at end. Matches canonical official domain."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2800,
+  "rubric_notes": "ngrok appears only in an optional pitfall note, not in a primary install/run block, so EXECUTABILITY cap at 2 not strictly triggered; scored 3 for layout.tsx duplication ambiguity. UploadThing not in canonical list but docs.uploadthing.com is the official domain.",
+  "_judge_latency_s": 14.611738920211792,
+  "_judge_input_tokens": 10936,
+  "_judge_output_tokens": 884
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mixpanel /import + Query API",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I28-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints (/import, /api/query/engage) and Basic Auth with service accounts are consistent with Mixpanel conventions. However mixpanel_base_url() returns https://mixpanel.com (or https://eu.mixpanel.com) which is wrong \u2014 should be api.mixpanel.com / api-eu.mixpanel.com. This is an internal inconsistency since the prose says https://api.mixpanel.com/import. Pydantic BaseSettings import path is v1-style (in Pydantic v2 it moved to pydantic_settings), a likely freshness issue.",
+    "executability": "Code blocks parse but several runtime issues: from pydantic import BaseSettings fails on modern pydantic v2 installs; mixpanel_base_url returns wrong host; the @app.on_event lifespan hooks are deprecated; test uses TestClient with @patch on http_client but mock_resp.raise_for_status is AsyncMock when httpx response.raise_for_status is sync; duplicate '$insert_id' check is a typo. No sandbox-infeasible patterns detected.",
+    "completeness": "(a) credentials acquisition described, (b) pip install bash present, (c) env template present with exact names matching BaseSettings fields, (d) backend FastAPI code present, (e) no frontend (FastAPI-only stack, acceptable), (f) test command shown via pytest snippet but no explicit 'pytest' run command in a bash block. Env vars listed match those referenced.",
+    "citation_anchoring": "Multiple official developer.mixpanel.com and docs.mixpanel.com URLs cited inline near relevant code/sections; also fastapi.tiangolo.com. Some github.com/mixpanel/docs links are semi-official. Placement is near code, not just at end."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Internal inconsistency between prose URL (api.mixpanel.com) and code (mixpanel.com host) lowers correctness; pydantic BaseSettings import is v1 pattern.",
+  "_judge_latency_s": 15.913161993026733,
+  "_judge_input_tokens": 12186,
+  "_judge_output_tokens": 1006
+}

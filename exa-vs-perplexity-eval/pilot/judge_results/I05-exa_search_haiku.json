@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Paytm All-in-One Web SDK",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I05-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "docs_unavailable; internal inconsistency: uses paytm-pg python SDK (likely unmaintained / not on PyPI under that name) and a frontend script URL 'securegw.paytm.in/merchantpgp/complianceValidator.js' that does not match the canonical Paytm Checkout JS bundle (typically /merchantpgpui/checkoutjs/merchants/<MID>.js). The JS bridge invocation uses window.Paytm.CheckoutJS.onNewWindowLoad/getLibrary/invoke pattern which is partially correct but combined with the wrong script source it will not load CheckoutJS. Long-tail handling: inconsistent + no version => low.",
+    "executability": "Multiple fixes needed: paytm-pg package likely uninstallable; CheckoutJS script URL wrong so window.Paytm undefined at runtime; CRA's index.html lives in public/ not src/ (header text says src/index.html); fastapi_limiter referenced without import/setup; TrustedHostMiddleware not imported. Also troubleshooting suggests ngrok (sandbox-infeasible pattern) though only in a table, not as a required step.",
+    "completeness": "All six pieces present: credentials acquisition, install bash, .env template, backend code, frontend code, test commands. However env var CLIENT_ID is used in config/service but not declared in .env template (mismatch). Some duplicate Paytm invoke logic.",
+    "citation_anchoring": "Multiple official business.paytm.com and paytmpayments.com URLs cited, numbered inline near relevant sections (e.g., [2] near SDK init, [6] near JS script). Matches canonical domain business.paytm.com/docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3600,
+  "rubric_notes": "ngrok appears only in a troubleshooting table, not as a required step, so EXECUTABILITY cap not strictly triggered; still kept at 2 due to wrong CheckoutJS script URL and dubious paytm-pg package.",
+  "_judge_latency_s": 17.345813035964966,
+  "_judge_input_tokens": 14554,
+  "_judge_output_tokens": 995
+}

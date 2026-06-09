@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Cloudflare R2 presigned PUT",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I25-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 5,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "boto3 client with endpoint_url, region_name='auto', generate_presigned_url('put_object', Params={Bucket,Key,ContentType}) is the standard R2 pattern, internally consistent. Endpoint format https://<ACCOUNT_ID>.r2.cloudflarestorage.com matches docs. No deprecated traps.",
+    "executability": "server-side upload route references UploadFile in signature before importing it (import inside body comes after use), which will NameError at module load. Also reload=os.getenv(...,True) passes a string 'True' not bool. Otherwise blocks parse; CORS preflight on R2 still needs dashboard config (documented). 1-2 non-obvious fixes needed.",
+    "completeness": "All six pieces present: R2 key acquisition with menu path, pip install bash block, .env template, backend main.py, frontend FileUpload.jsx, and curl/pytest test commands. Env var names consistent between .env and code. Minor duplication (server-side upload route) but not blocking.",
+    "citation_anchoring": "Multiple official developers.cloudflare.com URLs cited inline near relevant code (e.g., [2] near boto3 client and generate_presigned_url). Third-party sources also present but official dominates."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3800,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied \u2014 internally consistent with version claims (boto3==1.28.85) \u2192 high CF score. UploadFile used before import is the main executability hit.",
+  "_judge_latency_s": 14.003636837005615,
+  "_judge_input_tokens": 14009,
+  "_judge_output_tokens": 749
+}

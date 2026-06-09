@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Alchemy NFT API v3 owned NFTs",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I22-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses v3 endpoints /nft/v3/getNFTsForOwner and /nft/v3/getFloorPrice with Bearer auth, internally consistent. However mapping logic mixes v2 shapes (media[].gateway/raw, id.tokenId) with v3 \u2014 actual v3 uses image.cachedUrl/originalUrl and contract.openSeaMetadata. No version date stated. Long-tail handling: consistent but some shape inaccuracies.",
+    "executability": "Code is largely syntactically valid; however HttpUrl(string) constructor usage in Pydantic v2 may not work as written (HttpUrl is a type alias, not a callable in some versions \u2014 typically requires TypeAdapter or direct assignment). The httpx ASGITransport pattern is correct. Fake client returns OwnedNFT with HttpUrl strings which Pydantic should coerce. Minor fixes needed.",
+    "completeness": "(a) API key acquisition described in prose, not crisp; (b) pip install bash blocks present; (c) .env template with exact names matching Settings fields; (d) backend code in fenced python blocks; (e) no frontend (FastAPI-only spec, acceptable); (f) pytest test command present. Some duplicate narrative content.",
+    "citation_anchoring": "Numerous bracketed numeric citations [2][6][21][25] but no resolved URLs to docs.alchemy.com or alchemy.com/docs anywhere. References to dltHub third-party docs mentioned. No canonical official URL inline."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8500,
+  "rubric_notes": "docs_unavailable=true applied. Playbook is verbose with significant narrative duplication; v3 endpoint paths plausible and internally consistent but NFT response mapping likely targets v2 shape. No inline official URLs only bracketed numeric refs.",
+  "_judge_latency_s": 15.200925827026367,
+  "_judge_input_tokens": 27786,
+  "_judge_output_tokens": 937
+}

@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Connect Express",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I03-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 1,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses fabricated/incorrect stripe-python API surface: `from stripe import Stripe` and `stripe_client = Stripe(api_key=...)` is not the standard stripe-python pattern (which is `import stripe; stripe.api_key=...`). Methods like `stripe_client.paymentIntents.create` (camelCase), `stripe_client.v2.core.accounts.create`, `stripe_client.v2.core.accountLinks.create`, `webhooks.constructEvent` are JS-style camelCase, not Python snake_case (should be `stripe.PaymentIntent.create`, `stripe.Account.create`, `stripe.AccountLink.create`, `stripe.Webhook.construct_event`). Core integration is essentially fabricated for Python.",
+    "executability": "Multiple Python files will fail at import/runtime: `from stripe import Stripe` will ImportError; `Column('metadata', ...)` conflicts with SQLAlchemy reserved attribute name; relative imports `from ..schemas` won't work given the stated structure with main.py at backend root and `from routes import connect`. Final code block is truncated mid-statement (`idempotency_key=idemp`). Webhook testing section requires `brew install` (sandbox-infeasible) and `stripe listen` tunnel-like pattern.",
+    "completeness": "(a) API key acquisition present; (b) install bash present (though has invalid `npm install axios==1.6.0` syntax); (c) env template present; (d) backend code present but truncated; (e) frontend code present; (f) test commands present but rely on Stripe CLI. Playbook is truncated at the end \u2014 incomplete final code block.",
+    "citation_anchoring": "Inline numeric citations [1][3][5] etc. reference an unseen bibliography; no canonical docs.stripe.com URLs anchored near code. Only stripe.com homepage and a stripe-cli docs URL appear in prose."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "brew install",
+      "stripe listen --forward-to"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3600,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling \u2014 internal inconsistencies (camelCase methods, fabricated Stripe class import, truncated final block) plus no version self-consistency yield CORRECTNESS=1. Truncation also impacts executability/completeness.",
+  "_judge_latency_s": 17.4054217338562,
+  "_judge_input_tokens": 14860,
+  "_judge_output_tokens": 1017
+}

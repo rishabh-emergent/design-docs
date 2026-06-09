@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Telegram Bot inline keyboard + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I16-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: PTB v20 async API, Application.builder().token().updater(None).build(), setWebhook with secret_token, X-Telegram-Bot-Api-Secret-Token header verification, Update.de_json all align. However, BaseSettings import from pydantic is Pydantic v1 syntax; in v2 it moved to pydantic-settings \u2014 minor inconsistency given pinned versions absent.",
+    "executability": "Code is well-formed but ngrok is used as the primary local exposure mechanism (sandbox-infeasible per harness pattern). Also pydantic BaseSettings import will fail under modern Pydantic v2 without pydantic-settings dependency. Caps at 2.",
+    "completeness": "(a) BotFather acquisition steps present; (b) pip install bash block present; (c) env var names listed in Settings class but no explicit .env template block; (d) backend app.py present; (e) N/A frontend (bot integration); (f) test command via curl POST present. Env vars defined in code consistently referenced. Missing standalone .env template block is light gap.",
+    "citation_anchoring": "Cites core.telegram.org/bots/api (official Telegram docs), docs.python-telegram-bot.org, fastapi.tiangolo.com \u2014 official sources placed near relevant code sections. No fabricated URLs detected."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http 8000"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2100,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling \u2014 internal consistency strong, PTB v20 async patterns coherent. Ngrok usage triggers executability cap at 2. Pydantic BaseSettings import ambiguity noted.",
+  "_judge_latency_s": 14.378029108047485,
+  "_judge_input_tokens": 9833,
+  "_judge_output_tokens": 869
+}

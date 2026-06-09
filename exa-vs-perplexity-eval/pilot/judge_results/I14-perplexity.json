@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "WhatsApp Cloud API + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I14-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses correct graph.facebook.com/v19.0/{phone_number_id}/messages endpoint, proper template payload structure, X-Hub-Signature-256 HMAC-SHA256 verification with hmac.compare_digest. Internally consistent with version claims; long-tail handling applies.",
+    "executability": "Code is split across many small fragments scattered through prose with no single coherent main.py. Multiple undefined symbols when extracted (get_settings never defined, Response/Depends imports missing in some snippets, Settings referenced across blocks). Pydantic v1 BaseSettings import path is outdated (should be pydantic_settings). Explicitly relies on ngrok for webhook testing \u2014 sandbox-infeasibility pattern matched, caps at 2.",
+    "completeness": "(a) API key acquisition described in prose for Meta dashboard; (b) install commands mentioned in prose but not in clean ```bash blocks; (c) env vars listed in prose (WHATSAPP_ACCESS_TOKEN etc.) but no .env template block; (d) backend code fragments present but scattered; (e) frontend code present; (f) test commands shown as pytest snippets but no single runnable test command. Multiple pieces light/missing.",
+    "citation_anchoring": "Citations are bracketed numeric references [1][2][7] etc. with no resolvable URLs to developers.facebook.com/docs/whatsapp. No official canonical URLs anchored near code. References appear to be third-party/unidentified."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http 8000"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 11000,
+  "rubric_notes": "Extremely long, prose-heavy with code fragments interleaved. Deterministic extractor would struggle: many fenced blocks but no cohesive file. Heavy duplication of explanatory content penalizes completeness. ngrok dependence caps executability.",
+  "_judge_latency_s": 14.650387048721313,
+  "_judge_input_tokens": 31414,
+  "_judge_output_tokens": 932
+}

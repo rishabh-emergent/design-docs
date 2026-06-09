@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Supabase auth v2",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I10-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current v2 methods: supabase.auth.signInWithPassword, supabase.auth.signUp, supabase.auth.signOut, onAuthStateChange, getSession. Explicitly notes v1 signIn is deprecated. PyJWT HS256 verification with aud='authenticated' is standard. Internally consistent and versions claimed.",
+    "executability": "Fenced blocks parse correctly. Imports defined. Settings class uses `str | None` (Python 3.10+) which is fine. Backend setup with venv/pip is sandbox-feasible. Frontend uses `npm create vite@latest .` which is interactive \u2014 minor friction. No ngrok/sudo patterns.",
+    "completeness": "All 6 pieces present: (a) acquisition described (dashboard menu paths), (b) pip/npm install in bash blocks, (c) .env.example with exact var names matching code references, (d) backend code in fenced python blocks, (e) frontend tsx code, (f) pytest test command. Env vars listed match those referenced.",
+    "citation_anchoring": "Citations are bracketed numbers [2][3][5] etc. with no actual URLs visible. No canonical supabase.com/docs URLs cited inline. Cannot verify these are official docs links \u2014 appears to be reference-style without a bibliography in the output."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "supabase.auth.signInWithPassword"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "Very long playbook with significant prose duplication in security/pitfalls sections; doesn't materially harm extractability since code blocks are clean. Citation system uses numeric references without URLs visible \u2014 cannot confirm domain anchoring.",
+  "_judge_latency_s": 13.532097816467285,
+  "_judge_input_tokens": 28854,
+  "_judge_output_tokens": 860
+}

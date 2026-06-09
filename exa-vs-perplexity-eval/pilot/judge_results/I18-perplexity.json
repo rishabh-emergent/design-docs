@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Anthropic Messages + tool_use + cache_control",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I18-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Model name 'claude-opus-4-8' appears fabricated (no such Anthropic model identifier exists; real names follow patterns like claude-opus-4-20250514 or claude-3-5-sonnet-20241022). Also invents SDK classes 'AnthropicBedrockMantle', 'AnthropicFoundry', 'AnthropicAWS' that don't exist in the anthropic-python SDK. Cache_control structure on tools/system and tool_use flow patterns are otherwise plausible.",
+    "executability": "Uses 'from fastapi.sse import EventSourceResponse' \u2014 this module does not exist in FastAPI; EventSourceResponse comes from sse-starlette package. Imports anthropic_client from app.main creating circular import risk with router modules. Model string would 404. Multiple files spread across modules without a single runnable entry; extractor would write divergent files.",
+    "completeness": "(a) API key acquisition mentioned but no URL to console.anthropic.com; (b) install command present in bash; (c) .env template present (ANTHROPIC_API_KEY); (d) backend code present but split across ~10 implicit file paths; (e) no frontend (FastAPI-only stack, acceptable); (f) test commands shown as pytest files but no explicit 'pytest' run command in a final test block. Duplicate content across sections.",
+    "citation_anchoring": "Uses numbered bracket citations [1][6][7] etc. with no resolvable URLs. No canonical docs.anthropic.com URLs placed near code. Citations are opaque footnote markers, not links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8500,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Internal consistency reasonable but fabricated model identifier 'claude-opus-4-8' (repeated throughout) and invented SDK class names hurt correctness. fastapi.sse.EventSourceResponse is a real bug \u2014 that import path does not exist.",
+  "_judge_latency_s": 16.07254409790039,
+  "_judge_input_tokens": 25341,
+  "_judge_output_tokens": 970
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PhonePe PG v2 UPI",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I04-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses v2 endpoints (/checkout/v2/pay, OAuth via identity-manager), Authorization: O-Bearer token, and the UAT host \u2014 internally consistent with v2. However, v2 standard checkout primarily uses OAuth-bearer auth; combining X-VERIFY AND O-Bearer on /checkout/v2/pay mixes v1-style checksum with v2 auth, which may produce checksum errors at runtime. Docs unavailable, so applying long-tail handling: consistent versioning + claimed v2 \u2014 but the X-VERIFY-on-v2 conflation is a notable supporting-call inaccuracy.",
+    "executability": "Python and JSX blocks parse; imports are present (re-imports base64 inside webhook handler is harmless). One issue: backend response shape passed to PhonePeCheckout.transact expects tokenUrl but code optimistically maps multiple field names \u2014 would require a small fix once real response shape is known. No sandbox-infeasible patterns (no ngrok/brew/sudo).",
+    "completeness": "(a) credential acquisition described with portal reference; (b) pip and npm install in bash blocks; (c) env vars referenced in code (PHONEPE_CLIENT_ID, _SECRET, _MERCHANT_ID, _SALT_KEY, _SALT_INDEX, _ENV, WEBHOOK_USERNAME/PASSWORD) but no explicit .env template block listing them \u2014 extractor must infer from os.getenv calls; (d) backend code present; (e) frontend code present; (f) test commands are described in prose, not a runnable bash test block. Missing explicit .env template and Test bash command.",
+    "citation_anchoring": "Multiple official developer.phonepe.com URLs cited inline next to relevant code sections (X-VERIFY, webhook, PayPage, UAT sandbox), all on the canonical domain. One Stack Overflow reference is supplemental."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "docs_unavailable=true; long-tail handling applied. Mixing X-VERIFY (v1 checksum style) with v2 OAuth bearer on /checkout/v2/pay is a likely accuracy issue but internally the playbook claims v2 consistently. No explicit .env template or single runnable test bash block \u2014 caps completeness below 5.",
+  "_judge_latency_s": 16.92616081237793,
+  "_judge_input_tokens": 12933,
+  "_judge_output_tokens": 1095
+}

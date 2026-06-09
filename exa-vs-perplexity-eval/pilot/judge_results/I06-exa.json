@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Xendit virtual account",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I06-exa",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "xendit-python SDK usage shown (xendit.set_api_key, xendit.payment_requests.PaymentRequests) is inconsistent with the actual current SDK structure \u2014 the modern xendit-python uses xendit.ApiClient + PaymentRequestApi classes; the playbook's flat import pattern looks fabricated. Pinning to 7.0.0 with no docs available is internally consistent but the SDK surface inconsistency lowers confidence.",
+    "executability": "pip install --dev is not a valid pip flag (should be separate line, no --dev). 'uvicorn[standard]' without quotes can fail in some shells. Sandbox-infeasible patterns referenced (ngrok for webhook testing) but only in prose, not as required setup. SDK import xendit.payment_requests import PaymentRequests likely AttributeError at runtime.",
+    "completeness": "(a) API key acquisition described with dashboard path \u2713; (b) install bash present \u2713; (c) env var names mentioned in prose (XENDIT_API_KEY, XENDIT_CALLBACK_SECRET) but no explicit .env template block \u2717; (d) backend code \u2713; (e) frontend code \u2713; (f) test command not provided as runnable bash block (only pytest example file) \u2717. Env vars in prose only.",
+    "citation_anchoring": "Cites docs.xendit.co (canonical: developers.xendit.co per rubric, but docs.xendit.co is the actual current docs domain) inline near code. Some Stripe/third-party links mixed in for general best practices. Citations are placed near relevant code sections."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "ngrok mentioned only in testing prose, not as required setup step, so EXECUTABILITY not auto-capped at 2 by harness \u2014 but pip --dev flag and likely-wrong SDK import pattern justify 2 independently. docs_unavailable=true; applied LONG-TAIL HANDLING \u2014 SDK surface internally consistent but pattern doesn't match typical xendit-python v3+ structure.",
+  "_judge_latency_s": 16.301707983016968,
+  "_judge_input_tokens": 11183,
+  "_judge_output_tokens": 1004
+}

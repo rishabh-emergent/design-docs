@@ -1,0 +1,36 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Payment Element (one-time + sub)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I01-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current stripe.checkout.Session.create (not the deprecated lowercase form) and stripe.PaymentIntent.create with automatic_payment_methods. Subscription frontend imports 'CheckoutElementsProvider' and 'useCheckoutSession' from '@stripe/react-stripe-js/checkout' which is questionable/non-standard; standard would be Elements + clientSecret. Minor inaccuracy but core path correct.",
+    "executability": "FastAPI route decorator uses response_model={'client_secret': str} \u2014 a dict literal where Pydantic expects a model class \u2014 this will raise at import time. Also Subscription frontend imports likely-nonexistent module paths. webhook secret retrieval requires stripe CLI (sandbox-feasible but fine). brew install stripe-cli pattern present in test section triggers sandbox-infeasibility cap.",
+    "completeness": "All six pieces present: keys with URLs, pip+npm installs in bash, .env.example (backend+frontend), backend main.py, frontend React pages, curl test command. Frontend env vars REACT_APP_* match references. Webhook handler covers both required events.",
+    "citation_anchoring": "Multiple docs.stripe.com URLs (canonical official domain), cited inline next to relevant sections (e.g., [1][6] near webhook code, [4][8] near PaymentIntent code) and listed at end."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "stripe.checkout.Session.create"
+    ],
+    "sandbox_infeasibility_patterns": [
+      "brew install"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3400,
+  "rubric_notes": "response_model={'client_secret': str} is an executability bug (invalid Pydantic model). Subscription page uses checkout-namespaced React imports that are non-standard. brew install in test section caps executability at 2.",
+  "_judge_latency_s": 14.757232904434204,
+  "_judge_input_tokens": 13558,
+  "_judge_output_tokens": 896
+}

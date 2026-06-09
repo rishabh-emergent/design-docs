@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Flutterwave Standard (Nigeria)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I07-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 4,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses rave-python with Rave() init and rave.Card.verify(tx_ref) - this is internally consistent with rave-python SDK conventions. flutterwave-react-v3 with useFlutterwave hook is consistent. Comment claims .Card.verify works for mobile money which is questionable; rave-python is also less maintained vs direct REST. Long-tail consistent, no version pinned.",
+    "executability": "Fenced blocks parse cleanly. Backend imports correct. Frontend uses react-router-dom v6 syntax correctly. No sandbox-infeasible patterns (no ngrok/sudo). Minor: needs both .env files set up, but template is provided in prose not as a fenced .env.example block.",
+    "completeness": "(a) keys acquisition described; (b) install commands present; (c) env vars described in prose but NO explicit .env.example fenced block - violates explicit requirement; (d) backend code present; (e) frontend code present; (f) test commands present. Missing structured .env.example block is a notable gap.",
+    "citation_anchoring": "No URLs cited anywhere in the playbook - no link to developer.flutterwave.com or any docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1150,
+  "rubric_notes": "docs_unavailable: scored on internal consistency. No version pins on pip/npm packages (violates requirement b). .env.example not in a fenced block as required.",
+  "_judge_latency_s": 12.461440086364746,
+  "_judge_input_tokens": 7285,
+  "_judge_output_tokens": 778
+}

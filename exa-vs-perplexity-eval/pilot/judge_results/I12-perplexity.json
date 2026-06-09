@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Better-Auth social + magic link (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I12-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Multiple likely-fabricated package names and import paths: '@better-auth/prisma-adapter', '@better-auth/plugin-magic-link', '@better-auth/infra', '@better-auth/test-utils', 'better-auth/providers/google', 'better-auth/next'. Real better-auth uses 'better-auth/adapters/prisma', 'better-auth/plugins' for magicLink, social providers configured inline (no separate import), and 'better-auth/next-js' for toNextJsHandler/nextCookies. Playbook hedges with 'confirm exact package names' which signals uncertainty. No version pin stated.",
+    "executability": "Fenced blocks parse syntactically but imports will fail at install/runtime due to non-existent packages. Multiple code samples; extractor would write 'src/lib/auth.ts' etc. but pip/npm installs reference packages that don't exist. No single coherent test command. Multiple alternative install snippets (npm vs pnpm) create extractor ambiguity.",
+    "completeness": "Has (a) Google credential acquisition mentioned, (b) install commands in bash blocks (but contradictory npm/pnpm), (c) env template present, (d) backend code present, (e) frontend code present, (f) no clear runnable test command \u2014 only narrative about Playwright/Vitest. Heavy duplication and conflicting samples. Env vars listed match those referenced in code.",
+    "citation_anchoring": "Uses bracketed numeric references [1][19] etc. with no URLs resolved. No canonical clerk.com-equivalent (better-auth.com/docs) URLs present anywhere. No official docs URLs at all."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "docs_unavailable=true \u2192 long-tail handling applied. Internal inconsistency: playbook itself repeatedly tells reader to 'confirm package names', signaling the author is uncertain \u2014 penalized under consistency. Massive length with much duplicated narrative content; extractor would face multiple competing code samples.",
+  "_judge_latency_s": 16.401229858398438,
+  "_judge_input_tokens": 27625,
+  "_judge_output_tokens": 988
+}

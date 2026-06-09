@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "OpenAI Responses API + SSE",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I17-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "References fabricated models like 'gpt-5.5' and 'FastAPI 0.135.1' and 'React 19.2.7' that are not real as of mid-2026; uses prompt_tokens/completion_tokens (Chat Completions naming) for the Responses API which uses input_tokens/output_tokens. The usage event extraction mixes legacy Chat Completions field names with Responses API claims, indicating internal inconsistency.",
+    "executability": "Code uses fetch-event-source with wrong import (should be @microsoft/fetch-event-source); useRef is used without import in the hook; antd Textarea is not a valid named export (should be Input.TextArea); useState is used in StreamingResponse without import. Multiple undefined symbols would cause immediate runtime/compile errors. Mock event constructions in tests also wouldn't iterate correctly.",
+    "completeness": "Has (a) env vars with .env.example, (b) install commands in prose but NOT in ```bash fenced blocks (extractor would miss them), (c) env template, (d) backend code, (e) frontend code, (f) test commands but scattered. Install commands not in extractable bash fences is a critical gap; massive duplicated prose; no single 'Test' bash block.",
+    "citation_anchoring": "Citations are bracket numbers ([1], [2], [6], etc.) referencing search results that aren't shown; no actual official URLs to platform.openai.com/docs are present in the playbook text. No clickable canonical doc links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 11500,
+  "rubric_notes": "Long-tail handling applied (docs_unavailable=true). Internal inconsistency in usage field names (prompt_tokens vs Responses API's input_tokens) plus fabricated package versions caps correctness at 2. Install commands embedded in prose rather than bash fences hurts extractability significantly.",
+  "_judge_latency_s": 16.679347038269043,
+  "_judge_input_tokens": 29698,
+  "_judge_output_tokens": 861
+}

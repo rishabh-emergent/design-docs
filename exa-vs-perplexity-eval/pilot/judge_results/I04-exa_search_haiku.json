@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PhonePe PG v2 UPI",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I04-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Mixes v1 and v2 patterns inconsistently. PhonePe PG v2 (post-2024) uses OAuth Bearer tokens (Authorization: O-Bearer <token>) and does NOT use X-VERIFY checksums \u2014 X-VERIFY is the v1 Standard Checkout pattern. Also the status check uses the same /pay endpoint (wrong) and v2 response shape with instrumentResponse.redirectInfo is v1 shape. Internal consistency is poor: claims v2 but uses v1 auth. Version claimed but inconsistent.",
+    "executability": "Code blocks parse. Relative import `from ..config` will fail because main.py imports `routes.payment` as top-level (not a package). Missing `react-router-dom` install. Otherwise runnable on sandbox-feasible patterns; no ngrok/sudo.",
+    "completeness": "(a) credential acquisition described; (b) pip+npm installs present; (c) env template present with exact names; (d) backend code in fenced blocks; (e) React code present; (f) pytest test command present. All six covered. Some duplication of credentials between sections.",
+    "citation_anchoring": "Cites developer.phonepe.com (canonical) for several sections inline as [3][4], plus Medium and business.phonepe.com. Source [6] truncated. Mix of official and third-party with official inline anchoring."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 4200,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Playbook claims v2 but the X-VERIFY + instrumentResponse.redirectInfo pattern is canonical v1 Standard Checkout \u2014 internal inconsistency is severe enough to cap correctness at 2 despite version claim.",
+  "_judge_latency_s": 14.586266994476318,
+  "_judge_input_tokens": 14935,
+  "_judge_output_tokens": 897
+}

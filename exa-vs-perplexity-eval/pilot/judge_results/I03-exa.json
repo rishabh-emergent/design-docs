@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Connect Express",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I03-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "stripe.Account.create, stripe.AccountLink.create, stripe.PaymentIntent.create with transfer_data.destination + application_fee_amount, and stripe.Webhook.construct_event are all consistent with current stripe-python v8+ API surface. Internally consistent; stripe>=8.0 pinned. Minor: uses stripe.error.StripeError (still works in v8 via shim) \u2014 acceptable.",
+    "executability": "Backend code parses, but no CORSMiddleware is registered despite frontend cross-origin calls (only mentioned in pitfalls). Also automatic_payment_methods + payment_method_types=['card'] together is contradictory and may error. Webhook endpoint relies on raw body \u2014 OK. Frontend uses CRA env (REACT_APP_) which works. Test command exists (stripe listen) but no clear single 'test command' block after a Test header. No sandbox-infeasible blockers (stripe listen is acceptable CLI).",
+    "completeness": "(a) keys acquisition explained with Dashboard path \u2713; (b) install commands in bash-like list (not in ```bash fences \u2014 bullets) \u2717 partial; (c) env template present in fenced block \u2713; (d) backend code fenced \u2713; (e) frontend code fenced \u2713; (f) run commands present but not under a clear ## Test header. Env var names consistent between listed and referenced. No major duplication.",
+    "citation_anchoring": "Numerous docs.stripe.com canonical links placed inline next to relevant code/sections (Express, PaymentIntent create, destination charges, webhook signatures, React SDK). No fabricated URLs detected."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2700,
+  "rubric_notes": "Install steps given as bullet lists rather than ```bash fenced blocks \u2014 extractor may miss them. Contradictory payment_method_types + automatic_payment_methods could cause runtime error. No explicit CORS setup despite cross-origin frontend.",
+  "_judge_latency_s": 15.649207830429077,
+  "_judge_input_tokens": 11445,
+  "_judge_output_tokens": 960
+}

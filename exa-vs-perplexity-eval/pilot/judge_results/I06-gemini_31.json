@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Xendit virtual account",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I06-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Long-tail (docs_unavailable). Internally consistent and version-aware ('xendit-python' SDK, VirtualAccountApi). However, mixing xendit.set_api_key with VirtualAccountApi(client) is suspicious; current xendit-python uses xendit.Xendit(api_key=...) pattern. Callback token via x-callback-token header is plausible.",
+    "executability": "Fenced blocks parse. However, testing requires ngrok (sandbox-infeasible per harness pattern), which caps executability at 2. Also response.to_dict() may not match SDK object shape.",
+    "completeness": "All six pieces present: keys acquisition with URL+menu, install bash, .env template, backend code, frontend code, test procedure. Env var names consistent. Test command is procedural rather than a single runnable command.",
+    "citation_anchoring": "Only links to dashboard.xendit.co (operator console), not developers.xendit.co official docs. No official docs URL anchored near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1200,
+  "rubric_notes": "ngrok requirement caps executability at 2. Citation only points to dashboard, not developer docs domain.",
+  "_judge_latency_s": 11.280115127563477,
+  "_judge_input_tokens": 7202,
+  "_judge_output_tokens": 700
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Discord OAuth2 + bot slash command",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I15-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints (oauth2/authorize, oauth2/token, /api/v10/applications/{id}/guilds/{gid}/commands) are internally consistent with Discord's known API surface. Scopes identify/guilds correct. No version claim with date though API v10 referenced. Docs unavailable \u2014 internally consistent + version mentioned \u2248 3-4.",
+    "executability": "Uses httpx.utils.quote which does not exist in httpx (httpx has no utils.quote helper; should use urllib.parse.quote). This will raise AttributeError at import-time when building OAUTH_AUTHORIZE_URL. Also @app.on_event('startup') is deprecated in newer FastAPI but still works. The httpx.utils.quote bug is a hard runtime failure \u2192 executability capped low.",
+    "completeness": "All 6 pieces present: (a) Developer Portal acquisition steps, (b) bash install commands, (c) explicit .env template with exact names matching code, (d) backend code, (e) frontend code, (f) test command (pytest example + uvicorn run). Minor: test snippet imports backend.main but file path is backend/main.py without __init__.",
+    "citation_anchoring": "Cites docs.discord.com/developers/... which is not the canonical Discord docs domain (canonical is discord.com/developers/docs). FastAPI, CRA, Vite official docs cited inline near relevant code. Mix of official + third-party (stackoverflow, curity, obsidiansecurity). Discord docs URL appears fabricated/incorrect domain."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3600,
+  "rubric_notes": "httpx.utils.quote is a real bug \u2014 that module/attribute doesn't exist. Discord docs domain 'docs.discord.com/developers' is non-canonical (real is discord.com/developers/docs).",
+  "_judge_latency_s": 14.635653018951416,
+  "_judge_input_tokens": 14373,
+  "_judge_output_tokens": 895
+}

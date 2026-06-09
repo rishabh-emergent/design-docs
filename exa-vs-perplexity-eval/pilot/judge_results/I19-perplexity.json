@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "ElevenLabs websocket streaming TTS",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I19-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoint wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input and xi-api-key header are internally consistent. However, websockets.connect uses extra_headers= which is deprecated/removed in newer websockets versions (now additional_headers). No version pinning. generation_config/output_format placement within init message is plausible but not verified. Long-tail: internally consistent, partial version claims \u2014 score 3.",
+    "executability": "Multiple fixes needed: elevenlabs_client.py reads env vars at import time but main.py loads dotenv after importing \u2014 actually elevenlabs_client is imported later so may work, but env vars in elevenlabs_client.py module level still execute on import. No requirements.txt or pip install bash block. No .env template fenced block. Frontend has no package.json/install commands. WAV-per-chunk strategy is mentioned as potentially problematic in the prose itself. extra_headers kwarg may break on newer websockets lib.",
+    "completeness": "(a) API key acquisition described in prose, not crisp; (b) NO ```bash install block for pip or npm \u2014 major gap; (c) env var names listed in a table but no .env fenced template; (d) backend code present; (e) frontend code present; (f) test code present but no runnable bash test command. Missing install commands and .env template are critical extractor gaps.",
+    "citation_anchoring": "Citations are bare bracket numbers like [10][27] with no URLs. No canonical elevenlabs.io/docs URLs anywhere. No hyperlinks. Extractor cannot resolve references. Only inline numbers, no bibliography."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 11000,
+  "rubric_notes": "Very long, prose-heavy. No bash install fences, no .env fenced template, no resolvable URLs. Code blocks are present and substantial but extractor would miss installs and env scaffold.",
+  "_judge_latency_s": 15.074067115783691,
+  "_judge_input_tokens": 31131,
+  "_judge_output_tokens": 941
+}

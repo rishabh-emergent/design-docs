@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Google Maps Places API (New)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I24-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoint places.googleapis.com/v1/places:autocomplete is correct for the New Places API. However, the New API typically requires X-Goog-Api-Key header (not ?key= query param) and is internally consistent but mixes patterns. Suggestion parsing uses s.get('displayText') as a method call which is incorrect for JS objects \u2014 actual v1 response uses suggestions[].placePrediction.text.text, not displayText. Self-consistency partial.",
+    "executability": "Backend FastAPI block is syntactically valid and would likely run. Frontend Autocomplete.jsx has a bug: s.get('displayText') is called as if it's a Map method on plain objects, which will throw at runtime when suggestions are rendered. Test file's PatchedAsyncClient passes transport via both kwargs and *args which may cause TypeError. No sandbox-infeasibility patterns (no ngrok/sudo).",
+    "completeness": "All 6 pieces present: (a) API key acquisition with URLs/menu steps, (b) pip and npm install blocks, (c) .env.example with exact names, (d) backend code in fenced block, (e) frontend code in fenced block, (f) test commands via pytest/jest implied. env var names (GOOGLE_API_KEY, ALLOWED_ORIGINS, REACT_APP_API_BASE_URL) are referenced consistently in code. No explicit single test run command shown clearly \u2014 light gap.",
+    "citation_anchoring": "Official Google Maps docs URLs (developers.google.com/maps/documentation/places/...) cited near relevant code blocks. FastAPI official docs and HTTPX official docs also cited inline near code. Citations placed contextually, not just at end."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2900,
+  "rubric_notes": "docs_unavailable=true so long-tail handling applied: internally consistent endpoint/version claims but suggestion parsing pattern (s.get as method, displayText field) is inconsistent with itself and likely wrong for v1 response shape. Auth method via ?key= param vs the documented X-Goog-Api-Key header is a known concern but cannot be verified without docs.",
+  "_judge_latency_s": 16.89561128616333,
+  "_judge_input_tokens": 11855,
+  "_judge_output_tokens": 1025
+}

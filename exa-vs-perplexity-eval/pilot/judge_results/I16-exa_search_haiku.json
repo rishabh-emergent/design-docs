@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Telegram Bot inline keyboard + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I16-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Telegram Bot API methods (sendMessage, answerCallbackQuery, editMessageText, setWebhook with secret_token param) are consistent and match documented surface. However, the constraint specifies 'Verify update via secret token header' (X-Telegram-Bot-Api-Secret-Token), but the code only validates the secret embedded in the URL path, not the header. setWebhook does pass secret_token correctly but the verification is misaligned with the canonical pattern.",
+    "executability": "Fenced Python blocks parse cleanly. Imports look complete. Sandbox concerns: testing section uses openssl for self-signed certs and instructs running on port 8443 with SSL; production sections reference Railway/Vercel deployment but these are optional. The 'test' command is a curl against https://localhost:8443 requiring prior SSL setup, which is borderline sandbox-feasible. The 'pip install uvicorn[standard]' inside a code block may be parsed as install. Multiple code blocks (main.py, set_webhook.py, vercel.json, Dockerfile) \u2014 extractor may concatenate or overwrite files since filenames are in prose headers, not enforced.",
+    "completeness": "(a) Token acquisition via @BotFather described; (b) pip install in bash present; (c) .env template with exact var names; (d) backend code present; (e) N/A frontend; (f) test commands present (curl + set_webhook.py). Multiple python blocks without clear file boundaries for extractor \u2014 vercel.json shown as ```python which is wrong. Env vars listed match those referenced in code.",
+    "citation_anchoring": "Cites core.telegram.org/bots/api (official) plus many third-party GitHub repos and dev.to blog. Official URL present but listed only in SOURCES section at end, not inline near relevant code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "Constraint asks for secret token header verification; playbook uses URL path secret instead (still sets secret_token in setWebhook but doesn't check the X-Telegram-Bot-Api-Secret-Token header). This is a partial mismatch with the stated requirement. vercel.json fenced as ```python could confuse extractor.",
+  "_judge_latency_s": 16.837234020233154,
+  "_judge_input_tokens": 12609,
+  "_judge_output_tokens": 1050
+}

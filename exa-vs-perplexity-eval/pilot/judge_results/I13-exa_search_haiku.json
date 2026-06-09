@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Instagram Login Business (Graph)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I13-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current Instagram Login endpoints (www.instagram.com/oauth/authorize, graph.instagram.com, scopes instagram_business_basic and instagram_business_content_publish). API version v24.0 consistent. No deprecated Basic Display traps detected. Internally consistent and explicitly avoids deprecated API.",
+    "executability": "pip commands shown as separate lines (not requirements.txt despite reference). Frontend uses 'npm install axios==1.6.2' which is invalid npm syntax (should be @1.6.2). react-router-dom is used but never installed. Backend OAuth callback handler is POST while Instagram will redirect GET to /auth/callback \u2014 frontend route catches it but backend route /auth/callback is POST-only, which is fine since frontend handles the redirect. Multiple non-obvious fixes needed.",
+    "completeness": "All six pieces present: (a) credential acquisition with URL/menu, (b) install commands (with npm syntax error), (c) .env template with exact names, (d) backend code, (e) frontend code, (f) test command/tests. Env vars referenced match those listed. Test file is cut off at end.",
+    "citation_anchoring": "Only inline [1] markers with no actual URL references listed. No canonical developers.facebook.com/docs/instagram-platform URL placed near code. Reference list appears truncated/missing."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "instagram_business_basic",
+      "graph.instagram.com"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 4200,
+  "rubric_notes": "Playbook appears truncated mid-test-file. npm install with == version syntax is invalid (npm uses @). react-router-dom dependency missing from install list.",
+  "_judge_latency_s": 14.675932884216309,
+  "_judge_input_tokens": 14443,
+  "_judge_output_tokens": 866
+}

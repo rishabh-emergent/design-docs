@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Auth0 New Universal Login + RBAC",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I11-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Auth0 React SDK usage (Auth0Provider, loginWithRedirect, getAccessTokenSilently) is internally consistent with current SDK shape. However, backend uses jwt.get_unverified_claims (no signature verification) for the protected endpoint \u2014 functionally incorrect for RBAC enforcement though syntactically valid. auth0-fastapi package symbols (Auth0Config, AuthClient, register_auth_routes) cannot be verified; long-tail handling applies \u2014 consistent internally with claimed version.",
+    "executability": "App.jsx references useAuth0 without import (undefined symbol) \u2014 runtime ReferenceError. main.py imports succeed only if auth0-fastapi exposes those exact symbols (unverified). git clone of external repos is sandbox-feasible but mixing cloned-repo code with inline main.py creates ambiguity for the extractor about which file wins. Test file imports application.main which depends on env vars at import time \u2014 may fail. Multiple non-obvious fixes needed.",
+    "completeness": "(a) acquisition steps present and detailed; (b) bash install blocks present; (c) env template present with exact names; (d) backend code in fenced block; (e) frontend code present; (f) test command present. Env vars listed match those referenced. Some duplicate setup content (clone + inline code) creates conflicting samples. Light on which file path inline code overwrites in the cloned repo.",
+    "citation_anchoring": "Official auth0.com/docs and developer.auth0.com URLs cited at end with inline [1]-[4] markers near relevant sections. No fabricated URLs detected. Placement is end-of-doc with inline reference numbers rather than full URLs near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3400,
+  "rubric_notes": "App.jsx missing useAuth0 import is a clear executability defect. Backend RBAC check uses unverified JWT claims \u2014 security flaw acknowledged later in section 8.4 but the extracted main.py is what runs.",
+  "_judge_latency_s": 16.645861864089966,
+  "_judge_input_tokens": 13255,
+  "_judge_output_tokens": 909
+}

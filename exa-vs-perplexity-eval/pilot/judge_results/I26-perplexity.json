@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "UploadThing v6 file upload",
+  "template_stack": "nextjs",
+  "playbook_id": "I26-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent v6 usage: createUploadthing, createRouteHandler, generateUploadButton/Dropzone, FileRouter type, image shorthand and MIME-key configs with maxFileSize/maxFileCount. Pins to v6 explicitly. No deprecated traps; consistent and version-claimed long-tail handling.",
+    "executability": "Multiple fenced blocks but they are scattered across many files with ambiguous paths (e.g., ~/src vs src/utils), import path '~/app/api/uploadthing/core' assumes tsconfig path alias not configured. Test imports rely on internal `_def.routerConfig` private fields which likely won't exist. Mentions ngrok/Cloudflare Tunnels but as background, not required; not a sandbox blocker. Several non-obvious fixes required.",
+    "completeness": "(a) API key acquisition described only in prose, no explicit dashboard URL/menu path; (b) install bash present; (c) env template present (.env.local); (d) backend File Router + route handler present; (e) frontend page + utils present; (f) test command via Vitest mentioned with script suggestion but no explicit single runnable test command block following a Test header. Some duplication between sections. Env vars mentioned consistently.",
+    "citation_anchoring": "Uses bracketed numeric citations [5][9][25] etc. with no actual URLs to docs.uploadthing.com inlined; only generic mention of 'the docs'. No canonical official URLs cited as links near code. Effectively no official-docs URLs anchored."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Playbook is internally consistent and version-pinned (v6), warranting 4 on correctness. Citation anchoring suffers from numeric refs without URLs.",
+  "_judge_latency_s": 15.890850067138672,
+  "_judge_input_tokens": 23400,
+  "_judge_output_tokens": 919
+}

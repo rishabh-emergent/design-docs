@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Discord OAuth2 + bot slash command",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I15-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoints (/api/v10/oauth2/token, /applications/{app}/guilds/{guild}/commands) and scopes are internally consistent. However, Discord interaction signature verification uses Ed25519, not HMAC-SHA256 \u2014 the verify_discord_signature implementation is incorrect and will reject all real Discord interactions.",
+    "executability": "FastAPI handler signature for /interactions uses `body: bytes` and header params without Header(...) dependency \u2014 FastAPI will treat them as query params, breaking signature verification. Passing Authorization via query param to /user and /guilds is unusual but parseable. No sandbox-infeasible patterns (no ngrok/sudo). Multiple non-obvious fixes needed.",
+    "completeness": "All six pieces present: (a) acquisition steps, (b) pip/npm in bash, (c) env template, (d) backend code, (e) frontend code, (f) test commands. Env vars listed match those referenced. Slight prose around 'YOUR_CLIENT_ID' placeholders but extractable.",
+    "citation_anchoring": "Cites docs.discord.com URLs (note: actual canonical is discord.com/developers/docs) inline as [1][5][10]. Mix of official-looking and third-party (github, readthedocs). Domain 'docs.discord.com' may be fabricated \u2014 Discord's official docs live at discord.com/developers/docs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2700,
+  "rubric_notes": "docs_unavailable=true; scored on internal consistency. Major correctness issue: HMAC-SHA256 used instead of Ed25519 for Discord signature verification \u2014 Discord explicitly requires Ed25519. This is a fabricated/incorrect core supporting call, capping correctness at 2. Discord docs URL 'docs.discord.com' is non-canonical (real is discord.com/developers/docs).",
+  "_judge_latency_s": 15.341186046600342,
+  "_judge_input_tokens": 11561,
+  "_judge_output_tokens": 877
+}

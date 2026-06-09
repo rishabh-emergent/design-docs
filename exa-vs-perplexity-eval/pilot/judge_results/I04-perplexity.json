@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PhonePe PG v2 UPI",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I04-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent v2 API surface: /v1/oauth/token, /checkout/v2/pay, /checkout/v2/order/{id}/status, O-Bearer header, client_credentials grant. X-VERIFY SHA256(base64+path+salt)###index matches documented pattern. No clear deprecated v1 trap; consistent and version-claimed (v2 post-2024).",
+    "executability": "Python typo `cancelled = True` in JSX cleanup (should be `true`). Pydantic v1 BaseSettings import (`from pydantic import BaseSettings`) deprecated in v2 \u2014 needs pydantic-settings. `str | None` requires Python 3.10+. Multiple code blocks would write to same main.py (partial). Webhook hash comparison may miss SHA256 hex case. Several fixes needed.",
+    "completeness": "(a) credential acquisition described (PhonePe Business Dashboard, Developer Settings); (b) install commands present as requirements.txt not bash pip install; (c) env vars referenced via Settings class but no explicit .env template block with KEY=VALUE; (d) backend code present though split into 'partial' fragments; (e) frontend code present; (f) test command absent \u2014 pytest example shown but no test invocation command. Env var names listed only via Pydantic field names, not extractable .env template.",
+    "citation_anchoring": "Citations are bare bracketed numbers [14][22][7] etc. with no URLs to developer.phonepe.com. No canonical official docs URL anywhere in the document. Cannot verify any citation source."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "docs_unavailable=true: applied long-tail handling. Internal consistency strong, version claimed (v2), so correctness scored 4. Citations as numeric markers with no URLs hurts anchoring badly. Completeness reduced for split 'partial' code blocks that a deterministic extractor would concatenate incorrectly, missing explicit .env template, and missing test command in bash block.",
+  "_judge_latency_s": 15.987850904464722,
+  "_judge_input_tokens": 26418,
+  "_judge_output_tokens": 982
+}

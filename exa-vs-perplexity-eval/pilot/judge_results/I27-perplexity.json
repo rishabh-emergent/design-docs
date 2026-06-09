@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PostHog flags + capture",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I27-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: posthog.init, PostHogProvider, useFeatureFlagEnabled, posthog.identify, posthog.capture (JS); Posthog(api_key, host) and capture(distinct_id, event, properties) (Python). Hosts us.i.posthog.com / eu.i.posthog.com match known patterns. No version pin claimed but method names self-consistent.",
+    "executability": "Code blocks parse. Issue: imports `flush` from `posthog` top-level (likely should be posthog_client.flush()); uses `Posthog | None` union syntax (needs Python 3.10+, claimed). Test imports posthog_client at module load before lifespan runs, so posthog_client is None \u2014 assertions guarded by `if posthog_client is not None` will silently skip. Frontend fetch uses relative '/signup' with no CORS/proxy config noted. Multiple non-obvious fixes needed.",
+    "completeness": "(a) Key acquisition described in prose (project settings) without exact URL/menu path; (b) install commands present in bash; (c) env templates present for both frontend (VITE_) and backend (POSTHOG_); (d) backend code in fenced blocks; (e) frontend code in fenced blocks; (f) test commands implicit (pytest, vitest) but no explicit single test command block. Env var names consistent between template and code.",
+    "citation_anchoring": "Numerous bracketed numeric citations [1][2]... but no actual URLs provided. No posthog.com/docs links anywhere. Citations are unresolvable references."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 4800,
+  "rubric_notes": "docs_unavailable: long-tail handling applied. Self-consistent + no version pin, gets 4 on correctness. Citation numerals without URLs = fabricated/unresolvable -> score 1.",
+  "_judge_latency_s": 14.791071891784668,
+  "_judge_input_tokens": 14678,
+  "_judge_output_tokens": 913
+}

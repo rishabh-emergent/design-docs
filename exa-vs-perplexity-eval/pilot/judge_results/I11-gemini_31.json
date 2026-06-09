@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Auth0 New Universal Login + RBAC",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I11-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: @auth0/auth0-react SDK with loginWithRedirect/getAccessTokenSilently and authorizationParams.audience is current API. FastAPI uses PyJWKClient with RS256 and audience/issuer verification, which is consistent. No version pinned but methods are self-consistent across the playbook.",
+    "executability": "Fenced blocks parse cleanly. Minor gap: uses os.getenv but no python-dotenv import/load; .env file in backend won't auto-load unless uvicorn loads it externally. One trivial fix needed. No sandbox-infeasible patterns detected.",
+    "completeness": "All six pieces present: (a) Auth0 dashboard acquisition steps with menu paths, (b) bash install blocks, (c) explicit env templates for both frontend and backend with matching names referenced in code, (d) FastAPI main.py, (e) React index.js + App.js, (f) test commands and procedures. Env vars listed match references.",
+    "citation_anchoring": "No URLs to auth0.com/docs or any official documentation anywhere in the playbook. No citations at all."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1350,
+  "rubric_notes": "docs_unavailable: scored on internal consistency. Strong self-consistency. Citation dimension hits floor due to zero URLs.",
+  "_judge_latency_s": 13.814913034439087,
+  "_judge_input_tokens": 7529,
+  "_judge_output_tokens": 688
+}

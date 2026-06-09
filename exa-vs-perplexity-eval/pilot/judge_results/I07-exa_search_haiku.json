@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Flutterwave Standard (Nigeria)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I07-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses Flutterwave v3 API endpoints (api.flutterwave.com/v3/transactions/{id}/verify) and flutterwave-react-v3 hooks (useFlutterwave, closePaymentModal), which are internally consistent. rave_python is imported in requirements but not actually used in code \u2014 minor inconsistency. Versions claimed (rave_python==1.4.2, flutterwave-react-v3 v1.3.3). Long-tail handling: consistent + version claimed.",
+    "executability": "Fenced blocks parse cleanly. Backend uses httpx directly (not rave_python despite requirements). Imports complete. CORS configured. Test cards documented. No sandbox-infeasible patterns (no ngrok/sudo). Webhook endpoint included but signature verification stubbed. Minor: rave_python listed but unused \u2014 won't break execution.",
+    "completeness": "All 6 pieces present: (a) API key acquisition with dashboard path, (b) pip+npm install in bash, (c) .env templates for backend and frontend with exact names matching code references, (d) backend FastAPI code, (e) frontend React code, (f) test command with curl/Postman examples and test cards. Env vars match between listed and referenced.",
+    "citation_anchoring": "Sources include flutterwaveinc.mintlify.app (not the canonical developer.flutterwave.com), GitHub repos, npm registry, and a third-party blog. No citations to the canonical developer.flutterwave.com domain. Citations only at end, not anchored near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2900,
+  "rubric_notes": "rave_python listed in requirements but backend implements verify via raw httpx \u2014 minor inconsistency with constraint 'rave-python current' but doesn't break execution. Citations use mintlify mirror rather than canonical developer.flutterwave.com.",
+  "_judge_latency_s": 14.817535161972046,
+  "_judge_input_tokens": 11163,
+  "_judge_output_tokens": 935
+}

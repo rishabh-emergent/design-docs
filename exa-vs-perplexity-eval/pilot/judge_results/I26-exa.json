@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "UploadThing v6 file upload",
+  "template_stack": "nextjs",
+  "playbook_id": "I26-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent v6 API surface: createUploadthing, createRouteHandler, generateUploadButton/Dropzone, UTApi with token, FileRouter type. file.ufsUrl is v6-correct. Claims v6 explicitly.",
+    "executability": "Code blocks parse, but playbook recommends ngrok/Cloudflare Tunnel for local callback testing (sandbox-infeasible pattern). Import paths mix ~/app and ~/src/utils which may not resolve without tsconfig. Caps EXECUTABILITY at 2 due to ngrok mention.",
+    "completeness": "(a) dashboard URL given; (b) install in bash; (c) env template UPLOADTHING_TOKEN; (d) server core.ts + route.ts; (e) client page + utils; (f) test command present via jest. All six present but no top-level explicit test run script invocation.",
+    "citation_anchoring": "Multiple official docs.uploadthing.com URLs placed inline next to each relevant code block; matches canonical pattern for UploadThing."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok",
+      "Cloudflare Tunnel"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2400,
+  "rubric_notes": "docs_unavailable: applied long-tail handling \u2014 playbook is internally consistent and version-claimed (v6), scoring 4 on correctness. Sandbox-infeasibility (ngrok) caps executability at 2.",
+  "_judge_latency_s": 11.37038516998291,
+  "_judge_input_tokens": 9874,
+  "_judge_output_tokens": 703
+}

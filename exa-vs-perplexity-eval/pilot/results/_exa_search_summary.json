@@ -1,0 +1,9 @@
+{
+  "elapsed_s": 193.35575413703918,
+  "n_integrations": 29,
+  "n_ok": 29,
+  "avg_latency_s": 47.036945564993495,
+  "avg_chars": 20957.379310344826,
+  "total_cost_dollars": 2.794,
+  "avg_cost_dollars": 0.0963
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "ElevenLabs websocket streaming TTS",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I19-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: uses wss://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream-input with xi-api-key header, model_id eleven_flash_v2_5, base64 audio field decode \u2014 all match the known ElevenLabs realtime TTS contract. No version date stated but method names are consistent across backend and client.",
+    "executability": "Backend uses websockets.connect(extra_headers=...) which works on websockets<14 but was renamed to additional_headers in v14+; pip install pins no version. Client expects PCM but no output_format is sent in the initial message to ElevenLabs (which requires a BOS message with voice_settings/output_format before text), so audio format will default and may not match the client's 44100 assumption. AudioWorklet served from /public is standard CRA. No sandbox-infeasible patterns (no ngrok/sudo).",
+    "completeness": "(a) API key acquisition mentioned but no explicit URL/menu path to obtain ELEVEN_API_KEY from elevenlabs.io. (b) install bash blocks present. (c) .env template present (ELEVEN_API_KEY, ELEVEN_BASE). (d) backend main.py complete. (e) frontend TTSPlayer + worklet complete. (f) test command shown as pytest snippet but no explicit single run command. Env vars listed match those referenced.",
+    "citation_anchoring": "Official elevenlabs.io/docs URLs cited inline near relevant code (header auth, audio formats). Mix of official (FastAPI, MDN, ElevenLabs) and third-party (Strapi blog, SmashingMagazine, StackOverflow, GitHub issues). Official docs present and placed near code, but heavy reliance on third-party links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3600,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Internally consistent, version not explicitly dated. Potential extra_headers vs additional_headers gotcha on websockets v14+ could cause TypeError at runtime depending on installed version.",
+  "_judge_latency_s": 16.1024968624115,
+  "_judge_input_tokens": 14031,
+  "_judge_output_tokens": 1002
+}

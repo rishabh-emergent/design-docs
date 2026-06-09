@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Cloudflare R2 presigned PUT",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I25-gemini_31",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: boto3 client with R2 endpoint URL https://{account_id}.r2.cloudflarestorage.com, region 'auto', s3v4 signature, generate_presigned_url with put_object \u2014 all standard R2 patterns. No version claim made but methods self-consistent.",
+    "executability": "FastAPI and React code parse cleanly, imports present. Minor: frontend uses CRA (create-react-app) which is now deprecated but still functional; no .env file shown though os.getenv has defaults. No sandbox blockers detected.",
+    "completeness": "(a) API key acquisition with dashboard menu path present; (b) pip install bash block present; (c) env var names listed in code with os.getenv (CF_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME) though no separate .env template block; (d) backend code present; (e) frontend code present; (f) test command present. Env vars consistent between listed and referenced.",
+    "citation_anchoring": "No URLs to developers.cloudflare.com/r2 or any official docs cited anywhere in the playbook."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 1100,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. Playbook is internally consistent and uses correct R2-specific patterns (auto region, s3v4, r2.cloudflarestorage.com endpoint). No explicit .env template block but env vars are clearly named in os.getenv calls.",
+  "_judge_latency_s": 12.603450059890747,
+  "_judge_input_tokens": 7010,
+  "_judge_output_tokens": 827
+}

@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Solana @solana/web3.js v2 transfer",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I20-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Playbook claims to use @solana/web3.js v2 but the backend uses solders + raw JSON-RPC (not web3.js at all), and the frontend imports VersionedTransaction/sendAndConfirmTransaction from @solana/web3.js \u2014 these are v1 API surfaces, not v2's createSolanaRpc tree-shakable functions. Packages like @solana/react-hooks, @solana/client (with createClient/autoDiscover), @solana/kit appear fabricated/inconsistent with v2's actual API. Constraint explicitly required createSolanaRpc, which is absent.",
+    "executability": "Frontend code has explicit placeholder comments ('This is a placeholder for client-side signing flow', 'In production, relay signed tx through RPC') \u2014 transaction is never actually signed or broadcast. Imports from likely non-existent packages (@solana/react-hooks, @solana/client, @solana/kit). Pydantic model declares amount_lamports as int but frontend sends string. Multiple non-trivial fixes required.",
+    "completeness": "Has install commands, .env.example, backend code, frontend code, test command. Missing: no API key acquisition (Solana devnet is keyless \u2014 acceptable). However, the e2e example contains explicit placeholder TODOs/'...' style comments violating constraint (c). Env vars consistent between listed and referenced.",
+    "citation_anchoring": "Cites solana.com/docs and github.com/solana-foundation repos (semi-official) inline near code via [n] markers, plus third-party blog. No fabricated URLs detected, but canonical docs.solana.com / solana-labs.github.io references are mixed with many GitHub source links."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [
+      "new Connection() implied via VersionedTransaction/sendAndConfirmTransaction from @solana/web3.js"
+    ],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3800,
+  "rubric_notes": "Playbook nominally targets web3.js v2 but never uses createSolanaRpc; backend bypasses web3.js entirely using solders, frontend uses v1-style imports. Contains explicit placeholder comments admitting incomplete signing flow, violating no-TODO constraint. docs_unavailable=true so long-tail handling applied \u2014 internal inconsistency (claims v2, uses v1 + fabricated package names) drives CORRECTNESS down.",
+  "_judge_latency_s": 18.678220987319946,
+  "_judge_input_tokens": 12679,
+  "_judge_output_tokens": 1092
+}

@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Google Maps Places API (New)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I24-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 4,
+    "completeness": 5,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Endpoint places.googleapis.com/v1/places:autocomplete with X-Goog-Api-Key header and camelCase body fields (locationBias, includedPrimaryTypes, languageCode, sessionToken) is internally consistent and matches the new Places API v1 surface. No deprecated legacy /maps/api/place/autocomplete/json calls used.",
+    "executability": "Fenced blocks parse. Minor issues: npm install commands use `npm install react==18.2.0` (npm syntax is `react@18.2.0` \u2014 `==` will fail), and `dotenv` on frontend is unnecessary for CRA. Backend code is complete and importable. No ngrok/sudo/sandbox blockers.",
+    "completeness": "All six pieces present: (a) API key acquisition with console path; (b) pip/npm installs in bash; (c) env var template with GOOGLE_PLACES_API_KEY and REACT_APP_API_URL; (d) backend main.py; (e) frontend tsx components; (f) pytest + jest test commands. Env vars referenced match those listed.",
+    "citation_anchoring": "Multiple canonical developers.google.com/maps URLs cited including the v1 REST reference [10] and place-autocomplete-new [8]; inline [1] markers placed near relevant code. No fabricated URLs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3200,
+  "rubric_notes": "npm install syntax with `==` instead of `@` is a real but trivial fix; capped EXECUTABILITY at 4. Docs unavailable: scored on internal consistency, which is high.",
+  "_judge_latency_s": 14.211867332458496,
+  "_judge_input_tokens": 12765,
+  "_judge_output_tokens": 843
+}

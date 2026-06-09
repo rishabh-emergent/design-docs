@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Better-Auth social + magic link (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I12-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent API usage: betterAuth() config with socialProviders.google, magicLink plugin with sendMagicLink, toNextJsHandler, createAuthClient with magicLinkClient, authClient.signIn.magicLink and authClient.signIn.social \u2014 these match the documented better-auth surface. nextCookies() last-plugin rule noted. No version pinned but symbols self-consistent.",
+    "executability": "Install line `npm install better-auth better-auth/next-js better-auth/plugins better-auth/client/plugins` is wrong \u2014 these are subpath imports of the single `better-auth` package, not separate npm packages; npm will fail. Also `database: { type: 'sqlite', filename }` is not a valid better-auth database config (expects a Database instance/adapter). Both require non-obvious fixes before code runs.",
+    "completeness": "All six pieces present: install bash block, .env template with exact names, server lib/auth.ts, client lib/auth-client.ts, sign-in page + dashboard, Google credential acquisition steps with URL, and test bash commands. Env vars listed match those referenced in code.",
+    "citation_anchoring": "Cites better-auth GitHub docs source (github.com/better-auth/better-auth/...) and mintlify mirror, plus third-party (medium, makerkit, prismagraphql). Sources are listed only at end, not anchored near code. No canonical better-auth.com URL but GitHub repo docs are official-equivalent."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2300,
+  "rubric_notes": "docs_unavailable=true so long-tail handling applied: internal consistency strong, version not pinned \u2014 capped CORRECTNESS at 4. Install command bug is the main executability hit.",
+  "_judge_latency_s": 15.081747055053711,
+  "_judge_input_tokens": 9611,
+  "_judge_output_tokens": 890
+}

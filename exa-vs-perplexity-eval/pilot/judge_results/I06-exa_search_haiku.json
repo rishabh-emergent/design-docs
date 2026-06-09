@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Xendit virtual account",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I06-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "xendit-python==0.2.0 pinned is suspect; the SDK import paths (xendit.apis.PaymentRequestApi, xendit.payment_request.model.*) appear fabricated/inconsistent \u2014 xendit.set_api_key + xendit.ApiClient() coexisting is contradictory. No version date claimed. Long-tail: internally inconsistent SDK usage.",
+    "executability": "Pydantic v2 used (pydantic==2.5.0) but Field(regex=...) is invalid in v2 (must be 'pattern'), causing ImportError/validation error at startup. pydantic_settings imported but not in requirements. Frontend code block is truncated mid-CSS (unterminated fence), so extractor will fail to close the block. Multiple non-obvious fixes required.",
+    "completeness": "(a) key acquisition present; (b) install commands present; (c) env template present; (d) backend code present; (e) frontend code present but TRUNCATED mid-file; (f) no explicit test command/section. Truncation and missing test cmd are critical gaps.",
+    "citation_anchoring": "References like [1][2][10] are used throughout but no actual URLs or citation list is shown (truncated). developer.xendit.co not cited. Effectively no anchored official docs URLs."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3800,
+  "rubric_notes": "Playbook appears truncated at end of CSS block; pydantic v2 regex= is a hard runtime error; SDK API surface looks fabricated/inconsistent.",
+  "_judge_latency_s": 13.411489963531494,
+  "_judge_input_tokens": 14305,
+  "_judge_output_tokens": 748
+}

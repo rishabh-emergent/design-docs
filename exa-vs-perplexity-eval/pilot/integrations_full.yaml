@@ -1,0 +1,355 @@
+# Full 28-integration eval set (from eval-harness-design.md §2.1).
+# Pilot ran 7 (I02 I07 I10 I13 I17 I20 I24); harness skips if result file exists.
+
+- id: I01
+  name: Stripe Payment Element (one-time + sub)
+  stratum: payments-global
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Stripe Payment Element one-time and subscription"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: SaaS app with BOTH one-time digital product purchase AND monthly subscription billing, both via Stripe Payment Element (NOT legacy Card Element).
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions: stripe-python>=8.0 and @stripe/stripe-js latest.
+      (c) Webhook handler for invoice.paid AND payment_intent.succeeded.
+
+- id: I02
+  name: Lemon Squeezy hosted checkout
+  stratum: payments-global
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Lemon Squeezy"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: One-time digital product purchase via Lemon Squeezy hosted checkout with signed webhook verification on order_created.
+    Requirements:
+      (a) Include all required env vars in a .env.example block.
+      (b) Use exact pip/npm package names with specific versions (>= or pinned).
+      (c) Include a single working end-to-end example with no placeholder TODOs or "..." comments.
+    lemonsqueezy.py current.
+
+- id: I03
+  name: Stripe Connect Express
+  stratum: payments-global
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Stripe Connect Express marketplace application_fee"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Marketplace where sellers onboard via Stripe Connect Express, and the platform takes 10% application_fee on each PaymentIntent.
+    Requirements:
+      (a)(b)(c). stripe-python>=8.0.
+
+- id: I04
+  name: PhonePe PG v2 UPI
+  stratum: payments-regional
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "PhonePe Payment Gateway v2 UPI"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Indian B2C UPI payment via PhonePe Payment Gateway v2 (the post-2024 API, NOT deprecated v1).
+    Requirements:
+      (a)(b)(c). Include X-VERIFY checksum header generation.
+
+- id: I05
+  name: Paytm All-in-One Web SDK
+  stratum: payments-regional
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Paytm All-in-One Web SDK"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Paytm Payment Gateway All-in-One Web checkout for INR e-commerce cart.
+    Requirements:
+      (a)(b)(c). Server-side initiate-transaction; JS bridge on frontend.
+
+- id: I06
+  name: Xendit virtual account
+  stratum: payments-regional
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Xendit virtual account Indonesia"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Indonesian virtual-account creation via Xendit with callback handler for payment confirmation.
+    Requirements:
+      (a)(b)(c). xendit-python current.
+
+- id: I07
+  name: Flutterwave Standard (Nigeria)
+  stratum: payments-regional
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Flutterwave"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Flutterwave Standard checkout for Nigerian NGN cards + mobile money with transaction verification on redirect.
+    Requirements:
+      (a)(b)(c). rave-python current.
+
+- id: I08
+  name: MercadoPago Checkout Pro (LatAm)
+  stratum: payments-regional
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "MercadoPago Checkout Pro Argentina ARS"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Argentinian ARS payment via MercadoPago Checkout Pro with webhook for payment.updated.
+    Requirements:
+      (a)(b)(c). mercadopago-python current.
+
+- id: I09
+  name: Clerk clerkMiddleware (nextjs)
+  stratum: auth
+  freshness: HIGH
+  tech_stack: [nextjs, React]
+  query: "Clerk clerkMiddleware @clerk/nextjs"
+  constraints: |
+    Template stack: nextjs (App Router).
+    Use case: Clerk-based email + Google OAuth sign-in using clerkMiddleware from @clerk/nextjs current (NOT the deprecated authMiddleware). Protect /dashboard route.
+    Requirements:
+      (a)(b)(c).
+
+- id: I10
+  name: Supabase auth v2
+  stratum: auth
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Supabase Auth"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Supabase email/password auth using @supabase/supabase-js v2.x (NOT v1's signIn).
+    Requirements:
+      (a)(b)(c). FastAPI verifies JWT with project JWT secret.
+
+- id: I11
+  name: Auth0 New Universal Login + RBAC
+  stratum: auth
+  freshness: LOW
+  tech_stack: [FastAPI, React]
+  query: "Auth0 New Universal Login RBAC"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Auth0 New Universal Login with Google + email-password, plus RBAC via Auth0 permissions claim in the access token.
+    Requirements:
+      (a)(b)(c).
+
+- id: I12
+  name: Better-Auth social + magic link (nextjs)
+  stratum: auth
+  freshness: HIGH
+  tech_stack: [nextjs, React]
+  query: "better-auth social magic link"
+  constraints: |
+    Template stack: nextjs (App Router).
+    Use case: better-auth social (Google) + magic-link email auth using the better-auth current release (not next-auth, not Auth.js).
+    Requirements:
+      (a)(b)(c).
+
+- id: I13
+  name: Instagram Login Business (Graph)
+  stratum: social/msg
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Instagram Login Business"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Login with Instagram for a Business/Creator account via Instagram Login (Instagram Graph API), scopes instagram_business_basic and instagram_business_content_publish. NOT the deprecated Instagram Basic Display API.
+    Requirements:
+      (a)(b)(c).
+
+- id: I14
+  name: WhatsApp Cloud API + webhook
+  stratum: social/msg
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "WhatsApp Cloud API template message webhook"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Send WhatsApp template message via WhatsApp Cloud API (NOT On-Premises API), receive delivery webhook with verified X-Hub-Signature-256.
+    Requirements:
+      (a)(b)(c).
+
+- id: I15
+  name: Discord OAuth2 + bot slash command
+  stratum: social/msg
+  freshness: LOW
+  tech_stack: [FastAPI, React]
+  query: "Discord OAuth2 bot slash command"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Discord OAuth2 login (scopes 'identify guilds'), AND a bot that registers a guild-scoped slash command via the application commands REST endpoint.
+    Requirements:
+      (a)(b)(c).
+
+- id: I16
+  name: Telegram Bot inline keyboard + webhook
+  stratum: social/msg
+  freshness: LOW
+  tech_stack: [FastAPI]
+  query: "Telegram bot inline keyboard webhook"
+  constraints: |
+    Template stack: FastAPI backend.
+    Use case: Telegram bot with inline keyboard buttons, served via webhook (NOT long-polling). Verify update via secret token header.
+    Requirements:
+      (a)(b)(c).
+
+- id: I17
+  name: OpenAI Responses API + SSE
+  stratum: AI/ML
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "OpenAI Responses API streaming"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: OpenAI Responses API (the newer endpoint, NOT Chat Completions) with server-sent-events streaming to the React client, displaying token-by-token output AND final usage block (input/output/cache tokens).
+    Requirements:
+      (a)(b)(c).
+
+- id: I18
+  name: Anthropic Messages + tool_use + cache_control
+  stratum: AI/ML
+  freshness: MED
+  tech_stack: [FastAPI]
+  query: "Anthropic Messages API tool_use prompt caching"
+  constraints: |
+    Template stack: FastAPI backend.
+    Use case: Anthropic Messages API with tool_use, prompt-caching via cache_control on system + tools, and streaming.
+    Requirements:
+      (a)(b)(c). anthropic-python current.
+
+- id: I19
+  name: ElevenLabs websocket streaming TTS
+  stratum: AI/ML
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "ElevenLabs realtime websocket TTS streaming"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: ElevenLabs realtime websocket TTS streaming PCM to a browser AudioContext (NOT the simple HTTP endpoint).
+    Requirements:
+      (a)(b)(c).
+
+- id: I20
+  name: Solana @solana/web3.js v2 transfer
+  stratum: web3
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Solana web3.js v2 SOL transfer"
+  constraints: |
+    Template stack: FastAPI backend (server-signed) + React.
+    Use case: Send a SOL transfer transaction using @solana/web3.js >=2.0 (functional/tree-shakable API with createSolanaRpc, NOT v1's new Connection).
+    Requirements:
+      (a)(b)(c).
+
+- id: I21
+  name: wagmi v2 + viem connect + sign (nextjs)
+  stratum: web3
+  freshness: HIGH
+  tech_stack: [nextjs, React]
+  query: "wagmi v2 viem MetaMask USDC Base"
+  constraints: |
+    Template stack: nextjs (App Router) + wagmi v2 + viem.
+    Use case: Connect MetaMask, read user's USDC balance on Base, sign an arbitrary message. NOT wagmi v1.
+    Requirements:
+      (a)(b)(c).
+
+- id: I22
+  name: Alchemy NFT API v3 owned NFTs
+  stratum: web3
+  freshness: MED
+  tech_stack: [FastAPI]
+  query: "Alchemy NFT API v3 owned NFTs"
+  constraints: |
+    Template stack: FastAPI backend.
+    Use case: Use Alchemy NFT API v3 (NOT v2) to list NFTs owned by an Ethereum address, including media URLs and floor price.
+    Requirements:
+      (a)(b)(c).
+
+- id: I23
+  name: Mapbox GL JS v3 + Directions
+  stratum: geo/maps
+  freshness: MED
+  tech_stack: [FastAPI, React]
+  query: "Mapbox GL JS v3 Directions API session token"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Mapbox GL JS v3 map with a route drawn via the Mapbox Directions API between two clicked points. Use the new session-token billing approach.
+    Requirements:
+      (a)(b)(c).
+
+- id: I24
+  name: Google Maps Places API (New)
+  stratum: geo/maps
+  freshness: HIGH
+  tech_stack: [FastAPI, React]
+  query: "Google Maps Places API New autocomplete"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Address autocomplete using Google Maps Places API (New) — v1 endpoint at places.googleapis.com/v1/places:autocomplete, NOT the legacy Places API.
+    Requirements:
+      (a)(b)(c).
+
+- id: I25
+  name: Cloudflare R2 presigned PUT
+  stratum: storage
+  freshness: LOW
+  tech_stack: [FastAPI, React]
+  query: "Cloudflare R2 presigned PUT boto3"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Direct-from-browser upload to Cloudflare R2 via presigned PUT URL minted by FastAPI using boto3 with R2 endpoint. NOT S3.
+    Requirements:
+      (a)(b)(c).
+
+- id: I26
+  name: UploadThing v6 file upload (nextjs)
+  stratum: storage
+  freshness: MED
+  tech_stack: [nextjs, React]
+  query: "UploadThing v6 image upload"
+  constraints: |
+    Template stack: nextjs (App Router).
+    Use case: UploadThing v6 for image uploads with size + mime validation server-side. NOT v5.
+    Requirements:
+      (a)(b)(c).
+
+- id: I27
+  name: PostHog flags + capture
+  stratum: analytics
+  freshness: LOW
+  tech_stack: [FastAPI, React]
+  query: "PostHog JS React event capture feature flags posthog-python"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: PostHog JS in React (event capture + feature flag check) AND posthog-python in FastAPI for server-side identify on /signup.
+    Requirements:
+      (a)(b)(c).
+
+- id: I28
+  name: Mixpanel /import + Query API
+  stratum: analytics
+  freshness: LOW
+  tech_stack: [FastAPI]
+  query: "Mixpanel /import server-side event ingestion Query API"
+  constraints: |
+    Template stack: FastAPI backend.
+    Use case: Server-side event ingestion to Mixpanel /import (NOT /track), plus daily cohort export via Mixpanel Query API.
+    Requirements:
+      (a)(b)(c).
+
+- id: I29
+  name: Open-Meteo forecast + historical
+  stratum: weather
+  freshness: LOW
+  tech_stack: [FastAPI, React]
+  query: "Open-Meteo hourly forecast historical temperature"
+  constraints: |
+    Template stack: FastAPI+React.
+    Use case: Hourly forecast + last-7-days historical temperature for a user-entered city via Open-Meteo (free, no key). NOT OpenWeather.
+    Requirements:
+      (a)(b)(c).

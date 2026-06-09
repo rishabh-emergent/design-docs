@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "wagmi v2 + viem connect + sign (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I21-exa",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 3
+  },
+  "evidence": {
+    "correctness_and_freshness": "Config uses wagmi v1 patterns: imports `configureChains` (removed in v2), `publicClient` from viem (not exported that way), passes `publicClient` and `autoConnect` to `createConfig` (v2 takes `chains` and `transports`). `WagmiConfig` is also v1 (v2 uses `WagmiProvider`). InjectedConnector import path `wagmi/connectors/injected` is v1; v2 uses `injected()` from `wagmi/connectors`. useSignMessage API also v1-style (message in hook config + onSuccess). This violates 'NOT wagmi v1' constraint.",
+    "executability": "Config file will fail to import: `configureChains` doesn't exist in wagmi v2, `publicClient` is not a named viem export, `http` import path `viem/transports/http` is wrong. Multiple non-trivial fixes required across config, provider, connect, and sign components. Also missing QueryClientProvider wrapping required by wagmi v2.",
+    "completeness": "Install commands present; env template present; frontend code present; no backend needed; tests present. Missing a runnable test command in a bash block following Test header. API key acquisition is generic. Has duplicate balance examples (wagmi + viem) which is fine but config mixes APIs.",
+    "citation_anchoring": "Cites wagmi.sh, nextjs.org, base.org, Circle developers \u2014 relevant URLs near code. No canonical viem docs cited. URLs appear legitimate, not fabricated."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2800,
+  "rubric_notes": "Major issue: playbook claims wagmi v2 but code uses v1 APIs (configureChains, WagmiConfig, InjectedConnector class, useSignMessage with message option). Internal inconsistency with stated constraint.",
+  "_judge_latency_s": 14.358678102493286,
+  "_judge_input_tokens": 11617,
+  "_judge_output_tokens": 914
+}

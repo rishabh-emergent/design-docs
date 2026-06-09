@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Lemon Squeezy hosted checkout",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I02-perplexity",
+  "scores": {
+    "correctness_and_freshness": 2,
+    "executability": 1,
+    "completeness": 1,
+    "citation_anchoring": 1
+  },
+  "evidence": {
+    "correctness_and_freshness": "No actual code is provided \u2014 only prose descriptions. Mentions HMAC-SHA256 and X-Signature header which are correct for Lemon Squeezy, but no method signatures or endpoints to verify. References fictional 'compromised axios March 2026' which is hallucinated.",
+    "executability": "Zero fenced code blocks. No python/typescript/javascript/bash blocks at all. A pattern-matching extractor would produce no install commands, no env template, no code files, and no test command. Completely non-executable.",
+    "completeness": "None of the 6 pieces present in extractable form: (a) no acquisition URL in extractable form, (b) no ```bash install block, (c) no .env.example block, (d) no backend code fence, (e) no frontend code fence, (f) no test command. All described in prose only.",
+    "citation_anchoring": "Only bracketed numeric citations like [5][20][34] with no URLs. No docs.lemonsqueezy.com links anywhere. Zero official docs URLs cited."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 8500,
+  "rubric_notes": "Pure prose playbook with no fenced code blocks at all \u2014 worst case for deterministic extractor. Length is entirely filler. ngrok mention triggers sandbox infeasibility flag but executability already at floor.",
+  "_judge_latency_s": 11.768798828125,
+  "_judge_input_tokens": 24599,
+  "_judge_output_tokens": 718
+}

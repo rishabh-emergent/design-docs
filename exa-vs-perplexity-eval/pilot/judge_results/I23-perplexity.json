@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Mapbox GL JS v3 + Directions",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I23-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Directions API endpoint /directions/v5/{profile}/{coordinates} and lon,lat order are correct. Mapbox GL JS v3 init via mapboxgl.accessToken + new mapboxgl.Map is consistent. However, the 'session token billing' framing is honestly admitted to be adapted from Search Box (not actually a Directions billing concept) \u2014 internally consistent but the core premise (session-token billing for Directions) is fabricated/inaccurate. Uses pydantic BaseSettings v1 import (should be pydantic_settings in v2).",
+    "executability": "Code is split across many fenced blocks with prose between them, and main.py is built incrementally with overlapping imports (FastAPI imported twice, app = FastAPI() defined twice). A deterministic extractor concatenating python blocks would produce duplicate app instantiation and broken imports (from .models import ... when models are actually defined inline). pydantic BaseSettings import will fail in pydantic v2. fetch_directions is defined in a separate block from create_route which references it \u2014 order-dependent. No sandbox-infeasible patterns (no ngrok/sudo).",
+    "completeness": "(a) Token acquisition described in prose, no direct URL to console; (b) pip install present; (c) .env template present for both backend and frontend; (d) backend code present; (e) frontend code present; (f) test command 'pytest' present. Env var names consistent (MAPBOX_SECRET_TOKEN, MAPBOX_PUBLIC_TOKEN, VITE_MAPBOX_PUBLIC_TOKEN). Significant duplication across sections.",
+    "citation_anchoring": "Uses bracketed numeric refs [5][14][17] etc. throughout with no actual URLs resolved. No docs.mapbox.com URLs cited inline. Citations are opaque numbers without a bibliography visible \u2014 effectively unanchored."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 11500,
+  "rubric_notes": "docs_unavailable=true: applied long-tail handling. Playbook is internally consistent and claims version (GL JS v3, Directions v5) \u2014 but pydantic BaseSettings (v1 API) inconsistent with modern install. Multiple duplicated code blocks would confuse deterministic extractor. The session-token premise for Directions is honestly disclaimed as adapted, not native.",
+  "_judge_latency_s": 17.595348834991455,
+  "_judge_input_tokens": 30844,
+  "_judge_output_tokens": 1097
+}

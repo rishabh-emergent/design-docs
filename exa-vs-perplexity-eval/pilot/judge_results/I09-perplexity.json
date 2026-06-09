@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Clerk clerkMiddleware (nextjs)",
+  "template_stack": "nextjs",
+  "playbook_id": "I09-perplexity",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 2,
+    "completeness": 3,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current clerkMiddleware and createRouteMatcher from @clerk/nextjs/server, correctly avoiding deprecated authMiddleware. Uses useUser().user.primaryEmailAddress.emailAddress (current). However, claims about Next.js 16 'proxy.ts' middleware filename are dubious/likely fabricated \u2014 Next.js middleware is middleware.ts; no such proxy.ts convention exists in Next.js. Also auth() in App Router returns a Promise and must be awaited; code uses sync destructuring which is stale/incorrect.",
+    "executability": "auth() is called synchronously without await in DashboardPage; current Clerk requires await auth(). The middleware file naming guidance ('proxy.ts') would lead extractor to write a file Next.js does not recognize, silently disabling protection. Multiple code blocks are scattered with no single canonical version. Mock file uses JSX in .ts. redirect imported but unused. Sandbox feasible but multiple non-obvious fixes required.",
+    "completeness": "(a) API key acquisition described with dashboard menu, (b) install in bash fence, (c) env template present with exact names, (d) middleware/server code in fences, (e) frontend layout + sign-in page in fences, (f) test command \u2014 Playwright test code shown but no explicit runnable test command like 'npx playwright test'. Significant duplicate/competing code samples for proxy.ts and dashboard page may confuse extractor.",
+    "citation_anchoring": "Citations are bare numeric refs [1][2][10] etc. with no actual URLs to clerk.com/docs anywhere in the playbook. No canonical official docs URL present. References sound authoritative but no link is verifiable."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "clerkMiddleware",
+      "useUser().user.primaryEmailAddress.emailAddress"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 7800,
+  "rubric_notes": "Playbook invents a 'proxy.ts' Next.js 16 middleware convention that does not exist; this is a significant fabrication that would break route protection. auth() not awaited. No official URLs cited despite many bracket references.",
+  "_judge_latency_s": 16.55733013153076,
+  "_judge_input_tokens": 24563,
+  "_judge_output_tokens": 1018
+}

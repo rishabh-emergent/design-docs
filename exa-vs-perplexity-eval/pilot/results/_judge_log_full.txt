@@ -1,0 +1,974 @@
+Judging 58 playbooks (Shape A absolute)...
+  I02/perplexity: C&F=2 EX=1 CP=1 CT=1 (11.8s)
+  I02/exa: C&F=3 EX=2 CP=4 CT=5 (14.0s)
+  I01/exa: C&F=4 EX=4 CP=5 CT=5 (14.6s)
+  I03/exa: C&F=4 EX=3 CP=4 CT=5 (15.6s)
+  I03/perplexity: C&F=3 EX=2 CP=3 CT=2 (16.1s)
+  I01/perplexity: C&F=4 EX=3 CP=4 CT=2 (17.2s)
+  I04/exa: C&F=3 EX=3 CP=4 CT=5 (16.9s)
+  I04/perplexity: C&F=4 EX=3 CP=3 CT=2 (16.0s)
+  I05/exa: C&F=2 EX=2 CP=3 CT=4 (16.2s)
+  I05/perplexity: C&F=4 EX=2 CP=3 CT=1 (15.1s)
+  I06/exa: C&F=2 EX=2 CP=3 CT=3 (16.3s)
+  I06/perplexity: C&F=2 EX=2 CP=3 CT=2 (17.5s)
+  I07/exa: C&F=3 EX=4 CP=5 CT=4 (14.9s)
+  I08/exa: C&F=4 EX=4 CP=5 CT=5 (14.9s)
+  I08/perplexity: C&F=3 EX=2 CP=3 CT=2 (15.8s)
+  I09/exa: C&F=4 EX=3 CP=4 CT=5 (14.3s)
+  I07/perplexity: C&F=4 EX=3 CP=4 CT=2 (17.3s)
+  I09/perplexity: C&F=3 EX=2 CP=3 CT=2 (16.6s)
+  I10/exa: C&F=4 EX=3 CP=5 CT=5 (13.1s)
+  I10/perplexity: C&F=4 EX=4 CP=5 CT=2 (13.5s)
+  I11/exa: C&F=2 EX=2 CP=3 CT=5 (14.4s)
+  I11/perplexity: C&F=4 EX=2 CP=3 CT=2 (14.6s)
+  I12/exa: C&F=3 EX=3 CP=4 CT=4 (16.9s)
+  I12/perplexity: C&F=2 EX=2 CP=3 CT=1 (16.4s)
+  I13/exa: C&F=3 EX=3 CP=3 CT=5 (14.5s)
+  I14/exa: C&F=4 EX=2 CP=4 CT=4 (14.5s)
+  I14/perplexity: C&F=4 EX=2 CP=3 CT=2 (14.7s)
+  I13/perplexity: C&F=4 EX=4 CP=5 CT=2 (17.6s)
+  I15/exa: C&F=3 EX=2 CP=4 CT=3 (14.6s)
+  I15/perplexity: C&F=4 EX=3 CP=3 CT=2 (16.4s)
+  I16/exa: C&F=4 EX=2 CP=4 CT=4 (14.4s)
+  I17/exa: C&F=3 EX=3 CP=4 CT=4 (14.9s)
+  I17/perplexity: C&F=2 EX=2 CP=3 CT=1 (16.7s)
+  I18/exa: C&F=2 EX=2 CP=3 CT=3 (15.6s)
+  I16/perplexity: C&F=4 EX=3 CP=4 CT=2 (22.2s)
+  I18/perplexity: C&F=2 EX=2 CP=3 CT=2 (16.1s)
+  I19/exa: C&F=4 EX=3 CP=4 CT=3 (16.1s)
+  I19/perplexity: C&F=3 EX=2 CP=3 CT=2 (15.1s)
+  I20/exa: C&F=2 EX=2 CP=3 CT=3 (16.9s)
+  I21/exa: C&F=2 EX=2 CP=3 CT=3 (14.4s)
+  I20/perplexity: C&F=2 EX=1 CP=2 CT=2 (20.5s)
+  I21/perplexity: C&F=3 EX=2 CP=3 CT=2 (16.8s)
+  I22/exa: C&F=4 EX=2 CP=4 CT=5 (16.1s)
+  I22/perplexity: C&F=3 EX=3 CP=4 CT=2 (15.2s)
+  I23/exa: C&F=4 EX=3 CP=4 CT=5 (17.5s)
+  I23/perplexity: C&F=3 EX=2 CP=3 CT=2 (17.6s)
+  I24/perplexity: C&F=4 EX=4 CP=5 CT=1 (13.4s)
+  I24/exa: C&F=3 EX=3 CP=4 CT=5 (16.9s)
+  I25/exa: C&F=4 EX=4 CP=5 CT=5 (14.8s)
+  I25/perplexity: C&F=4 EX=3 CP=4 CT=2 (13.9s)
+  I26/exa: C&F=4 EX=2 CP=4 CT=5 (11.4s)
+  I27/exa: C&F=3 EX=3 CP=4 CT=5 (14.6s)
+  I26/perplexity: C&F=4 EX=3 CP=3 CT=2 (15.9s)
+  I27/perplexity: C&F=4 EX=3 CP=4 CT=1 (14.8s)
+  I28/exa: C&F=3 EX=2 CP=4 CT=4 (15.9s)
+  I28/perplexity: C&F=4 EX=3 CP=3 CT=2 (17.5s)
+  I29/exa: C&F=4 EX=3 CP=4 CT=4 (16.0s)
+  I29/perplexity: C&F=4 EX=3 CP=4 CT=2 (14.0s)
+
+=== JUDGE AGGREGATE ===
+{
+  "pairs": [
+    {
+      "integration": "I01",
+      "name": "Stripe Payment Element (one-time + sub)",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I02",
+      "name": "Lemon Squeezy hosted checkout",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 1,
+        "completeness": 1,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 4,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 3,
+          "citation_anchoring": 4
+        },
+        "sum_abs": 9,
+        "both_broken": true,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I03",
+      "name": "Stripe Connect Express",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 6,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I04",
+      "name": "PhonePe PG v2 UPI",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": 0,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I05",
+      "name": "Paytm All-in-One Web SDK",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": -2,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": true,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I06",
+      "name": "Xendit virtual account",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "TIE",
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 1,
+        "both_broken": true,
+        "tie_rule": "within_noise"
+      },
+      "winner_provider": "TIE"
+    },
+    {
+      "integration": "I07",
+      "name": "Flutterwave Standard (Nigeria)",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 2,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 2
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I08",
+      "name": "MercadoPago Checkout Pro (LatAm)",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 2,
+          "completeness": 2,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 8,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I09",
+      "name": "Clerk clerkMiddleware (nextjs)",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 6,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I10",
+      "name": "Supabase auth v2",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 5,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": -1,
+          "completeness": 0,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 4,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I11",
+      "name": "Auth0 New Universal Login + RBAC",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": -2,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": true,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I12",
+      "name": "Better-Auth social + magic link (nextjs)",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 6,
+        "both_broken": true,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I13",
+      "name": "Instagram Login Business (Graph)",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 3,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": -1,
+          "completeness": -2,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 7,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I14",
+      "name": "WhatsApp Cloud API + webhook",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 2,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 0,
+          "completeness": 1,
+          "citation_anchoring": 2
+        },
+        "sum_abs": 3,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I15",
+      "name": "Discord OAuth2 + bot slash command",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "TIE",
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": -1,
+          "completeness": 1,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 4,
+        "both_broken": false,
+        "tie_rule": "zero_sum"
+      },
+      "winner_provider": "TIE"
+    },
+    {
+      "integration": "I16",
+      "name": "Telegram Bot inline keyboard + webhook",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 2,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": -1,
+          "completeness": 0,
+          "citation_anchoring": 2
+        },
+        "sum_abs": 3,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I17",
+      "name": "OpenAI Responses API + SSE",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 6,
+        "both_broken": true,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I18",
+      "name": "Anthropic Messages + tool_use + cache_control",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "TIE",
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 1,
+        "both_broken": true,
+        "tie_rule": "within_noise"
+      },
+      "winner_provider": "TIE"
+    },
+    {
+      "integration": "I19",
+      "name": "ElevenLabs websocket streaming TTS",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 4,
+        "total_diff": 4,
+        "both_broken": false,
+        "tie_rule": "aggregate"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I20",
+      "name": "Solana @solana/web3.js v2 transfer",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 1,
+        "completeness": 2,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 3,
+        "total_diff": 3,
+        "both_broken": true,
+        "tie_rule": "aggregate"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I21",
+      "name": "wagmi v2 + viem connect + sign (nextjs)",
+      "exa_scores": {
+        "correctness_and_freshness": 2,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 3
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "TIE",
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 1
+        },
+        "sum_abs": 2,
+        "both_broken": true,
+        "tie_rule": "within_noise"
+      },
+      "winner_provider": "TIE"
+    },
+    {
+      "integration": "I22",
+      "name": "Alchemy NFT API v3 owned NFTs",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": -1,
+          "completeness": 0,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I23",
+      "name": "Mapbox GL JS v3 + Directions",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 1,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 6,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I24",
+      "name": "Google Maps Places API (New)",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 4,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": -1,
+          "completeness": -1,
+          "citation_anchoring": 4
+        },
+        "sum_abs": 7,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I25",
+      "name": "Cloudflare R2 presigned PUT",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 4,
+        "completeness": 5,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I26",
+      "name": "UploadThing v6 file upload (nextjs)",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 3,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": -1,
+          "completeness": 1,
+          "citation_anchoring": 3
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I27",
+      "name": "PostHog flags + capture",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 5
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 1
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 4,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 4
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I28",
+      "name": "Mixpanel /import + Query API",
+      "exa_scores": {
+        "correctness_and_freshness": 3,
+        "executability": 2,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 3,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 2,
+        "all_diffs": {
+          "correctness_and_freshness": -1,
+          "executability": -1,
+          "completeness": 1,
+          "citation_anchoring": 2
+        },
+        "sum_abs": 5,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    },
+    {
+      "integration": "I29",
+      "name": "Open-Meteo forecast + historical",
+      "exa_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 4
+      },
+      "pplx_scores": {
+        "correctness_and_freshness": 4,
+        "executability": 3,
+        "completeness": 4,
+        "citation_anchoring": 2
+      },
+      "verdict": {
+        "winner": "A",
+        "decisive_dim": "citation_anchoring",
+        "decisive_diff": 2,
+        "all_diffs": {
+          "correctness_and_freshness": 0,
+          "executability": 0,
+          "completeness": 0,
+          "citation_anchoring": 2
+        },
+        "sum_abs": 2,
+        "both_broken": false,
+        "tie_rule": "single_dim_ge_2"
+      },
+      "winner_provider": "exa"
+    }
+  ],
+  "winner_counts": {
+    "exa": 25,
+    "perplexity": 0,
+    "TIE": 4,
+    "skipped": 0
+  },
+  "dim_averages": {
+    "exa": {
+      "correctness_and_freshness": 3.24,
+      "executability": 2.69,
+      "completeness": 3.93,
+      "citation_anchoring": 4.31
+    },
+    "perplexity": {
+      "correctness_and_freshness": 3.34,
+      "executability": 2.52,
+      "completeness": 3.34,
+      "citation_anchoring": 1.79
+    }
+  }
+}

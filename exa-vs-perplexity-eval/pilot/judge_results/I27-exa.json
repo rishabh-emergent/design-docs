@@ -1,0 +1,32 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "PostHog flags + capture",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I27-exa",
+  "scores": {
+    "correctness_and_freshness": 3,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 5
+  },
+  "evidence": {
+    "correctness_and_freshness": "Core SDK usage (posthog-js init, PostHogProvider, useFeatureFlagEnabled, usePostHog, posthog-python Posthog() with capture/identify) is internally consistent and matches typical PostHog patterns. However, identify_context/new_context are non-standard methods for posthog-python (standard is capture(distinct_id, event, ...) and identify(distinct_id, ...)); this risks AttributeError. No explicit version pin.",
+    "executability": "Fenced blocks parse. Frontend init code looks runnable. Backend uses identify_context/new_context which may not exist in posthog-python \u2014 would cause runtime error. Circular import risk between app/main.py and app/routes/auth.py (auth imports posthog_client from main, but main needs to include router). No sandbox-infeasible patterns (no ngrok/brew/sudo).",
+    "completeness": "(a) Key acquisition mentioned with URL but light on menu navigation; (b) install bash blocks present; (c) env var template present and names match usage (VITE_POSTHOG_PROJECT_TOKEN, POSTHOG_API_KEY); (d) backend code present; (e) frontend code present; (f) test commands/examples present but no single canonical run command. Some duplicate env blocks.",
+    "citation_anchoring": "Multiple official posthog.com/docs and fastapi.tiangolo.com URLs cited inline near relevant code sections. No fabricated URLs detected."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2800,
+  "rubric_notes": "docs_unavailable=true; applied long-tail handling. identify_context/new_context appear to be hallucinated or very-new API surface for posthog-python \u2014 drops correctness to 3. Otherwise internally consistent.",
+  "_judge_latency_s": 14.61116099357605,
+  "_judge_input_tokens": 11527,
+  "_judge_output_tokens": 886
+}

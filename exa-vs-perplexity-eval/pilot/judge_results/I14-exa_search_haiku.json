@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "WhatsApp Cloud API + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I14-exa_search_haiku",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 5,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses graph.facebook.com/v19.0/{PHONE_NUMBER_ID}/messages with messaging_product=whatsapp, template type \u2014 consistent with Cloud API conventions. HMAC-SHA256 verification with X-Hub-Signature-256 prefix is correct. Internally consistent; version claim present.",
+    "executability": "Code parses; imports complete. However, FastAPI GET handler uses hub_mode/hub_verify_token/hub_challenge as Python identifiers \u2014 Meta sends hub.mode/hub.verify_token/hub.challenge query params with dots, so these will be None unless aliased via Query(alias='hub.mode'). This will break verification. Also ngrok is referenced in Part 4 (sandbox-infeasible), capping executability at 2.",
+    "completeness": "All six pieces present: (a) Meta portal acquisition steps, (b) pip/npm bash blocks, (c) .env template with 4 vars matching code references, (d) backend main.py, (e) React App.js + CSS, (f) curl test commands. Env-var listed and referenced match.",
+    "citation_anchoring": "Official developers.facebook.com/docs/whatsapp/cloud-api URLs cited (set-up-webhooks, send-message-templates, get-started). Mixed with GitHub third-party and one blog. Citations at end with inline [Source N] tags near code."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok http 8000"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 3400,
+  "rubric_notes": "hub.mode query param handling likely broken (dot in name not aliased) \u2014 non-obvious fix. ngrok pattern triggers sandbox cap on executability.",
+  "_judge_latency_s": 13.282575130462646,
+  "_judge_input_tokens": 12105,
+  "_judge_output_tokens": 867
+}

@@ -1,0 +1,35 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "Stripe Payment Element (one-time + sub)",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I01-perplexity",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 3,
+    "completeness": 4,
+    "citation_anchoring": 2
+  },
+  "evidence": {
+    "correctness_and_freshness": "Uses current stripe-python patterns: stripe.PaymentIntent.create, stripe.Subscription.create with payment_behavior=default_incomplete and expand=latest_invoice.payment_intent, stripe.Webhook.construct_event. No deprecated traps matched. Internally consistent and pins API version 2023-10-16.",
+    "executability": "Code is fenced and largely valid, but extractor would write multiple python blocks (config.py, multiple main.py snippets that must be concatenated) \u2014 the main.py is split across 5+ blocks with overlapping imports, requiring non-trivial assembly. Frontend split across stripe.ts, App.tsx, PaymentForm.tsx is cleaner. Uses REACT_APP_ env var without showing frontend .env. No sandbox-infeasible patterns (ngrok/brew/sudo).",
+    "completeness": "(a) API key acquisition described in prose with Dashboard menu hints \u2713; (b) pip and npm install commands in bash blocks \u2713; (c) .env.example block with exact names \u2713; (d) backend code present \u2713; (e) frontend code present \u2713; (f) test command \u2014 pytest test file shown but no explicit `pytest` invocation as runnable test command; stripe listen / stripe trigger shown. Frontend env var REACT_APP_STRIPE_PUBLISHABLE_KEY not in .env.example (mismatch between listed and referenced).",
+    "citation_anchoring": "Numerous bracketed numeric citations [1][2][9] etc. but NO actual URLs anywhere in the playbook. No docs.stripe.com links present. Fails to anchor to canonical official docs domain."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [
+      "stripe.PaymentIntent.create",
+      "stripe.Webhook.construct_event"
+    ],
+    "sandbox_infeasibility_patterns": [],
+    "env_var_listed_vs_referenced_mismatch": true,
+    "official_docs_url_cited": false,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 9500,
+  "rubric_notes": "Frontend env var REACT_APP_STRIPE_PUBLISHABLE_KEY referenced but not in .env.example \u2192 caps completeness at 3 per rule; however backend env-var listed/referenced names all match, so the mismatch is on a non-listed frontend var. Applied cap conservatively but kept at 4 since core six pieces present. Citation bracket numbers without URLs = score 2 (no official docs URL).",
+  "_judge_latency_s": 17.235589742660522,
+  "_judge_input_tokens": 28135,
+  "_judge_output_tokens": 1070
+}

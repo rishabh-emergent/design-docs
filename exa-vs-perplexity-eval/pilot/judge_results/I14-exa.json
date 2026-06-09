@@ -1,0 +1,34 @@
+{
+  "rubric_version": "2.0.0",
+  "shape": "absolute",
+  "integration": "WhatsApp Cloud API + webhook",
+  "template_stack": "fastapi-react",
+  "playbook_id": "I14-exa",
+  "scores": {
+    "correctness_and_freshness": 4,
+    "executability": 2,
+    "completeness": 4,
+    "citation_anchoring": 4
+  },
+  "evidence": {
+    "correctness_and_freshness": "Internally consistent: graph.facebook.com/{API_VERSION}/{PHONE_NUMBER_ID}/messages endpoint, messaging_product=whatsapp, template payload shape, HMAC-SHA256 with APP_SECRET for X-Hub-Signature-256, and hub.mode/hub.verify_token/hub.challenge verification all match documented WhatsApp Cloud API pattern. API_VERSION v17.0 is somewhat dated but stated explicitly.",
+    "executability": "Code parses; pydantic-settings BaseSettings is imported correctly. However, GET /webhook uses Python params hub_mode/hub_verify_token/hub_challenge \u2014 FastAPI will not auto-map these from the actual query string keys hub.mode/hub.verify_token/hub.challenge (dots not valid in Python identifiers, need alias via Query). This is a real bug. Also relies on ngrok in test flow \u2014 sandbox-infeasibility pattern matched, caps at 2.",
+    "completeness": "All six pieces present: env vars listed with acquisition, pip install bash block, .env template, FastAPI backend code, React frontend code, curl test commands. Env var names consistent between list and code. Minor: webhook GET param mismatch and ngrok dependency for full test.",
+    "citation_anchoring": "Official developers.facebook.com docs cited inline near relevant sections (Graph API, webhook verification), plus FastAPI/Vite/CRA official docs. Some Meta URLs use /documentation/ path which may not resolve, but domain is canonical."
+  },
+  "deterministic_flags_observed": {
+    "freshness_traps_matched_deprecated": [],
+    "freshness_traps_matched_current": [],
+    "sandbox_infeasibility_patterns": [
+      "ngrok"
+    ],
+    "env_var_listed_vs_referenced_mismatch": false,
+    "official_docs_url_cited": true,
+    "infeasibility_escape_valve_applied": false
+  },
+  "length_tokens_estimate": 2600,
+  "rubric_notes": "ngrok present in test instructions caps EXECUTABILITY at 2. Webhook GET query-param alias bug noted but does not change cap. docs_unavailable=true: long-tail handling applied, scored on internal consistency + explicit version, giving CORRECTNESS=4.",
+  "_judge_latency_s": 14.498289823532104,
+  "_judge_input_tokens": 11824,
+  "_judge_output_tokens": 962
+}
