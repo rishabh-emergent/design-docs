@@ -1,8 +1,10 @@
-# How Emergent calls Perplexity today — exact trace
+# How Emergent calls Perplexity today — exact trace (INTERNAL version)
 
-**Purpose:** Shareable reference for the Exa team showing exactly how our `integration_playbook_expert_v2` tool calls Perplexity in production — request construction, settings, prompts, and real measured outputs (latency + cost + full responses).
+> **⚠️ For external sharing use [`PERPLEXITY_TRACE.md`](./PERPLEXITY_TRACE.md)** — single self-contained file with all 5 samples fully inlined and internal paths/job-IDs scrubbed. This README is the internal companion (keeps prod job IDs + source file paths for traceability).
 
-**Method:** We pulled 4 real production tool inputs (from jobs that ran in the last 6 hours and hit the Perplexity fallback in prod), then replayed them through the byte-identical request construction our production Go service uses. Every number below is measured, not estimated. Full raw request/response JSON for each sample is in [`samples/`](./samples/).
+**Purpose:** Reference showing exactly how our `integration_playbook_expert_v2` tool calls Perplexity in production — request construction, settings, prompts, and real measured outputs (latency + cost + full responses).
+
+**Method:** We pulled 5 real production tool inputs (from jobs that ran in the last few hours and hit the Perplexity fallback in prod — 4 on the expo template, 1 on the main web template), then replayed them through the byte-identical request construction our production Go service uses. Every number below is measured, not estimated. Full raw request/response JSON for each sample is in [`samples/`](./samples/).
 
 **No assumptions were made.** Prompt templates are verbatim copies from production source (`llm-proxy-service/pkg/tools/perplexity/client.go`), tech-stack values are verbatim from the template registry (`emergent/agents/service/templates/config.yaml`), and the inputs are verbatim agent tool calls from production trajectories.
 
@@ -110,11 +112,11 @@ Note: because `{query}` is a multi-line block, the assembled user prompt reads l
 | `fastapi_react_mongo_base_image` | `["reactjs frontend", "fastapi backend", "mongodb database"]` |
 | Fallback if template lookup fails | `["Python", "FastAPI"]` |
 
-All 4 samples below ran on `expo_mongo_base_image`, so `{stack}` = `expo react native, mongodb database, react native web`.
+Samples 1–4 below ran on `expo_mongo_base_image`, so `{stack}` = `expo react native, mongodb database, react native web`. Sample 5 ran on `fastapi_react_mongo_shadcn_base_image`, so `{stack}` = `reactjs frontend with shadcn, fastapi backend, mongodb database`.
 
-## 4. The 4 samples — real prod inputs, measured results
+## 4. The 5 samples — real prod inputs, measured results
 
-Each sample is a **real production tool input** (verbatim, from a job in the last 6 hours that hit the Perplexity fallback), replayed with the exact construction above. Full request + response JSON per sample in [`samples/`](./samples/).
+Each sample is a **real production tool input** (verbatim, from a job in the last few hours that hit the Perplexity fallback), replayed with the exact construction above. Full request + response JSON per sample in [`samples/`](./samples/).
 
 | # | Sample | Prod job | Latency | Total cost | Output | Citations | Search queries |
 |---|---|---|---|---|---|---|---|
@@ -122,7 +124,8 @@ Each sample is a **real production tool input** (verbatim, from a job in the las
 | 2 | Google Drive CSV upload (FastAPI) | `7abb5ac8-1f08…` | **321.2 s** | **$0.943** | 90,197 ch | 48 | 50 |
 | 3 | Custom JWT auth (Expo + FastAPI + Mongo) | `dc6c8b51-79c3…` | **261.7 s** | **$0.916** | 67,328 ch | 41 | 50 |
 | 4 | JWT + mocked OTP + roles (Expo) | `da83523f-7735…` | **317.9 s** | **$1.257** | 77,531 ch | 50 | 59 |
-| | **Average** | | **289.8 s (4.8 min)** | **$0.988** | 75,750 ch | 45 | 52 |
+| 5 | PayPal checkout (web dropshipping store) | `30cd3e24-f9d2…` | **229.6 s** | **$1.047** | 63,374 ch | 50 | 60 |
+| | **Average** | | **277.7 s (4.6 min)** | **$1.000** | 73,274 ch | 46 | 54 |
 
 ### Cost composition (from Perplexity's own `usage.cost` field)
 
@@ -132,8 +135,9 @@ Each sample is a **real production tool input** (verbatim, from a job in the las
 | 2 | $0.00051 | $0.14414 | $0.04544 | $0.50285 | $0.25000 | $0.94294 |
 | 3 | $0.00051 | $0.10977 | $0.05750 | $0.49826 | $0.25000 | $0.91603 |
 | 4 | $0.00053 | $0.13248 | $0.06797 | $0.76137 | $0.29500 | $1.25735 |
+| 5 | $0.00039 | $0.10578 | $0.05405 | $0.58689 | $0.30000 | $1.04711 |
 
-→ ~**56% of cost is hidden reasoning tokens** (146k–254k per call), ~**26% is search queries** (50–59 searches per call at $5/1k).
+→ ~**56% of cost is hidden reasoning tokens** (146k–254k per call), ~**26% is search queries** (50–60 searches per call at $5/1k).
 
 ### Token usage (from `usage`)
 
@@ -143,6 +147,7 @@ Each sample is a **real production tool input** (verbatim, from a job in the las
 | 2 | 254 | 18,018 | 22,718 | 167,616 |
 | 3 | 254 | 13,721 | 28,749 | 166,085 |
 | 4 | 267 | 16,560 | 33,983 | 253,791 |
+| 5 | 195 | 13,222 | 27,027 | 195,629 |
 
 ## 5. Sample 1 in full — exact assembled request
 
@@ -218,6 +223,7 @@ This is the byte-exact request body sent for sample 1 (only the API key is mocke
 2. `# Integration Playbook: Google Drive CSV Export with a FastAPI Backend and Expo React Native / React Native Web Clients`
 3. `# End-to-End Integration Playbook for JWT-Based Email/Password Authentication with Expo React Native (SDK 54), FastAPI, and MongoDB`
 4. `# End-to-end Integration Playbook: JWT Authentication between an Expo React Native App and a FastAPI + MongoDB Backend`
+5. `# Integration Playbook: PayPal Checkout for a React (shadcn) + FastAPI + MongoDB Dropshipping Store`
 
 ## 6. What we do with the response
 
@@ -249,14 +255,17 @@ At ~70k fallback calls/month, the current Perplexity path costs **≈ $67k/month
 
 ```
 perplexity-prod-trace/
-├── README.md                          ← this doc
+├── README.md                          ← this doc (internal version)
+├── PERPLEXITY_TRACE.md                ← SHAREABLE single-file version (all samples inlined, internals scrubbed)
 ├── replay.py                          ← the replay harness (exact prod construction)
+├── build_doc.py                       ← generates PERPLEXITY_TRACE.md from samples/
 ├── replay_log.txt                     ← run log
 └── samples/
     ├── sample-1-stripe-expo.json      ← full request + full response + timing (89 KB)
     ├── sample-2-google-drive.json     ← (116 KB)
     ├── sample-3-jwt-auth-expo.json    ← (89 KB)
-    └── sample-4-jwt-otp-roles-expo.json ← (104 KB)
+    ├── sample-4-jwt-otp-roles-expo.json ← (104 KB)
+    └── sample-5-paypal-web.json       ← web-stack sample (78 KB)
 ```
 
 Each sample JSON contains: the prod job id + original prod call timestamp, the exact request (URL, headers with mocked key, full body), HTTP status, measured latency, and the complete unmodified Perplexity response.
