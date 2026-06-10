@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PR #1519 Review — Unified ToolSquashPolicy</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --panel: #181b24;
+    --panel2: #1f2330;
+    --text: #e2e6ef;
+    --muted: #9aa3b5;
+    --accent: #6ea8fe;
+    --green: #4ade80;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --purple: #c084fc;
+    --border: #2a2f3e;
+    --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; padding: 40px 20px; max-width: 1000px; margin: 0 auto;
+  }
+  h1 { font-size: 1.7rem; margin-bottom: 4px; }
+  h2 { font-size: 1.25rem; margin: 36px 0 14px; color: var(--accent); border-bottom: 1px solid var(--border); padding-bottom: 6px;}
+  h3 { font-size: 1.02rem; margin: 18px 0 8px; }
+  p { margin: 8px 0; color: var(--text); }
+  .sub { color: var(--muted); margin-bottom: 24px; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 0.75rem; font-weight: 600; margin-right: 6px; }
+  .pill.green { background: #14321f; color: var(--green); }
+  .pill.yellow { background: #38300f; color: var(--yellow); }
+  .pill.red { background: #3a1a1a; color: var(--red); }
+  .pill.blue { background: #16243d; color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; margin: 14px 0; }
+  .card h3 { margin-top: 0; }
+  code { font-family: var(--mono); font-size: 0.85em; background: var(--panel2); padding: 1px 6px; border-radius: 4px; color: #b9c5e0; }
+  pre { font-family: var(--mono); font-size: 0.8rem; background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 14px; overflow-x: auto; margin: 10px 0; color: #b9c5e0; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .muted { color: var(--muted); }
+  .good { color: var(--green); }
+  .warn { color: var(--yellow); }
+  .bad { color: var(--red); }
+  .flowbox { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-family: var(--mono); font-size: 0.78rem; }
+  .arrow { color: var(--purple); }
+  /* simple flow diagram */
+  .flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+  .flow .step { background: var(--panel2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; font-size: 0.8rem; text-align: center; }
+  .flow .step b { color: var(--accent); display: block; font-size: 0.82rem; }
+  .flow .arr { color: var(--purple); font-size: 1.1rem; }
+  .verdict { border-left: 4px solid var(--green); }
+  details { margin: 8px 0; }
+  summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<h1>PR #1519 — Unified <code>ToolSquashPolicy</code></h1>
+<p class="sub">cortex • <code>feat/tool-squash-unified</code> → <code>main</code> • +1203 / −13 • 15 files • consumes xllm PR #200<br>
+Review date: 2026-06-10 • Reviewed by: Claude (build + full test run verified locally)</p>
+
+<div class="card verdict">
+  <h3>Verdict: <span class="good">Approve with minor fixes</span></h3>
+  <p>Design is solid and actually <b>simpler</b> than the two PRs it replaces (#1499 + #1423). Code builds, all targeted package tests pass locally with the pinned xllm version. Nothing breaks existing behavior — the whole feature is opt-in (no <code>tool_squash</code> in YAML → byte-for-byte same behavior as today).</p>
+  <p>There is <b>1 real convention violation</b> (metric emitted from workflow code), <b>1 hard merge blocker</b> (xllm pseudo-version pin, already acknowledged), and a few small cleanups.</p>
+</div>
+
+<h2>1. Ye PR karta kya hai? (What does this PR do?)</h2>
+<p>Long agent conversations me context window bhar jata hai. Cortex already old messages ko "squash" (truncate) karta hai. Ye PR ek <b>naya configurable rule engine</b> add karta hai jo do extra cheezein squash kar sakta hai:</p>
+<table>
+  <tr><th>Kya squash hota hai</th><th>Example</th><th>Pehle kahan tha</th></tr>
+  <tr><td><b>Tool call ke arguments</b> (<code>tool_use.Input</code>)</td><td><code>design_agent</code> ko diya hua 10KB ka task prompt → 256 chars</td><td>PR #1499 (ab close hoga)</td></tr>
+  <tr><td><b>Tool ke results</b> (<code>tool_result</code>)</td><td>purane <code>supervisorctl restart</code> outputs → <code>"[restart output stripped]"</code></td><td>PR #1423 (ab close hoga)</td></tr>
+</table>
+<p>Sab kuch agent YAML me rules se control hota hai — regex se tool match karo, action choose karo (<code>on_args</code> truncate / <code>on_result</code> replace-or-truncate). <b>Empty rules = feature off.</b> Koi separate enable flag nahi — ye ek achha simplification hai.</p>
+
+<div class="flow">
+  <div class="step"><b>Agent YAML</b>tool_squash rules</div>
+  <div class="arr">→</div>
+  <div class="step"><b>pkg/agentsdk</b>parse + Validate()</div>
+  <div class="arr">→</div>
+  <div class="step"><b>elite setup.go</b>re-validate post-experiment, attach</div>
+  <div class="arr">→</div>
+  <div class="step"><b>xcontext policy.go</b>compile → xllm policy</div>
+  <div class="arr">→</div>
+  <div class="step"><b>xllm</b>ApplySquash mutates messages</div>
+  <div class="arr">→</div>
+  <div class="step"><b>xcontext squash.go</b>diff → persist truncated_content_ref</div>
+</div>
+
+<h2>2. File-by-file: kis file me kya change hua</h2>
+
+<div class="card">
+  <h3>📄 <code>pkg/agentsdk/context.go</code> <span class="pill blue">+127</span> — config ka YAML surface</h3>
+  <p><b>Simple terms:</b> Ye file batati hai ki agent YAML me <code>tool_squash:</code> section kaisa dikhega. Naye types: <code>ToolSquashConfig</code> (rules ki list + <code>preserve_last_n_assistant</code> + default <code>truncation_length</code>), <code>ToolSquashRuleConfig</code> (kaunsa tool match kare — <code>tool_name_regex</code>, optionally <code>args_content_regex</code>), aur do actions: <code>OnArgs</code> (sirf truncate) / <code>OnResult</code> (replace ya truncate).</p>
+  <p><b>Validation:</b> regex compile hote hain, har rule me kam-se-kam ek action hona chahiye, negative numbers reject. Plus ek <b>cross-invariant</b>: <code>tool_squash.preserve_last_n_assistant ≥ context.preserve_last_n</code> — taaki tool-squash kabhi us "live tail" ko na chhue jo bulk-checkpoint protect karta hai.</p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>core/xcontext/policy.go</code> <span class="pill blue">+54</span> — YAML → runtime translation</h3>
+  <p><b>Simple terms:</b> <code>CompileToolSquash()</code> YAML config ko xllm ke runtime <code>ToolSquashPolicy</code> me convert karta hai. Pure mapping code hai, koi logic nahi. Nil/empty config → nil policy (feature off). Action-less rules silently drop hote hain (defense — experiment patch se aayi bad rule workflow crash na kare).</p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>core/workflows/elite/setup.go</code> <span class="pill blue">+38</span> — workflow me attach karna</h3>
+  <p><b>Simple terms:</b> Naya function <code>attachToolSquash()</code>. Workflow start hote waqt: config ko <b>dobara validate</b> karta hai (kyunki experiment patches YAML-time validation ke <i>baad</i> apply hote hain aur shape tod sakte hain), cross-invariant ko <b>resolved</b> bulk-preserve value ke against re-check karta hai, phir compiled policy ko <code>squashPolicy.ToolSquash</code> me attach karta hai. Fail hone par: warn log + metric, policy skip (workflow chalta rahta hai).</p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>core/xcontext/squash.go</code> <span class="pill blue">+75/−7</span> — sabse important file: cache protection + persistence fix</h3>
+  <p><b>Do kaam:</b></p>
+  <p><b>(a) StartIndex — cache protection.</b> Anthropic prompt-cache me purane messages cached hote hain. Agar tool-squash unhe mutate kare to cache invalid ho jata hai (paisa barbaad). <code>toolSquashStartForReason()</code> decide karta hai squashing kahan se shuru ho: normally previous cutoff ke baad se (cached prefix safe); agar reason hi cache-invalidation hai to index 0 se (cache waise hi mar chuka hai). <code>withToolSquashStartIndex()</code> policy ki deep-copy banata hai taaki shared policy mutate na ho.</p>
+  <p><b>(b) messagesEqual — persistence fix.</b> Squash ke baad cortex original vs squashed messages diff karta hai, jo change hua wo <code>truncated_content_ref</code> me DB me save hota hai. Pehle <code>tool_use.Input</code> ke changes detect hi nahi hote the → truncation har baar dobara hoti. Ab naya <code>BlockTypeToolUse</code> case + <code>jsonEqual()</code> helper. JSON comparison kyu? Kyunki xllm messages ko JSON-clone karta hai jisse int → float64 ban jata hai; <code>reflect.DeepEqual</code> usse "changed" samajh ke <b>faltu DB writes</b> karta. Smart catch. 👍</p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>internal/pgsql/agents.go</code> + <code>sessions.go</code> <span class="pill blue">+6</span> — DB round-trip</h3>
+  <p><b>Simple terms:</b> <code>tool_squash</code> config ko <code>squashing_strategy</code> JSON column ke andar save/load karna. Chaaron jagah update hui (create params, update params, do readers) — koi site miss nahi hui. <span class="muted">(Note: ye anonymous struct ab 2 files me duplicate hai — pre-existing pattern hai, PR ne sahi follow kiya, but future me shared type me nikalna better hoga.)</span></p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>core/workflows/elite/metrics.go</code> <span class="pill blue">+65</span> — observability</h3>
+  <p><b>Simple terms:</b> Do naye metrics: (1) <code>elite.tool_squash.config_validation</code> counter — experiment patch ne config toda to alert; (2) <code>elite.squash.activity_latency_seconds</code> histogram — squash activity kitni slow hai. <span class="warn">⚠ Pehle wala metric workflow-side code se emit hota hai — niche Finding F1 dekho.</span></p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>core/workflows/elite/activities.go</code> <span class="pill blue">+11/−2</span> — logging + latency</h3>
+  <p><b>Simple terms:</b> "squashing applied" log line me 3 naye counters (<code>args_truncated</code>, <code>results_replaced</code>, <code>results_truncated</code>), aur activity ke start me ek <code>defer</code> jo latency histogram record karta hai. <span class="muted">(Activities me metrics theek hai — wahan real context hota hai.)</span></p>
+</div>
+
+<div class="card">
+  <h3>📄 <code>go.mod</code> / <code>go.sum</code> — dependency bump</h3>
+  <p><b>Simple terms:</b> xllm ko pseudo-version <code>v1.0.88-0.20260610...</code> pe pin kiya hai (branch build, tagged release nahi). <span class="bad">Merge se pehle tagged version pe re-pin karna zaroori hai</span> — PR body khud bolti hai, abhi tak pending.</p>
+</div>
+
+<div class="card">
+  <h3>🧪 Tests <span class="pill green">+824 lines</span> — 4 test files</h3>
+  <table>
+    <tr><td><code>pkg/agentsdk/context_test.go</code></td><td>Validation table-tests (13 cases) + cross-invariant cases</td></tr>
+    <tr><td><code>core/xcontext/policy_test.go</code></td><td>Compile mapping — args rule, result-replace, result-truncate, both</td></tr>
+    <tr><td><code>core/xcontext/squash_test.go</code></td><td>Integration: bulk-only firing, StartIndex unit tests, persistence diffs, aur ek <b>sentinel-based cache-prefix test</b> (genuinely strong — prove karta hai ki second squash cached prefix ko touch nahi karta)</td></tr>
+    <tr><td><code>internal/pgsql/agents_test.go</code></td><td>Full DB round-trip + nil-stays-nil</td></tr>
+  </table>
+</div>
+
+<h2>3. Review findings</h2>
+
+<div class="card" style="border-left: 4px solid var(--red);">
+  <h3>F1 <span class="pill red">Should fix</span> Metric workflow code se emit ho raha hai (<code>context.Background()</code>)</h3>
+  <p><code>recordToolSquashValidation()</code> ko <code>attachToolSquash()</code> call karta hai, jo <code>setup()</code> = <b>workflow-side code</b> hai. Cortex ka apna CLAUDE.md clearly bolta hai: <i>"metrics... must be done inside activities, not from the workflow function"</i> aur <i>"never use context.Background() in production code"</i>.</p>
+  <p><b>Practical problem:</b> workflow replay (worker restart / sticky-cache eviction) par <code>setup()</code> dobara chalega aur counter <b>dobara increment</b> hoga — "alertable" metric noisy ho jayega.</p>
+  <p><b>Sibling precedent:</b> isi function me 30 lines niche, <code>range_threshold</code> misconfig sirf <code>log.Error</code> karta hai aur policy drop karta hai — koi metric nahi. Wahi pattern follow karo.</p>
+  <p><b>Suggested fix:</b> metric hatao, warn-log par alert lagao (simplest, sibling-consistent). Ya validation ko <code>ResolveAgentConfig</code> activity me move karo jahan real context hai. <span class="muted">Comment me "#1499 ka same pattern" likha hai — par #1499 kabhi merge nahi hua, wo precedent nahi hai.</span></p>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--red);">
+  <h3>F2 <span class="pill red">Merge blocker (known)</span> xllm pseudo-version pin</h3>
+  <p><code>go.mod</code> me <code>v1.0.88-0.20260610095955-35e10ec264e3</code> — branch build. xllm PR #200 land + tag hone ke baad re-pin karna hai. PR body ye acknowledge karti hai (par body me purana pseudo-version <code>v1.0.79-...</code> likha hai — wo bhi stale hai).</p>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--yellow);">
+  <h3>F3 <span class="pill yellow">PR body stale</span> Description code se match nahi karti</h3>
+  <p>Body bolti hai: <i>"<code>applyBulkCheckpointStrategy</code> uses <code>xllm.HasToolSquashWork</code> to fire squash when bulk has no cutoff"</i>. <b>Code exactly opposite karta hai</b> — bulk cutoff nahi to tool-squash fire hi nahi hota, aur test <code>TestApplySquash_DoesNotFireWhenBulkCannotTruncate</code> isi behavior ko pin karta hai ("Simpler model, easier cache reasoning" — jo sahi decision hai). xllm <code>HasToolSquashWork</code> export karta hai par cortex use kahin call nahi karta. <b>Body update karo</b>; agar koi consumer nahi to xllm se export hatane ka issue file karo.</p>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--yellow);">
+  <h3>F4 <span class="pill yellow">Edge case</span> <code>simple</code> strategy ke saath cache protection nahi hai</h3>
+  <p>StartIndex protection sirf <code>bulk_checkpoint</code> path me set hota hai. Agar koi agent <code>squashing_strategy: simple</code> + <code>tool_squash</code> configure kare, to policy unchanged pass-through hoti hai — <code>StartIndex=0</code>, matlab har squash par tool-squash <b>poori history walk karega, cached prefix included</b>. Mutations idempotent hain to damage limited hai, par intent clearly bulk-only hai.</p>
+  <p><b>Suggested fix (cheap):</b> <code>attachToolSquash</code> me ek guard — strategy <code>bulk_checkpoint</code> nahi to skip + warn. Ya document karo ki ye bulk-only feature hai.</p>
+</div>
+
+<div class="card" style="border-left: 4px solid var(--border);">
+  <h3>F5 <span class="pill blue">Nits</span> Chhoti cheezein</h3>
+  <table>
+    <tr><td><code>setup.go</code></td><td><code>attachToolSquash</code> log key <code>agent_id</code> hai par value agent <b>name</b> hai — label mismatch.</td></tr>
+    <tr><td><code>squash_test.go</code></td><td><code>func min(a, b int)</code> redundant — Go 1.24 me builtin <code>min</code> hai. Hata do.</td></tr>
+    <tr><td><code>metrics.go</code></td><td>Latency histogram tool-squash se unrelated hai (scope creep). Harmless, par apna commit/PR better hota.</td></tr>
+    <tr><td><code>context.go</code></td><td><code>ToolSquashArgsAction.Mode</code> "forward-compat" — abhi sirf ek mode hai (YAGNI). Strictly validated hai isliye harmless; chaaho to field abhi drop kar sakte ho.</td></tr>
+    <tr><td><code>setup.go</code></td><td><code>tsp == nil</code> check after successful Validate is dead code (validated rules hamesha compile hoti hain). Harmless defense.</td></tr>
+  </table>
+</div>
+
+<h2>4. Kya ye kuch tod raha hai? (Breakage analysis)</h2>
+<div class="card">
+  <table>
+    <tr><th>Concern</th><th>Verdict</th><th>Kyun</th></tr>
+    <tr><td>Existing agents (no tool_squash in YAML)</td><td class="good">Safe</td><td>Nil config → nil policy → xllm me poora path skip. Zero behavior change.</td></tr>
+    <tr><td><code>wasApplied</code> semantics (<code>Stats.Any()</code>)</td><td class="good">Safe</td><td>Verified in xllm source: Any() = old 2 counters + new 3. Feature off → new counters hamesha 0 → same as before.</td></tr>
+    <tr><td>DB schema</td><td class="good">Safe</td><td>Koi migration nahi — existing JSON column me optional key. Old rows me key absent → nil. Round-trip tested.</td></tr>
+    <tr><td>ImageOverflow path ab policy copy return karta hai</td><td class="good">Safe (improvement)</td><td>Pehle shared pointer return hota tha; ab deep-copy — latent shared-mutation risk khatam.</td></tr>
+    <tr><td>Temporal determinism</td><td class="good">Safe</td><td>Pinned versioning (TWD) — in-flight workflows naya code dekhte hi nahi. GetVersion guards ki zaroorat nahi (repo policy).</td></tr>
+    <tr><td>Build + tests</td><td class="good">Verified locally</td><td><code>go build ./...</code> clean; <code>core/xcontext</code>, <code>pkg/agentsdk/...</code>, <code>core/workflows/elite</code>, <code>internal/pgsql</code> sab green.</td></tr>
+  </table>
+</div>
+
+<h2>5. Simplicity scorecard (vs the two PRs it replaces)</h2>
+<div class="card">
+  <table>
+    <tr><th>Decision</th><th>Assessment</th></tr>
+    <tr><td>No <code>Enabled</code> flag — empty rules = off</td><td class="good">✓ Right call. Ek hi tarika off bolne ka, validation friction zero.</td></tr>
+    <tr><td>Flat <code>ToolSquashRuleConfig</code> (no <code>ToolRegexSpec</code> wrapper)</td><td class="good">✓ #1499 ka unnecessary nesting hataya.</td></tr>
+    <tr><td>No per-policy Lower/Upper gate — surrounding strategy ka threshold inherit</td><td class="good">✓ #1499 me ye aspirational tha, kabhi shipped nahi. Drop karna sahi.</td></tr>
+    <tr><td>Tool-squash fires only when bulk fires (no independent firing)</td><td class="good">✓ Simpler model, cache reasoning easy. (Body ko update karna hai — F3.)</td></tr>
+    <tr><td>Double validation (YAML + runtime post-patch)</td><td class="good">✓ Looks redundant, hai nahi — experiment patches YAML validation ke baad aate hain. Runtime check resolved values use karta hai. Justified.</td></tr>
+    <tr><td>Validation metric from workflow code</td><td class="warn">✗ Convention violation — F1.</td></tr>
+  </table>
+</div>
+
+<h2>6. TL;DR recommendation</h2>
+<div class="card verdict">
+  <p><b>Approve after:</b></p>
+  <p>1. <span class="bad">F1</span> — <code>recordToolSquashValidation</code> ko hatao ya activity me le jao (replay double-count + repo convention).<br>
+  2. <span class="bad">F2</span> — xllm tagged release par re-pin (already known).<br>
+  3. <span class="warn">F3</span> — PR body se <code>HasToolSquashWork</code> wala stale claim hatao.<br>
+  4. <span class="warn">F4</span> — simple-strategy + tool_squash combo ko guard ya document karo.<br>
+  <span class="muted">F5 nits optional.</span></p>
+</div>
+
+<p class="muted" style="margin-top:30px; font-size:0.8rem;">Generated by Claude Code review session • 2026-06-10 • Verified against local build + test run on the PR branch and xllm v1.0.88-0.20260610095955 module source.</p>
+
+</body>
+</html>
