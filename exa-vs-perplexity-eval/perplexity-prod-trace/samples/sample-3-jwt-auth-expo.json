@@ -352,5 +352,6 @@
         "finish_reason": "stop"
       }
     ]
-  }
+  },
+  "agent_input": "INTEGRATION: Custom JWT-based email/password authentication for an Expo React Native (SDK 54) mobile app with FastAPI + MongoDB backend. Need: register, login, password hashing (bcrypt), JWT token issuance/validation, secure token persistence on mobile (expo-secure-store).\n\nCONSTRAINTS: \n- Expo SDK 54 React Native mobile app\n- FastAPI backend with /api prefix on all routes\n- MongoDB for user storage\n- Token storage via expo-secure-store"
 }

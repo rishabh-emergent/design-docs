@@ -57,6 +57,7 @@ MODEL = "sonar-deep-research"
 
 # Exact per-template tech_stack (emergent/agents/service/templates/config.yaml)
 EXPO_STACK = ["expo react native", "mongodb database", "react native web"]
+WEB_STACK = ["reactjs frontend with shadcn", "fastapi backend", "mongodb database"]
 
 # Real prod tool inputs (verbatim `action` from analytics.trajectories_full_view;
 # all four jobs ran on expo_mongo_base_image and hit the Perplexity fallback in prod).
@@ -81,6 +82,13 @@ SAMPLES = [
         "prod_called_at": "2026-06-10T08:55:47.765 UTC",
         "tech_stack": EXPO_STACK,
         "query": "INTEGRATION: Custom JWT-based email/password authentication for an Expo React Native (SDK 54) mobile app with FastAPI + MongoDB backend. Need: register, login, password hashing (bcrypt), JWT token issuance/validation, secure token persistence on mobile (expo-secure-store).\n\nCONSTRAINTS: \n- Expo SDK 54 React Native mobile app\n- FastAPI backend with /api prefix on all routes\n- MongoDB for user storage\n- Token storage via expo-secure-store",
+    },
+    {
+        "id": "sample-5-paypal-web",
+        "prod_job_id": "30cd3e24-f9d2-438b-ba0a-a207f8e12bb2",
+        "prod_called_at": "2026-06-10T08:28:03.633 UTC",
+        "tech_stack": WEB_STACK,
+        "query": "INTEGRATION: PayPal payment processing for e-commerce checkout\nCONSTRAINTS: Need to integrate PayPal checkout button and payment processing for a dropshipping store",
     },
     {
         "id": "sample-4-jwt-otp-roles-expo",
@@ -151,10 +159,12 @@ def run_sample(s):
 
 
 def main():
-    print(f"Replaying {len(SAMPLES)} real prod queries against {API_URL} (model={MODEL})...")
+    # Skip samples whose JSON already exists (idempotent re-runs for added samples).
+    todo = [s for s in SAMPLES if not (OUT / f"{s['id']}.json").exists()]
+    print(f"Replaying {len(todo)} of {len(SAMPLES)} queries against {API_URL} (model={MODEL})...")
     t0 = time.time()
     with cf.ThreadPoolExecutor(max_workers=4) as ex:
-        results = list(ex.map(run_sample, SAMPLES))
+        results = list(ex.map(run_sample, todo))
     print(f"\nDone in {time.time()-t0:.0f}s. Files in {OUT}/")
     total_cost = 0.0
     for r in results:

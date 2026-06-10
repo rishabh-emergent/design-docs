@@ -359,5 +359,6 @@
         "finish_reason": "stop"
       }
     ]
-  }
+  },
+  "agent_input": "INTEGRATION: Stripe payment integration for Expo React Native mobile app + FastAPI backend. Use case: students/parents pay school registration fee for pondok pesantren (Islamic boarding school). Need test mode payment with checkout session. CONSTRAINTS: Mobile app uses Expo SDK 54, no login (registration ID based), Stripe test keys available in pod environment."
 }

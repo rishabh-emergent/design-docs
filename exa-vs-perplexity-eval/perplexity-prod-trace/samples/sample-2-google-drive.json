@@ -401,5 +401,6 @@
         "finish_reason": "stop"
       }
     ]
-  }
+  },
+  "agent_input": "INTEGRATION: Google Drive API integration for Python FastAPI backend\nREQUIREMENTS:\n- Upload CSV files to a specific shared Google Drive folder\n- Auto-sync functionality for daily/weekly exports\n- Real-time sync of time entry data\n- User will provide OAuth tokens/credentials\n- Need to handle authentication and file upload to shared folder ID\nCONSTRAINTS:\n- Must work with FastAPI backend\n- Need to support automated scheduled uploads\n- Handle OAuth2 authentication flow"
 }

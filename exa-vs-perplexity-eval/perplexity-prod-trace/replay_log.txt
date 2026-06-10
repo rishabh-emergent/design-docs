@@ -10,3 +10,9 @@ Replaying 4 real prod queries against https://api.perplexity.ai/chat/completions
 
 Done in 321s. Files in /Users/rishabhamga/Desktop/Repository/mono/design-docs/exa-vs-perplexity-eval/perplexity-prod-trace/samples/
 Total replay cost: $3.953
+Replaying 1 of 5 queries against https://api.perplexity.ai/chat/completions (model=sonar-deep-research)...
+[sample-5-paypal-web] firing...
+[sample-5-paypal-web] OK 229.6s  cost=$1.04711  content=63374 ch  citations=50
+
+Done in 230s. Files in /Users/rishabhamga/Desktop/Repository/mono/design-docs/exa-vs-perplexity-eval/perplexity-prod-trace/samples/
+Total replay cost: $1.047

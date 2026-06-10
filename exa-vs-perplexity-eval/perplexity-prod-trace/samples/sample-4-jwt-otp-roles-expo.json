@@ -415,5 +415,6 @@
         "finish_reason": "stop"
       }
     ]
-  }
+  },
+  "agent_input": "INTEGRATION: JWT-based authentication for Expo React Native app with FastAPI backend. Need:\n1. Email + password registration & login (working JWT auth)\n2. Phone OTP mocked login (accept any 6-digit OTP for now, just generate JWT)\n3. Role-based auth (customer vs admin role)\n4. Token storage via expo-secure-store on client\n\nCONSTRAINTS: \n- Backend FastAPI with MongoDB (Motor)\n- Frontend Expo Router with React Native\n- Use bcrypt for password hashing\n- JWT tokens for session"
 }
