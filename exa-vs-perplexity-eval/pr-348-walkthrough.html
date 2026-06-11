@@ -34,7 +34,6 @@
   table { border-collapse: collapse; width: 100%; margin: 12px 0; font-size: 14px; }
   th, td { border: 1px solid #d4d4d4; padding: 7px 10px; text-align: left; vertical-align: top; }
   th { background: #f0f0f0; }
-  .lineno { color: #888; user-select: none; padding-right: 12px; }
   ol.dry-run { counter-reset: step; list-style: none; padding-left: 0; }
   ol.dry-run > li {
     counter-increment: step; padding: 10px 14px 10px 48px;
@@ -61,7 +60,15 @@
   Repo: <code>emergentbase/llm-proxy-service</code> &middot;
   PR: <a href="https://github.com/emergentbase/llm-proxy-service/pull/348">#348</a> &middot;
   Branch: <code>feat/integration-playbook-exa-gemini</code> &middot;
-  Last reviewed commit: <code>dc5c480</code>
+  Last reviewed commit: <code>f039354</code> &middot;
+  Deployed tag: <code>server-tools-v0.0.40-exa-agent</code>
+</div>
+
+<div class="callout warn">
+  <strong>Updated (2026-06-11):</strong> the Exa implementation has moved to the <strong>Exa Agent API</strong>
+  (<code>POST /agent/runs</code>, <code>effort=medium</code>, flat $0.10/call) per Exa team's integration guidance —
+  replacing the earlier <code>/search</code> + Claude Haiku synthesis pipeline this doc previously described.
+  Section 11 has the full evolution timeline.
 </div>
 
 <nav class="toc">
@@ -70,14 +77,14 @@
     <li><a href="#tldr">TL;DR</a></li>
     <li><a href="#scope">2. What the PR changes (and what it doesn't)</a></li>
     <li><a href="#files">3. Files added / modified</a></li>
-    <li><a href="#exa-client">4. <code>pkg/tools/exa/client.go</code> — two-step pipeline</a></li>
+    <li><a href="#exa-client">4. <code>pkg/tools/exa/client.go</code> — Exa Agent API client</a></li>
     <li><a href="#exa-tool">5. <code>pkg/tools/exa/tool.go</code> — MCP wrapper</a></li>
     <li><a href="#gemini-pkg">6. <code>pkg/gemini/research.go</code> — grounding helper</a></li>
     <li><a href="#gemini-tool">7. <code>pkg/tools/gemini_research/tool.go</code> — MCP wrapper</a></li>
     <li><a href="#events">8. <code>pkg/events/{types,service}.go</code> — telemetry</a></li>
     <li><a href="#registry">9. <code>internal/mcpserver/registry.go</code> — wiring</a></li>
     <li><a href="#dryrun">10. End-to-end dry run</a></li>
-    <li><a href="#cleanup">11. Cleanup pass (commit <code>dc5c480</code>)</a></li>
+    <li><a href="#evolution">11. Evolution of the PR (commit timeline)</a></li>
   </ol>
 </nav>
 
@@ -88,22 +95,22 @@
   <code>integration_playbook_expert_v2</code> contract that Perplexity serves today:
 </p>
 <table>
-  <thead><tr><th>Tool name</th><th>Backend</th><th>Why</th></tr></thead>
+  <thead><tr><th>Tool name</th><th>Backend</th><th>Measured (5 real prod inputs)</th></tr></thead>
   <tbody>
-    <tr><td><code>integration_playbook_expert_v2_exa</code></td><td>Exa <code>/search</code> (semantic) + Claude Haiku 4.5 synthesis</td><td>~8× cheaper than Perplexity, similar substance.</td></tr>
-    <tr><td><code>integration_playbook_expert_v2_gemini</code></td><td>Gemini <code>3.1-pro-preview</code> + <code>google_search</code> grounding</td><td>~24× cheaper than Perplexity, best substance scores in the 4-way eval.</td></tr>
+    <tr><td><code>integration_playbook_expert_v2_exa</code></td><td><strong>Exa Agent API</strong> — <code>POST /agent/runs</code>, <code>effort=medium</code>, async polling</td><td>avg 78.5 s · <strong>flat $0.10/call</strong> · ~11k char playbooks · 7–16 real doc-page citations per call</td></tr>
+    <tr><td><code>integration_playbook_expert_v2_gemini</code></td><td>Gemini <code>3.1-pro-preview</code> + <code>google_search</code> grounding</td><td>avg 32.9 s · ~$0.049/call · ~10k chars · grounding URLs rarely surfaced</td></tr>
   </tbody>
 </table>
 <p>
-  Both tools use the same EA verified-playbook lookup as the Perplexity tool — only the
-  fallback (when no verified playbook exists in DB) calls a different provider.
+  Baseline for comparison — Perplexity <code>sonar-deep-research</code> on the same inputs: avg 277.7 s, ~$1.00/call, ~73k chars.
+  Both new tools use the same EA verified-playbook lookup as the Perplexity tool — only the fallback
+  (when no verified playbook exists in DB) calls a different provider.
 </p>
 <div class="callout">
-  <strong>Why three twins instead of one replaceable backend?</strong> Cortex can flip
-  which tool name a given agent yaml whitelists per-cohort via Unleash, without
-  re-deploying server-tools. All three tools alias to the same <code>display_name</code>
-  in the agent yaml's <code>overrides.tools</code>, so the LLM-visible surface is
-  identical regardless of provider.
+  <strong>Why three twins instead of one replaceable backend?</strong> Cortex flips which tool name an
+  agent yaml whitelists per-cohort via Unleash, without redeploying server-tools. All three tools alias
+  to the same <code>display_name</code> in the agent yaml's <code>overrides.tools</code>, so the
+  LLM-visible surface is identical regardless of provider.
 </div>
 </section>
 
@@ -116,19 +123,20 @@
   <tbody><tr>
     <td>
       <ul>
-        <li>Adds <code>pkg/tools/exa/</code> (client + tool).</li>
-        <li>Adds <code>pkg/tools/gemini_research/</code> (tool).</li>
-        <li>Adds <code>pkg/gemini/research.go</code> (low-level Search helper).</li>
-        <li>Adds three new <code>EventService</code> methods each for Exa + GeminiResearch into <code>pkg/events/service.go</code> and matching structs in <code>pkg/events/types.go</code>.</li>
-        <li>Wires both tools in <code>internal/mcpserver/registry.go</code> via <code>setupExaClient</code> / <code>setupExaTool</code> / <code>setupGeminiResearchTool</code>.</li>
+        <li>Adds <code>pkg/tools/exa/</code> (Agent API client + MCP tool + unit tests).</li>
+        <li>Adds <code>pkg/tools/gemini_research/</code> (MCP tool).</li>
+        <li>Adds <code>pkg/gemini/research.go</code> (grounded Search helper on the existing Gemini client).</li>
+        <li>Adds 4 event-emit methods each for Exa + GeminiResearch in <code>pkg/events/service.go</code> and matching structs in <code>pkg/events/types.go</code>.</li>
+        <li>Wires both tools in <code>internal/mcpserver/registry.go</code>.</li>
+        <li>(Merged in from a parallel branch) imagegrid 2000px MaxDimension cap.</li>
       </ul>
     </td>
     <td>
       <ul>
         <li>Existing <code>pkg/tools/perplexity/</code> path. Default tool name <code>integration_playbook_expert_v2</code> still routes to Perplexity.</li>
-        <li>Agent / EA <code>/knowledge/check</code> contract — both new tools call the same endpoint with the same body.</li>
+        <li>EA <code>/knowledge/check</code> contract — both new tools call the same endpoint with the same body, tenant headers, and EA-host override behavior.</li>
         <li>MCP tool description text — verbatim copy of Perplexity's so the LLM sees no difference.</li>
-        <li>Cortex agent yamls — the cortex-side companion PR <a href="https://github.com/emergentbase/cortex/pull/1679">#1679</a> handles the override pre-wiring.</li>
+        <li>Cortex agent yamls — companion PR <a href="https://github.com/emergentbase/cortex/pull/1679">cortex#1679</a> pre-wires the display_name overrides.</li>
       </ul>
     </td>
   </tr></tbody>
@@ -142,13 +150,14 @@
 <table>
   <thead><tr><th>File</th><th>Status</th><th>What lives there</th></tr></thead>
   <tbody>
-    <tr><td><span class="filepath">pkg/tools/exa/client.go</span></td><td>new</td><td>Two-step pipeline: Exa <code>/search</code> → Haiku synthesis. Same <code>Response</code> shape as Perplexity.</td></tr>
-    <tr><td><span class="filepath">pkg/tools/exa/tool.go</span></td><td>new</td><td>MCP tool implementing the <code>interfaces.MCPCapable</code> contract; checks EA knowledge base, calls client on miss, emits events.</td></tr>
-    <tr><td><span class="filepath">pkg/tools/gemini_research/tool.go</span></td><td>new</td><td>MCP tool for Gemini variant; structure mirrors <code>exa/tool.go</code>.</td></tr>
-    <tr><td><span class="filepath">pkg/gemini/research.go</span></td><td>new</td><td>Adds <code>Client.Search()</code> to the existing Gemini client — runs <code>GenerateContent</code> with the <code>google_search</code> built-in tool.</td></tr>
-    <tr><td><span class="filepath">pkg/events/types.go</span></td><td>modified</td><td>Adds <code>ExaEvent</code> and <code>GeminiResearchEvent</code> structs; identical shape to <code>PerplexityEvent</code> for schema parity.</td></tr>
-    <tr><td><span class="filepath">pkg/events/service.go</span></td><td>modified</td><td>Four event-emit methods each for Exa and GeminiResearch (KnowledgeBaseFound / NotFound / APICallCompleted / APICallFailed).</td></tr>
-    <tr><td><span class="filepath">internal/mcpserver/registry.go</span></td><td>modified</td><td>Adds <code>Exa</code> field to <code>Deps</code>, wires it in <code>NewDeps</code>, adds the two <code>setup*Tool</code> factories, registers them in <code>SetupMCPTools</code>.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/exa/client.go</span></td><td>new (263 lines)</td><td>Exa Agent API client: start run → poll → map onto the Perplexity-shaped <code>Response</code>.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/exa/client_test.go</span></td><td>new (69 lines)</td><td>Unit tests: <code>isTerminal</code>, citation dedup/ordering in <code>toResponse</code>, nil-output safety.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/exa/tool.go</span></td><td>new (263 lines)</td><td>MCP tool implementing <code>interfaces.MCPCapable</code>; EA knowledge-base check first, Exa fallback, event emission.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/gemini_research/tool.go</span></td><td>new (286 lines)</td><td>MCP tool for the Gemini variant; structure mirrors <code>exa/tool.go</code>.</td></tr>
+    <tr><td><span class="filepath">pkg/gemini/research.go</span></td><td>new (141 lines)</td><td><code>Client.Search()</code> — <code>GenerateContent</code> with the <code>google_search</code> built-in tool; citations from grounding metadata.</td></tr>
+    <tr><td><span class="filepath">pkg/events/types.go</span></td><td>modified (+36)</td><td><code>ExaEvent</code> + <code>GeminiResearchEvent</code>, same shape as <code>PerplexityEvent</code> for schema parity.</td></tr>
+    <tr><td><span class="filepath">pkg/events/service.go</span></td><td>modified (+124)</td><td>4 emit methods per provider (KnowledgeBaseFound / NotFound / APICallCompleted / APICallFailed).</td></tr>
+    <tr><td><span class="filepath">internal/mcpserver/registry.go</span></td><td>modified (+44)</td><td><code>Deps.Exa</code> field, <code>setupExaClient</code>, the two <code>setup*Tool</code> factories, Gemini backend gate.</td></tr>
   </tbody>
 </table>
 </section>
@@ -156,154 +165,128 @@
 <hr class="section-break">
 
 <section id="exa-client">
-<h2>4. <span class="filepath">pkg/tools/exa/client.go</span> — two-step pipeline</h2>
+<h2>4. <span class="filepath">pkg/tools/exa/client.go</span> — Exa Agent API client</h2>
 
-<h3>4.1 Constants and types</h3>
+<h3>4.1 Constants</h3>
 
 <pre><code>const (
-    exaBaseURL       = "https://api.exa.ai"
-    anthropicBaseURL = "https://api.anthropic.com"
+    exaBaseURL    = "https://api.exa.ai"
+    agentRunsPath = "/agent/runs"
 
-    // Claude Haiku 4.5 — synthesis model id; keep in sync with config/model_config.go.
-    SynthesisModel = "claude-haiku-4-5-20251001"
+    // ExaBetaHeader gates the Agent API (per Exa's integration guidance).
+    ExaBetaHeader = "agent-2026-05-07"
 
-    DefaultNumResults     = 15
-    DefaultMaxOutputChars = 8000
+    // DefaultEffort caps cost at $0.10/call ("medium" tier per Exa Agent pricing).
+    DefaultEffort = "medium"
+
+    // pollInterval follows Exa's documented recommendation of 4s.
+    pollInterval = 4 * time.Second
+    maxWait      = 10 * time.Minute
+
+    // maxConsecutivePollFailures tolerates transient blips without abandoning an in-flight (billed) run.
+    maxConsecutivePollFailures = 3
 
     systemPromptTemplate = `You are Integration_Playbook_Expert, ...` // verbatim from Perplexity
 )</code></pre>
 <div class="callout">
-  <strong>Why two base URLs in one client?</strong> The pipeline talks to <em>both</em>
-  Exa (<code>/search</code>) and Anthropic (<code>/v1/messages</code>) inside a single
-  <code>Execute()</code> call. Keeping both URLs as package constants makes the
-  intent obvious at the call site without grepping for hardcoded strings.
+  <strong>Why effort=medium?</strong> Exa Agent's effort tiers price at low $25/1k, medium $100/1k,
+  high $500/1k. Medium = flat $0.10/call max — measured exactly $0.10 on all 5 replayed prod inputs,
+  vs Perplexity's $0.84–$1.26 float. Predictable billing was an explicit selection criterion.
 </div>
 
-<pre><code>type Client struct {
-    client       *http.Client
-    exaAPIKey    string
-    anthropicKey string
-}
-
-func NewClient(exaKey, anthropicKey string, httpClient *http.Client) *Client { ... }</code></pre>
-<p>
-  Same shape as <code>perplexity.Client</code> but with two API keys. The <code>http.Client</code>
-  is injected by <code>registry.go</code> so all tools share the same connection pool, retry
-  policy, and New Relic instrumentation (<code>utils.RunWithNewRelic</code>).
-</p>
-
-<h3>4.2 The wire structs (Exa /search + Anthropic Messages)</h3>
+<h3>4.2 Wire types (verified against live responses)</h3>
 <table>
-  <thead><tr><th>Struct</th><th>Used for</th></tr></thead>
+  <thead><tr><th>Struct</th><th>Maps</th></tr></thead>
   <tbody>
-    <tr><td><code>exaSearchRequest</code></td><td>POST body to <code>https://api.exa.ai/search</code>. Fields: <code>query</code>, <code>numResults</code>, <code>type: "neural"</code>, <code>useAutoprompt: true</code>, plus a <code>contents</code> sub-object asking Exa to return text + highlights + summary per result.</td></tr>
-    <tr><td><code>exaSearchResult</code> / <code>exaSearchResponse</code></td><td>Decoded response: array of <code>{url, title, publishedDate, summary, highlights[], text}</code>.</td></tr>
-    <tr><td><code>anthropicRequest</code></td><td>POST body to <code>https://api.anthropic.com/v1/messages</code>. Minimal subset — only <code>model</code>, <code>max_tokens</code>, <code>system</code>, <code>messages[].role/content</code>.</td></tr>
-    <tr><td><code>anthropicResponse</code></td><td>Decoded response: array of content blocks (we keep only <code>type: "text"</code>), plus <code>usage.input_tokens</code> / <code>output_tokens</code>.</td></tr>
+    <tr><td><code>agentRunRequest</code></td><td>POST body: <code>{"query": "...", "effort": "medium"}</code> — nothing else sent.</td></tr>
+    <tr><td><code>agentRunResponse</code></td><td>Run object: <code>id, status, stopReason, output, costDollars, error</code>. Status lifecycle: <code>queued → running → completed | failed | cancelled</code>.</td></tr>
+    <tr><td><code>agentOutput</code></td><td><code>output.text</code> (the playbook markdown) + <code>output.grounding[]</code>.</td></tr>
+    <tr><td><code>groundingEntry / groundingCitation</code></td><td><code>grounding[].citations[].{url,title}</code> — real, checkable doc-page links (e.g. <code>docs.stripe.com/...</code>).</td></tr>
+    <tr><td><code>costBreakdown</code></td><td><code>costDollars.total</code> — the actual billed amount.</td></tr>
   </tbody>
 </table>
 
 <h3>4.3 <code>Execute()</code> — the public entrypoint</h3>
-<p>This is the only method <code>tool.go</code> calls. Signature matches Perplexity 1:1.</p>
+<p>Signature mirrors <code>perplexity.Client.Execute</code> 1:1 so the tool layer stays provider-agnostic.</p>
 
 <pre><code>func (c *Client) Execute(ctx context.Context, query string, techStack []string,
                          jobID, userID, envImage string) (Response, error) {
-    if c.exaAPIKey == ""    { return Response{}, fmt.Errorf("EXA_API_KEY ...") }
-    if c.anthropicKey == "" { return Response{}, fmt.Errorf("ANTHROPIC_API_KEY ...") }
-    if len(techStack) == 0  { techStack = []string{"FastAPI", "React"} }
+    if c.apiKey == ""      { return Response{}, fmt.Errorf("EXA_API_KEY ...") }
+    if len(techStack) == 0 { techStack = []string{"FastAPI", "React"} }
 
-    stackStr := strings.Join(techStack, ", ")
+    stackStr     := strings.Join(techStack, ", ")
     systemPrompt := fmt.Sprintf(systemPromptTemplate, stackStr)
     userPrompt   := fmt.Sprintf("Create a detailed integration playbook for %s in %s ...", query, stackStr)
+    agentQuery   := systemPrompt + "\n\n" + userPrompt   // single query field for the Agent API
 
-    searchQuery := fmt.Sprintf("%s %s integration setup guide official documentation",
-                               query, strings.Join(techStack, " "))
-
-    searchResp, err := c.searchExa(ctx, searchQuery)             // step 1
-    if err != nil || len(searchResp.Results) == 0 { ... }
-
-    sourceContext, citations := formatSearchResults(searchResp.Results)
-
-    synthesized, usage, err := c.synthesizeWithHaiku(ctx,         // step 2
-                                  systemPrompt, userPrompt, sourceContext)
-    if err != nil { return Response{}, ... }
-
-    return Response{
-        ID:    fmt.Sprintf("exa-search-haiku-%d", time.Now().UnixNano()),
-        Model: SynthesisModel,
-        Choices: []Choice{{Index: 0, FinishReason: "stop",
-                            Message: Message{Role: "assistant", Content: synthesized}}},
-        Usage:     Usage{PromptTokens: usage.InputTokens, CompletionTokens: usage.OutputTokens,
-                         TotalTokens: usage.InputTokens + usage.OutputTokens},
-        Citations: citations,
-    }, nil
+    run, err := c.startRun(ctx, agentQuery)
+    if err != nil { return Response{}, err }
+    if !isTerminal(run.Status) {
+        run, err = c.poll(ctx, run.ID)                   // 4s interval, max 10 min
+        if err != nil { return Response{}, err }
+    }
+    if run.Status != "completed" {
+        return Response{}, fmt.Errorf("exa agent run ended with status=%s stop_reason=%s ...", ...)
+    }
+    if run.Output == nil || run.Output.Text == "" {
+        return Response{}, fmt.Errorf("exa agent run completed with empty output ...")
+    }
+    return toResponse(*run), nil
 }</code></pre>
 
 <h4>Line-by-line — easy English</h4>
 <table>
-  <thead><tr><th>Line</th><th>What it does</th></tr></thead>
+  <thead><tr><th>Step</th><th>What it does</th></tr></thead>
   <tbody>
-    <tr><td><code>if c.exaAPIKey == ""</code></td><td>If we never got the Exa key from environment, fail fast — don't make a half-baked call.</td></tr>
-    <tr><td><code>if c.anthropicKey == ""</code></td><td>Same check for the Anthropic key. The pipeline needs BOTH to work.</td></tr>
-    <tr><td><code>if len(techStack) == 0</code></td><td>If the EA classifier didn't tell us which stack to write code for, assume the most common one (FastAPI + React).</td></tr>
-    <tr><td><code>systemPrompt := fmt.Sprintf(...)</code></td><td>Bake the stack into the persona prompt so Haiku writes code in the right language/framework.</td></tr>
-    <tr><td><code>userPrompt := fmt.Sprintf(...)</code></td><td>Build the user-facing ask: "give me a playbook for X in Y stack".</td></tr>
-    <tr><td><code>searchQuery := ...</code></td><td>Build a separate, documentation-oriented query for Exa. The "<em>integration setup guide official documentation</em>" suffix biases Exa's semantic search toward real docs and away from blog spam.</td></tr>
-    <tr><td><code>c.searchExa(ctx, searchQuery)</code></td><td>HTTP POST to <code>https://api.exa.ai/search</code> — wait for the JSON response of up to 15 docs.</td></tr>
-    <tr><td><code>len(searchResp.Results) == 0</code></td><td>Defensive: if Exa returned no hits, don't even try synthesis (Haiku would have no context to work with).</td></tr>
-    <tr><td><code>formatSearchResults(...)</code></td><td>Turn the array of docs into one big text block ("[Source 1]... URL: ... Content: ..."), and collect the URLs into the <code>citations</code> slice we'll return.</td></tr>
-    <tr><td><code>c.synthesizeWithHaiku(...)</code></td><td>HTTP POST to Anthropic Messages API. Passes the same Integration_Playbook_Expert system prompt + user prompt + the retrieved docs as context.</td></tr>
-    <tr><td>The <code>return Response{...}</code> block</td><td>Stuff Haiku's markdown into a <code>Choice</code> shaped like Perplexity's response so <code>tool.go</code> doesn't know which provider ran.</td></tr>
+    <tr><td>key / stack guards</td><td>Fail fast without a key; default to FastAPI+React if EA didn't supply a stack.</td></tr>
+    <tr><td><code>agentQuery</code></td><td>The Agent API takes ONE <code>query</code> string, not role-based messages — so the same system + user templates used by the Perplexity twin are concatenated with a blank line.</td></tr>
+    <tr><td><code>startRun</code></td><td>POST <code>/agent/runs</code>. Returns the run object immediately (usually <code>status=queued</code>).</td></tr>
+    <tr><td><code>isTerminal</code> check</td><td>If Exa already returned a terminal status on create (possible for failures), skip polling.</td></tr>
+    <tr><td><code>poll</code></td><td>GET <code>/agent/runs/{id}</code> every 4 s until terminal. Measured: 50–113 s for medium effort.</td></tr>
+    <tr><td>status / empty guards</td><td><code>failed</code>/<code>cancelled</code> runs and completed-but-empty outputs become explicit errors instead of silently handing the agent nothing.</td></tr>
+    <tr><td><code>toResponse</code></td><td>Wrap <code>output.text</code> into the Perplexity-shaped <code>Response</code>; dedupe grounding URLs into <code>Citations</code> (first-seen order).</td></tr>
   </tbody>
 </table>
 
-<h3>4.4 <code>searchExa()</code></h3>
-<p>Standard HTTP POST. Marshals the request body, sets <code>x-api-key</code>, sends through the shared HTTP client (so New Relic spans are recorded). Non-2xx → returns a wrapped error with the response body included for debugging.</p>
+<h3>4.4 <code>doRunRequest()</code> — one HTTP path for create + poll</h3>
+<pre><code>// doRunRequest sends one Agent API request and decodes the run object.
+func (c *Client) doRunRequest(ctx context.Context, method, url string, body io.Reader) (*agentRunResponse, error) {
+    req, _ := http.NewRequestWithContext(ctx, method, url, body)
+    req.Header.Set("x-api-key", c.apiKey)
+    req.Header.Set("Exa-Beta", ExaBetaHeader)
+    req.Header.Set("Content-Type", "application/json")
 
-<h3>4.5 <code>formatSearchResults()</code></h3>
+    resp, err := utils.RunWithNewRelic(ctx, req, c.client)   // shared pool + NR instrumentation
+    ...
+}</code></pre>
 <p>
-  Pure function (no I/O). Loops over results and builds a single context string. Each
-  source block looks like:
+  <code>startRun</code> (POST with body) and the poll loop (GET) both delegate here — one place for
+  headers, status checks, and decoding.
 </p>
-<pre><code>[Source 3] Stripe Payment Element guide
-URL: https://docs.stripe.com/payments/payment-element
-Published: 2025-08-12
-Summary: A drop-in payment UI for one-time and recurring charges.
-Key highlights:
-- The Payment Element renders all enabled payment methods automatically.
-- ...
 
-Content:
-&lt;first 8000 chars of the page&gt;</code></pre>
-<p>Blocks are joined with <code>\n\n---\n\n</code>. Returns the joined text and a parallel slice of URLs.</p>
+<h3>4.5 Poll-failure tolerance</h3>
+<pre><code>out, err := c.doRunRequest(ctx, http.MethodGet, exaBaseURL+agentRunsPath+"/"+runID, nil)
+if err != nil {
+    // Transient poll failures must not abandon an in-flight (billed) run.
+    consecutiveFailures++
+    if consecutiveFailures >= maxConsecutivePollFailures {
+        return nil, fmt.Errorf("exa poll failed %d times in a row ...", ...)
+    }
+    continue
+}
+consecutiveFailures = 0</code></pre>
+<div class="callout good">
+  An Exa run is billed once it starts. A single network blip during the 1–2 minute polling window
+  previously would have abandoned the run and wasted the $0.10. Now up to 3 consecutive poll
+  failures are tolerated; the counter resets on any success.
+</div>
 
-<h3>4.6 <code>synthesizeWithHaiku()</code></h3>
-<p>Wraps the retrieved sources into a structured user message and calls Claude Haiku 4.5:</p>
-<pre><code>userMsg := fmt.Sprintf(`%s
-
-You have access to the following web sources retrieved via search. Use them to
-construct an accurate, current playbook. Cite sources inline as [N] (matching
-source numbers below).
-
-================================================================================
-RETRIEVED SOURCES
-================================================================================
-%s
-================================================================================
-
-Now produce the integration playbook. Be specific (exact package versions, real
-endpoint URLs from the sources, exact env var names). Include code that compiles.
-End with a SOURCES section listing each [N] URL used.`, userPrompt, sourceContext)</code></pre>
-<p>
-  The hard instruction "<em>include code that compiles</em>" is intentional — the
-  rubric in the eval treats the downstream consumer as a pattern-matching extractor,
-  not a forgiving LLM. We want Haiku to over-specify versions and endpoints.
-</p>
-<p>
-  Non-2xx HTTP → wrapped error. Top-level <code>error</code> object in the response
-  → also wrapped error. Empty content → still an error. Only when we have text do
-  we return it along with the usage block.
-</p>
+<h3>4.6 Unit tests (<span class="filepath">client_test.go</span>)</h3>
+<ul>
+  <li><code>TestIsTerminal</code> — the full status table (<code>queued/running</code> false, <code>completed/failed/cancelled</code> true).</li>
+  <li><code>TestToResponse_DedupesCitationsFirstSeenOrder</code> — duplicate URLs collapse, empties skipped, order preserved.</li>
+  <li><code>TestToResponse_NilOutput</code> — nil output never panics.</li>
+</ul>
 </section>
 
 <hr class="section-break">
@@ -311,43 +294,23 @@ End with a SOURCES section listing each [N] URL used.`, userPrompt, sourceContex
 <section id="exa-tool">
 <h2>5. <span class="filepath">pkg/tools/exa/tool.go</span> — MCP wrapper</h2>
 
-<p>Almost a line-for-line mirror of <code>pkg/tools/perplexity/tool.go</code>:</p>
+<p>Line-for-line mirror of <code>pkg/tools/perplexity/tool.go</code>, including the review-driven parity fixes:</p>
 
 <table>
   <thead><tr><th>Method</th><th>What it does</th></tr></thead>
   <tbody>
-    <tr><td><code>NewExaTool</code></td><td>Constructor — injects the <code>Client</code>, the <code>agents.Service</code> (for EA knowledge-base calls), the proxy API key (for inter-service auth), and the <code>EventService</code> (for telemetry).</td></tr>
-    <tr><td><code>Execute</code></td><td>The main flow. Reads <code>task</code>/<code>query</code> from the tool input, calls <code>checkKnowledgeBase</code>, returns cached playbook if found, else hands off to <code>p.client.Execute()</code> and emits events for either path.</td></tr>
-    <tr><td><code>Validate</code></td><td>MCP-side input validation — at least one of <code>task</code> or <code>query</code> must be non-empty.</td></tr>
-    <tr><td><code>IsEnabled</code></td><td>The tool is hidden from the MCP registry unless <code>p.client != nil && p.client.exaAPIKey != ""</code>.</td></tr>
-    <tr><td><code>checkKnowledgeBase</code></td><td>HTTP call to EA's <code>/api/v1/knowledge/check</code> with the query. Honors the <code>X_emergent_base_url</code> request header for eph routing; falls back to <code>EA_HOST</code> env var.</td></tr>
-    <tr><td><code>Description</code></td><td>Returns the verbatim Perplexity description. Critical for provider-blind behaviour — the LLM never sees a "this is Exa" hint.</td></tr>
-    <tr><td><code>MCPTool</code></td><td>Schema definition: one required <code>query</code> string parameter.</td></tr>
-    <tr><td><code>MCPExecute</code></td><td>Adapter from MCP <code>map[string]any</code> args to <code>interfaces.ToolInput</code> + return shape.</td></tr>
+    <tr><td><code>Execute</code></td><td>Reads <code>task</code>/<code>query</code>, calls <code>checkKnowledgeBase</code>, returns the cached verified playbook on hit, else <code>p.client.Execute()</code> (the Agent API path). Emits events on every branch.</td></tr>
+    <tr><td><code>checkKnowledgeBase</code></td><td>POSTs EA's <code>/api/v1/knowledge/check</code>. Honors <code>X_emergent_base_url</code>, falls back to <code>agentsService.EAHostFor(ctx)</code> (per-request X-EA-Host override), and passes <code>execCtx.TenantHeadersMap()</code> — identical to Perplexity.</td></tr>
+    <tr><td><code>IsEnabled</code></td><td><code>p.client != nil &amp;&amp; p.client.apiKey != ""</code> — tool hidden without a key.</td></tr>
+    <tr><td><code>Description</code></td><td>Verbatim Perplexity description — provider-blind LLM surface.</td></tr>
+    <tr><td><code>MCPExecute</code></td><td>Appends citations as a <code>Sources:</code> list, wraps as <code>{"content": ..., "cost": 1.5}</code>.</td></tr>
   </tbody>
 </table>
 
-<h3>5.1 The branching in <code>Execute()</code></h3>
-<pre><code>knowledgeFound, techStack, err := p.checkKnowledgeBase(ctx, searchQuery, execCtx)
-if err == nil && knowledgeFound != nil {
-    p.eventSvc.ExaKnowledgeBaseFound(ctx, execCtx, len(knowledgeFound.Content), 0,
-                                       knowledgeFound.Content, input.ToolName)
-    return interfaces.ToolOutput{
-        Content: knowledgeFound.Content,
-        Success: true,
-        Metadata: KnowledgeBaseMetadata{ Source: "knowledge_base", Cached: true, ... },
-    }, nil
-}
-// cache miss → live Exa+Haiku
-p.eventSvc.ExaKnowledgeBaseNotFound(ctx, execCtx, input.ToolName, "")
-apiStartTime := time.Now()
-response, err := p.client.Execute(ctx, searchQuery, techStack, execCtx.RunID, ...)
-apiDuration := time.Since(apiStartTime)</code></pre>
-<div class="callout good">
-  This is the same EA-first short-circuit as the Perplexity tool. Verified playbooks
-  in the EA DB cost <strong>$0</strong> and return in <strong>~1-2 seconds</strong>.
-  The expensive provider path only fires on classifier=OTHER (≈14% of FastAPI+React
-  traffic per prior prod analysis).
+<div class="callout">
+  <strong>The <code>cost: 1.5</code> is intentional</strong> — it is an internal billing unit charged
+  to the job (flat on research fallback, KB price on cache hit), matching the Perplexity twin exactly.
+  It is NOT the provider's dollar cost; that is observable via the <code>ExaAPICallCompleted</code> event.
 </div>
 </section>
 
@@ -356,62 +319,20 @@ apiDuration := time.Since(apiStartTime)</code></pre>
 <section id="gemini-pkg">
 <h2>6. <span class="filepath">pkg/gemini/research.go</span> — grounding helper</h2>
 <p>
-  Adds a single new method, <code>Client.Search()</code>, to the existing
-  <code>pkg/gemini</code> client. The implementation uses the same backend-fan-out
-  logic (Vertex first, then direct API) that the rest of the package uses for
-  image generation and file analysis.
+  Adds <code>Client.Search()</code> to the existing Gemini client: <code>GenerateContent</code> on
+  <code>gemini-3.1-pro-preview</code> with the <code>google_search</code> built-in tool,
+  <code>maxOutputTokens 8192</code>, system instruction + user content from the same templates.
+  Uses the package's existing backend fan-out (Vertex first, direct API fallback).
 </p>
-<pre><code>func (c *Client) Search(ctx context.Context, req SearchRequest) (*ResearchResponse, error) {
-    model := req.Model
-    if model == "" { model = ModelGeminiResearch } // "gemini-3.1-pro-preview"
-
-    contents := []*genai.Content{
-        genai.NewContentFromParts([]*genai.Part{genai.NewPartFromText(req.Query)}, genai.RoleUser),
-    }
-
-    config := &genai.GenerateContentConfig{
-        ResponseMIMEType: "text/plain",
-        MaxOutputTokens:  DefaultMaxOutputTokens,        // 8192
-        Tools: []*genai.Tool{
-            {GoogleSearch: &genai.GoogleSearch{}},       // the magic — turns grounding ON
-        },
-    }
-    if req.SystemPrompt != "" {
-        config.SystemInstruction = &genai.Content{
-            Parts: []*genai.Part{genai.NewPartFromText(req.SystemPrompt)},
-        }
-    }
-
-    clients := c.getAvailableClients()
-    for _, gc := range clients {                          // try Vertex, fall back to direct API
-        resp, err = gc.Models.GenerateContent(ctx, string(model), contents, config)
-        if err == nil && len(resp.Candidates) > 0 { break }
-    }
-
-    cand := resp.Candidates[0]
-    return &ResearchResponse{
-        Content:   extractText(cand),
-        Citations: extractCitations(cand),  // pulls unique URLs from GroundingMetadata
-        Model:     string(model),
-        InputTokens / OutputTokens / TotalTokens: from resp.UsageMetadata,
-    }, nil
-}</code></pre>
-
-<h3>6.1 Cleanup applied during review</h3>
-<div class="callout warn">
-  The first version had a redundant if/else block: both branches produced the same
-  <code>contents</code> value, and the <code>if</code> branch built a
-  <code>systemPrompt</code> local variable that was immediately discarded with
-  <code>_ = systemPrompt</code>. The system instruction is actually applied via
-  <code>config.SystemInstruction</code> a few lines later. The dead code was
-  removed in commit <code>dc5c480</code>.
-</div>
-
-<h3>6.2 Helpers</h3>
 <ul>
-  <li><code>extractText</code> — concatenates all <code>Text</code> parts from the first candidate. Returns <code>""</code> if the response is empty or malformed.</li>
-  <li><code>extractCitations</code> — loops over <code>GroundingMetadata.GroundingChunks</code>, pulls each <code>web.uri</code>, dedupes by URL preserving first-seen order. Returns <code>nil</code> when grounding metadata isn't present (which, per our prod-trace investigation, happens in ~60% of Gemini grounded calls — Gemini's grounding works internally but URLs aren't always surfaced).</li>
+  <li><code>extractText</code> — concatenates the first candidate's text parts.</li>
+  <li><code>extractCitations</code> — unique URLs from <code>GroundingMetadata.GroundingChunks[].web.uri</code>, first-seen order. In practice Gemini often surfaces zero URLs even when grounding ran — observed across our replays.</li>
 </ul>
+<div class="callout warn">
+  A review bot flagged <code>gemini-3.1-pro-preview</code> as unsupported based on a stale models page.
+  Empirically falsified: 34 successful grounded calls (29-integration eval + 5 prod replays), all HTTP 200
+  with usage metadata.
+</div>
 </section>
 
 <hr class="section-break">
@@ -419,26 +340,10 @@ apiDuration := time.Since(apiStartTime)</code></pre>
 <section id="gemini-tool">
 <h2>7. <span class="filepath">pkg/tools/gemini_research/tool.go</span> — MCP wrapper</h2>
 <p>
-  Structure is identical to <code>exa/tool.go</code>: same EA-first knowledge-base
-  short-circuit, same telemetry event pattern, same MCP description text, same
-  <code>Validate</code> rules. The only material difference is the fallback call —
-  instead of <code>client.Execute()</code> on the Exa client, it invokes
-  <code>gemini.Client.Search()</code> with a <code>SearchRequest</code> that
-  carries the same system + user prompts.
-</p>
-<pre><code>req := gemini.SearchRequest{
-    Query:        userPrompt,                // "Create a detailed integration playbook for ..."
-    SystemPrompt: systemPrompt,               // Integration_Playbook_Expert persona
-}
-resp, err := p.client.Search(ctx, req)
-if err != nil {
-    p.eventSvc.GeminiResearchAPICallFailed(...)
-    return ToolOutput{Success: false, Content: "gemini api call failed: " + err}, nil
-}</code></pre>
-<p>
-  Conversion from <code>gemini.ResearchResponse</code> to the
-  <code>GeminiAPIMetadata</code> struct keeps the wire shape identical to the
-  Exa and Perplexity twins.
+  Identical structure to <code>exa/tool.go</code>: same EA-first short-circuit (with tenant headers +
+  <code>EAHostFor</code>), same telemetry pattern, same verbatim description. The fallback calls
+  <code>gemini.Client.Search()</code> with the same system + user prompts and converts
+  <code>gemini.ResearchResponse</code> into the shared metadata shape.
 </p>
 </section>
 
@@ -446,28 +351,19 @@ if err != nil {
 
 <section id="events">
 <h2>8. <span class="filepath">pkg/events/{types,service}.go</span> — telemetry</h2>
-
-<h3>8.1 <code>types.go</code></h3>
 <p>
-  Adds <code>ExaEvent</code> and <code>GeminiResearchEvent</code>, both with the
-  <em>exact same fields</em> as the existing <code>PerplexityEvent</code>. Downstream
-  PubSub consumers parse the three events with the same schema — only the
-  event-name suffix ("Exa…" vs "Perplexity…" vs "GeminiResearch…") tells you
-  which provider ran.
+  <code>ExaEvent</code> and <code>GeminiResearchEvent</code> have the exact same fields as
+  <code>PerplexityEvent</code>; only the event-name prefix differs. Four emit methods per provider:
 </p>
-
-<h3>8.2 <code>service.go</code></h3>
-<p>Adds 8 new methods: 4 per provider, mirroring Perplexity's pattern.</p>
 <table>
   <thead><tr><th>Method</th><th>Emitted when</th></tr></thead>
   <tbody>
-    <tr><td><code>ExaKnowledgeBaseFound</code> / <code>GeminiResearchKnowledgeBaseFound</code></td><td>EA returned a verified playbook (cache hit).</td></tr>
-    <tr><td><code>ExaKnowledgeBaseNotFound</code> / <code>GeminiResearchKnowledgeBaseNotFound</code></td><td>EA classifier returned OTHER — tool falls through to live provider.</td></tr>
-    <tr><td><code>ExaAPICallCompleted</code> / <code>GeminiResearchAPICallCompleted</code></td><td>Live provider call succeeded; records latency, content length, citation count, token usage, full response body.</td></tr>
-    <tr><td><code>ExaAPICallFailed</code> / <code>GeminiResearchAPICallFailed</code></td><td>Live provider call errored; records error message.</td></tr>
+    <tr><td><code>*KnowledgeBaseFound</code></td><td>EA returned a verified playbook (cache hit, $0).</td></tr>
+    <tr><td><code>*KnowledgeBaseNotFound</code></td><td>Classifier returned OTHER — falling through to the live provider.</td></tr>
+    <tr><td><code>*APICallCompleted</code></td><td>Provider call succeeded; latency, content length, citations, tokens, full response body.</td></tr>
+    <tr><td><code>*APICallFailed</code></td><td>Provider call errored; duration + error message.</td></tr>
   </tbody>
 </table>
-<p>Each method publishes via <code>PublishEvent(ctx, "&lt;EventName&gt;", event, es.pubsubPublisher)</code>, which is the existing helper that gracefully no-ops when PubSub isn't configured (eph environments without PUBSUB_PROJECT_ID).</p>
 </section>
 
 <hr class="section-break">
@@ -475,60 +371,25 @@ if err != nil {
 <section id="registry">
 <h2>9. <span class="filepath">internal/mcpserver/registry.go</span> — wiring</h2>
 
-<h3>9.1 <code>Deps</code> struct gets one new field</h3>
-<pre><code>type Deps struct {
-    ...
-    Perplexity    *perplexity.Client
-    Exa           *exa.Client          // NEW
-    ...
-}</code></pre>
-
-<h3>9.2 <code>NewDeps</code> initialises the Exa client</h3>
-<pre><code>deps.Exa = setupExaClient(httpClient)
-
-// setupExaClient initializes the Exa client; requires both EXA_API_KEY and
-// ANTHROPIC_API_KEY for the two-step pipeline.
+<pre><code>// setupExaClient initializes the Exa Agent API client.
 func setupExaClient(httpClient *http.Client) *exa.Client {
-    exaKey := os.Getenv("EXA_API_KEY")
-    anthropicKey := os.Getenv("ANTHROPIC_API_KEY")
-    if exaKey == "" || anthropicKey == "" {
-        return nil
+    if apiKey := os.Getenv("EXA_API_KEY"); apiKey != "" {
+        return exa.NewClient(apiKey, httpClient)
     }
-    return exa.NewClient(exaKey, anthropicKey, httpClient)
+    return nil
 }</code></pre>
 <p>
-  If <em>either</em> key is missing, the client stays <code>nil</code> and the
-  corresponding tool's <code>IsEnabled()</code> returns <code>false</code> — the
-  tool simply isn't registered. This is how staging environments without an
-  Anthropic key gracefully fall back to Perplexity-only.
+  Single-key gate (the earlier two-step pipeline also needed <code>ANTHROPIC_API_KEY</code>; the Agent
+  API removed that dependency). Tool registration:
 </p>
-
-<h3>9.3 Two tool registrations</h3>
-<pre><code>if tool := setupExaTool(ctx, deps); tool != nil {
-    tools = append(tools, tool)
-}
-if tool := setupGeminiResearchTool(ctx, deps); tool != nil {
-    tools = append(tools, tool)
-}
-
-// setupExaTool creates the Exa research tool (integration_playbook_expert_v2_exa).
-func setupExaTool(ctx context.Context, deps *Deps) interfaces.MCPCapable {
-    if deps.Exa == nil { return nil }
-    tool := exa.NewExaTool(deps.Exa, deps.AgentsSvc, deps.ProxyAPIKey, deps.EventSvc,
-                            "integration_playbook_expert_v2_exa")
-    log.Info(ctx, "Registered MCP tool", log.Str("tool", "integration_playbook_expert_v2_exa"))
-    return tool
-}
-
+<pre><code>// setupExaTool creates the Exa research tool (integration_playbook_expert_v2_exa).
 // setupGeminiResearchTool creates the Gemini research tool (integration_playbook_expert_v2_gemini).
-func setupGeminiResearchTool(ctx context.Context, deps *Deps) interfaces.MCPCapable {
-    if deps.Gemini == nil { return nil }
-    tool := gemini_research.NewGeminiResearchTool(deps.Gemini, deps.AgentsSvc,
-              deps.ProxyAPIKey, deps.EventSvc, "integration_playbook_expert_v2_gemini")
-    log.Info(ctx, "Registered MCP tool",
-              log.Str("tool", "integration_playbook_expert_v2_gemini"))
-    return tool
-}</code></pre>
+//   → refuses to register unless GEMINI_API_KEY or both Vertex env vars are set, because
+//     setupGeminiClient returns non-nil even with zero usable backends.</code></pre>
+<div class="callout good">
+  If a key is missing the tool simply isn't registered — environments without Exa/Gemini config
+  gracefully stay Perplexity-only.
+</div>
 </section>
 
 <hr class="section-break">
@@ -538,102 +399,59 @@ func setupGeminiResearchTool(ctx context.Context, deps *Deps) interfaces.MCPCapa
 
 <p>
   Scenario: agent calls <code>integration_playbook_expert_v2_exa</code> with
-  <code>{"query": "Supabase Auth"}</code>; the integration is <em>not</em> in
-  the EA verified playbook DB (classifier returns OTHER); tech stack is
-  FastAPI + React; we're in dev where both EXA_API_KEY and ANTHROPIC_API_KEY
-  are set.
+  <code>{"query": "INTEGRATION: Stripe payment integration for Expo... CONSTRAINTS: ..."}</code>;
+  no verified playbook in the EA DB; expo template. Numbers are from a real replayed prod input.
 </p>
 
 <ol class="dry-run">
-  <li><strong>Cortex calls MCP tool over HTTP.</strong> The MCP server routes to <code>ExaTool.MCPExecute</code> with <code>args = {"query": "Supabase Auth"}</code>.</li>
-  <li><strong><code>MCPExecute</code> wraps args into <code>interfaces.ToolInput</code></strong> and calls <code>p.Execute(ctx, input, execCtx)</code>. <code>execCtx</code> carries <code>RunID</code>, <code>UserID</code>, <code>EnvImage</code>, and request headers.</li>
-  <li><strong><code>Execute</code> picks <code>searchQuery = "Supabase Auth"</code></strong> (uses <code>query</code> arg because <code>task</code> is empty).</li>
-  <li><strong>Knowledge-base check fires.</strong> <code>checkKnowledgeBase</code> reads <code>X_emergent_base_url</code> from <code>execCtx.RequestHeaders</code>, falls back to <code>p.agentsService.GetEAHost()</code>. Then POSTs to <code>{baseURL}/api/v1/knowledge/check</code> with <code>{"query":"Supabase Auth","run_id":"...","user_id":"...","env_image":"..."}</code>.</li>
-  <li><strong>EA returns <code>{"knowledge_found": false, "tech_stack": ["FastAPI","React"]}</code></strong> — no verified playbook for this query.</li>
-  <li><strong>Event fired:</strong> <code>p.eventSvc.ExaKnowledgeBaseNotFound(ctx, execCtx, "integration_playbook_expert_v2_exa", "")</code> publishes to the <code>llm-proxy-events</code> PubSub topic.</li>
-  <li><strong>Live pipeline begins.</strong> <code>apiStartTime := time.Now()</code>. Calls <code>p.client.Execute(ctx, "Supabase Auth", ["FastAPI","React"], runID, userID, envImage)</code>.</li>
-  <li><strong>Inside the Client:</strong> builds <code>systemPrompt = "...Complete code examples for this tech stack: FastAPI, React..."</code> and <code>searchQuery = "Supabase Auth FastAPI React integration setup guide official documentation"</code>.</li>
-  <li><strong>Exa <code>/search</code> call.</strong> POSTs to <code>https://api.exa.ai/search</code> with the search request body. Receives ~15 source URLs back, each with text + highlights + summary. Total response size ~50 KB.</li>
-  <li><strong><code>formatSearchResults</code> builds the source context.</strong> Joins all docs into one big string like <code>"[Source 1] Supabase Docs\nURL: ...\nContent: ...\n\n---\n\n[Source 2] ..."</code>. Citations slice now holds 15 URLs.</li>
-  <li><strong>Anthropic Messages call.</strong> POST to <code>https://api.anthropic.com/v1/messages</code> with <code>model=claude-haiku-4-5-20251001</code>, <code>system=systemPrompt</code>, and <code>user=userPrompt + "\n\nRETRIEVED SOURCES\n..."</code>. Haiku reads ~5-15 KB of input tokens, generates a Markdown playbook (~3-5 KB output).</li>
-  <li><strong>Synthesis returns.</strong> <code>synthesizeWithHaiku</code> returns <code>(markdown, usage{InputTokens: 5234, OutputTokens: 3120}, nil)</code>.</li>
-  <li><strong>Client builds the <code>Response</code>:</strong> wraps the markdown into a <code>Choice</code> with <code>FinishReason="stop"</code>, fills <code>Usage</code> from the Haiku usage block, attaches the 15 citation URLs.</li>
-  <li><strong>Back in <code>tool.Execute</code>:</strong> <code>apiDuration := time.Since(apiStartTime)</code> ≈ <code>32s</code> (5s search + 27s synthesis). <code>p.eventSvc.ExaAPICallCompleted</code> fires with all the stats.</li>
-  <li><strong>Tool returns <code>ToolOutput{Content: markdown, Success: true, Metadata: ExaAPIMetadata{Source:"exa_api", Citations:[...], CitationsCount:15, Cached:false}}</code>.</strong></li>
-  <li><strong>MCPExecute wraps the response into <code>mcp.CallToolResultText</code>.</strong> Appends a "Sources:" footer listing the 15 URLs, embeds everything into a JSON <code>{"content":"...","cost":1.5}</code> blob, returns to cortex.</li>
-  <li><strong>Cortex stores the result as a tool_result message</strong> and feeds it back to the agent on the next iteration. The agent reads the playbook and starts writing code.</li>
+  <li><strong>Cortex calls the MCP tool.</strong> The MCP server routes to <code>ExaTool.MCPExecute</code> with the agent's tool input.</li>
+  <li><strong><code>Execute</code> picks the query</strong> (the full INTEGRATION/CONSTRAINTS block) and calls <code>checkKnowledgeBase</code>.</li>
+  <li><strong>EA knowledge check.</strong> POST <code>{baseURL}/api/v1/knowledge/check</code> with query, run/user ids, env image, tenant headers. (~200 ms)</li>
+  <li><strong>EA returns <code>knowledge_found=false</code></strong> + <code>tech_stack=["expo react native","mongodb database","react native web"]</code>.</li>
+  <li><strong>Event:</strong> <code>ExaKnowledgeBaseNotFound</code> published.</li>
+  <li><strong>Agent run starts.</strong> POST <code>https://api.exa.ai/agent/runs</code> with <code>{"query": "&lt;system template + user template&gt;", "effort": "medium"}</code> and the <code>Exa-Beta</code> header. Run comes back <code>status=queued</code>.</li>
+  <li><strong>Polling.</strong> GET <code>/agent/runs/{id}</code> every 4 s. Exa's agent searches the web (~9 searches on this input), reads sources, writes the playbook.</li>
+  <li><strong>Run completes</strong> — <code>status=completed</code>, <code>stopReason=schema_satisfied</code>, ~92 s total. <code>costDollars.total = 0.10</code>.</li>
+  <li><strong><code>toResponse</code></strong> wraps <code>output.text</code> (~10.6k chars) and dedupes 14 grounding URLs into <code>Citations</code>.</li>
+  <li><strong>Event:</strong> <code>ExaAPICallCompleted</code> with latency, sizes, and the full response body.</li>
+  <li><strong><code>MCPExecute</code></strong> appends the <code>Sources:</code> list (14 real doc URLs: docs.stripe.com, docs.expo.dev, ...) and returns <code>{"content": "...", "cost": 1.5}</code> to cortex.</li>
+  <li><strong>The agent reads the playbook</strong> and writes the integration. Net: ~92 s wall-clock, $0.10 provider cost — vs ~258 s and $0.84 for the same input on Perplexity.</li>
 </ol>
-
-<div class="callout good">
-  <strong>Net result:</strong> One MCP call → 1 EA HTTP call (knowledge check, ~200 ms) + 1 Exa HTTP call (~5 s) + 1 Anthropic HTTP call (~27 s) → ~32 s wall-clock, ~$0.10 in API cost, one cached telemetry event, agent gets a ~5 KB Markdown playbook with citations.
-</div>
 </section>
 
 <hr class="section-break">
 
-<section id="cleanup">
-<h2>11. Cleanup pass (commit <code>dc5c480</code>)</h2>
-<p>
-  Two specific cleanups landed on top of the original PR commit
-  (<code>62b8ccc</code>) and the search+Haiku refactor (<code>eaf85ed</code>):
-</p>
-<h3>11.1 Multi-line <code>//</code> comments collapsed</h3>
-<p>
-  All comment blocks of 3+ consecutive <code>//</code> lines that were
-  <em>added</em> by this PR were collapsed to a single sentence. Pre-existing
-  multi-line comments (e.g. <code>setupImageGenClient</code>'s 5-line
-  comment) were left untouched — strictly scoped to PR-introduced code per
-  the project's "Surgical Changes" rule.
-</p>
+<section id="evolution">
+<h2>11. Evolution of the PR (commit timeline)</h2>
 <table>
-  <thead><tr><th>File</th><th>Before</th><th>After</th></tr></thead>
+  <thead><tr><th>Commit</th><th>What changed</th><th>Why</th></tr></thead>
   <tbody>
-    <tr><td><code>pkg/tools/exa/client.go</code></td><td>6-line package doc</td><td>1 line</td></tr>
-    <tr><td><code>pkg/tools/exa/tool.go</code></td><td>7-line ExaTool doc + 3-line Execute + 3-line Description</td><td>1 line each</td></tr>
-    <tr><td><code>pkg/gemini/research.go</code></td><td>4-line ModelGeminiResearch + 3-line MaxOutput + 6-line Search</td><td>1 line each</td></tr>
-    <tr><td><code>pkg/tools/gemini_research/tool.go</code></td><td>3-line package doc + 5-line tool doc</td><td>1 line each</td></tr>
-    <tr><td><code>pkg/events/types.go</code></td><td>3-line ExaEvent + 2-line Gemini doc</td><td>1 line each</td></tr>
-    <tr><td><code>internal/mcpserver/registry.go</code></td><td>3-line setupExaClient + 6-line setupExaTool + 6-line setupGeminiResearchTool</td><td>1 line each</td></tr>
+    <tr><td><code>62b8ccc</code></td><td>Initial: Exa via <code>/research/v1</code> (hosted exa-research-pro) + Gemini grounded twin + events + wiring.</td><td>Ported from the xtools reference implementation.</td></tr>
+    <tr><td><code>eaf85ed</code></td><td>Exa switched to <code>/search</code> + Claude Haiku 4.5 synthesis (two-step).</td><td>4-way eval showed same substance at ~8x lower cost than /research/v1.</td></tr>
+    <tr><td><code>dc5c480</code></td><td>Comment cleanup + dead-code removal (redundant Search() branch, apiKey accessor).</td><td>Code review hygiene.</td></tr>
+    <tr><td><code>b336258</code></td><td>Parity fixes from bot review: tenant headers to <code>CheckKnowledge</code>, <code>EAHostFor(ctx)</code> for per-request EA host, Gemini registration gated on a real backend.</td><td>Match Perplexity behavior exactly.</td></tr>
+    <tr><td><code>01fa1df</code></td><td><strong>Exa switched to the Agent API</strong> (<code>/agent/runs</code>, effort=medium, beta header). Haiku synthesis + ANTHROPIC_API_KEY dependency removed.</td><td>Exa team's recommended integration; flat $0.10/call, real grounding citations, single provider call.</td></tr>
+    <tr><td><code>f5146ef</code></td><td>Hardening per Exa docs: 4 s poll interval, 3-consecutive-failure tolerance, empty-output guard, correct terminal-status set, unit tests.</td><td>Don't waste billed runs on transient blips; docs-verified behavior.</td></tr>
+    <tr><td><code>f039354</code></td><td>DRY: one <code>doRunRequest</code> HTTP helper for create + poll (−31 lines); all comments single-line.</td><td>Smaller, modular, easier to read.</td></tr>
   </tbody>
 </table>
 
-<h3>11.2 Dead-code removal in <code>pkg/gemini/research.go</code></h3>
-<div class="callout bad">
-  <strong>Bug found in review:</strong> the original <code>Search()</code> had:
-  <pre><code>if req.SystemPrompt != "" {
-    systemPrompt := &genai.Content{Parts: ..., Role: ""}
-    _ = systemPrompt        // (kept for parity; passed via config below)
-    contents = []*genai.Content{ genai.NewContentFromParts(...) }
-} else {
-    contents = []*genai.Content{ genai.NewContentFromParts(...) }
-}</code></pre>
-  Both branches produced <em>identical</em> <code>contents</code>. The
-  <code>systemPrompt</code> local was created and discarded —
-  the system instruction is actually applied a few lines later via
-  <code>config.SystemInstruction</code>. The whole if/else collapsed to a single
-  unconditional <code>contents := ...</code> assignment.
-</div>
+<h3>11.1 Measured comparison (same 5 real prod inputs)</h3>
+<table>
+  <thead><tr><th>Provider</th><th>Avg latency</th><th>Cost/call</th><th>Avg playbook</th><th>Citations</th></tr></thead>
+  <tbody>
+    <tr><td>Perplexity sonar-deep-research (today's default)</td><td>277.7 s</td><td>$0.84–$1.26 (avg ~$1.00)</td><td>73k chars</td><td>46 (end-of-doc list)</td></tr>
+    <tr><td><strong>Exa Agent API (this PR)</strong></td><td>78.5 s</td><td><strong>$0.10 flat</strong></td><td>11k chars</td><td>12 real doc-page URLs</td></tr>
+    <tr><td>Gemini 3.1 + grounding (this PR)</td><td>32.9 s</td><td>~$0.049</td><td>10k chars</td><td>0 surfaced</td></tr>
+  </tbody>
+</table>
+<div class="caption">Full traces with exact requests/responses: PERPLEXITY_TRACE.md, GEMINI_TRACE.md, EXA_TRACE.md in <code>perplexity-prod-trace/</code>.</div>
 
-<h3>11.3 <code>apiKey()</code> accessor hack removed</h3>
-<p>
-  The original cut over from <code>/research/v1</code> to <code>/search+Haiku</code>
-  renamed the client field from <code>apiKey</code> to <code>exaAPIKey</code>. To
-  avoid touching <code>tool.go</code>'s <code>IsEnabled()</code>, I'd added a
-  stub method <code>func (c *Client) apiKey() string</code>. The cleanup just
-  uses the package-private field directly (<code>tool.go</code> is in the same
-  <code>package exa</code> so this is legal), matching how Perplexity does it.
-</p>
-
-<h3>11.4 Final diff sizes (vs <code>main</code>)</h3>
-<pre><code>internal/mcpserver/registry.go  +  42
-pkg/events/service.go           + 124
-pkg/events/types.go             +  34
-pkg/gemini/research.go          + 127
-pkg/tools/exa/client.go         + 322
-pkg/tools/exa/tool.go           + 251
-pkg/tools/gemini_research/tool.go + 286
-                                ─────
-                                1186 insertions (was 1502 before cleanup)</code></pre>
+<h3>11.2 Open review notes</h3>
+<ul>
+  <li><strong>Exa concurrency:</strong> Agent API default is 2 concurrent runs per account (1/5 of QPS) — needs a limit raise from Exa before full prod rollout (~70k calls/month is bursty).</li>
+  <li><strong>imagegrid cap comment</strong> (bot, <code>pkg/imagegrid/grid.go</code>): belongs to the parallel imagegrid commit merged into this branch, owned separately.</li>
+</ul>
 </section>
 
 </body>
