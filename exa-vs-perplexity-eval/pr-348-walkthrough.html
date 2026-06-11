@@ -60,8 +60,8 @@
   Repo: <code>emergentbase/llm-proxy-service</code> &middot;
   PR: <a href="https://github.com/emergentbase/llm-proxy-service/pull/348">#348</a> &middot;
   Branch: <code>feat/integration-playbook-exa-gemini</code> &middot;
-  Last reviewed commit: <code>f039354</code> &middot;
-  Deployed tag: <code>server-tools-v0.0.40-exa-agent</code>
+  Last reviewed commit: <code>b7256cf</code> &middot;
+  Deployed tag: <code>server-tools-v0.0.41-playbook-pkg</code>
 </div>
 
 <div class="callout warn">
@@ -123,6 +123,7 @@
   <tbody><tr>
     <td>
       <ul>
+        <li>Adds <code>pkg/tools/playbook/</code> — shared contract of the tool family (description, prompts, KB lookup, metadata, MCP wiring) used by both new twins.</li>
         <li>Adds <code>pkg/tools/exa/</code> (Agent API client + MCP tool + unit tests).</li>
         <li>Adds <code>pkg/tools/gemini_research/</code> (MCP tool).</li>
         <li>Adds <code>pkg/gemini/research.go</code> (grounded Search helper on the existing Gemini client).</li>
@@ -150,10 +151,12 @@
 <table>
   <thead><tr><th>File</th><th>Status</th><th>What lives there</th></tr></thead>
   <tbody>
-    <tr><td><span class="filepath">pkg/tools/exa/client.go</span></td><td>new (263 lines)</td><td>Exa Agent API client: start run → poll → map onto the Perplexity-shaped <code>Response</code>.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/playbook/playbook.go</span></td><td>new (172 lines)</td><td>Shared contract of the tool family: tool description, prompt templates, EA knowledge-base lookup, metadata structs, MCP schema, <code>{"content","cost"}</code> wrapping.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/playbook/playbook_test.go</span></td><td>new (45 lines)</td><td>Unit tests: prompt defaults (FastAPI/React), provided stack passthrough, task/query extraction precedence.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/exa/client.go</span></td><td>new (242 lines)</td><td>Exa Agent API client: start run → poll → map onto the Perplexity-shaped <code>Response</code>. Prompts come from <code>playbook.BuildPrompts</code>.</td></tr>
     <tr><td><span class="filepath">pkg/tools/exa/client_test.go</span></td><td>new (69 lines)</td><td>Unit tests: <code>isTerminal</code>, citation dedup/ordering in <code>toResponse</code>, nil-output safety.</td></tr>
-    <tr><td><span class="filepath">pkg/tools/exa/tool.go</span></td><td>new (263 lines)</td><td>MCP tool implementing <code>interfaces.MCPCapable</code>; EA knowledge-base check first, Exa fallback, event emission.</td></tr>
-    <tr><td><span class="filepath">pkg/tools/gemini_research/tool.go</span></td><td>new (286 lines)</td><td>MCP tool for the Gemini variant; structure mirrors <code>exa/tool.go</code>.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/exa/tool.go</span></td><td>new (147 lines)</td><td>MCP tool implementing <code>interfaces.MCPCapable</code>; delegates the shared surface to <code>playbook</code>, owns only the Exa call + event emission.</td></tr>
+    <tr><td><span class="filepath">pkg/tools/gemini_research/tool.go</span></td><td>new (152 lines)</td><td>MCP tool for the Gemini variant; same delegation pattern as <code>exa/tool.go</code>.</td></tr>
     <tr><td><span class="filepath">pkg/gemini/research.go</span></td><td>new (141 lines)</td><td><code>Client.Search()</code> — <code>GenerateContent</code> with the <code>google_search</code> built-in tool; citations from grounding metadata.</td></tr>
     <tr><td><span class="filepath">pkg/events/types.go</span></td><td>modified (+36)</td><td><code>ExaEvent</code> + <code>GeminiResearchEvent</code>, same shape as <code>PerplexityEvent</code> for schema parity.</td></tr>
     <tr><td><span class="filepath">pkg/events/service.go</span></td><td>modified (+124)</td><td>4 emit methods per provider (KnowledgeBaseFound / NotFound / APICallCompleted / APICallFailed).</td></tr>
@@ -185,9 +188,12 @@
 
     // maxConsecutivePollFailures tolerates transient blips without abandoning an in-flight (billed) run.
     maxConsecutivePollFailures = 3
-
-    systemPromptTemplate = `You are Integration_Playbook_Expert, ...` // verbatim from Perplexity
 )</code></pre>
+<div class="callout">
+  The system/user prompt templates used to live here as a verbatim Perplexity copy; they now come
+  from the shared <code>pkg/tools/playbook</code> package (<code>playbook.BuildPrompts</code>) —
+  one source of truth for all three provider twins.
+</div>
 <div class="callout">
   <strong>Why effort=medium?</strong> Exa Agent's effort tiers price at low $25/1k, medium $100/1k,
   high $500/1k. Medium = flat $0.10/call max — measured exactly $0.10 on all 5 replayed prod inputs,
@@ -294,18 +300,27 @@ consecutiveFailures = 0</code></pre>
 <section id="exa-tool">
 <h2>5. <span class="filepath">pkg/tools/exa/tool.go</span> — MCP wrapper</h2>
 
-<p>Line-for-line mirror of <code>pkg/tools/perplexity/tool.go</code>, including the review-driven parity fixes:</p>
+<p>Behaviorally identical to <code>pkg/tools/perplexity/tool.go</code>, but the shared parts now live in
+<code>pkg/tools/playbook</code> — the tool file keeps only the provider-specific call and its events:</p>
 
 <table>
   <thead><tr><th>Method</th><th>What it does</th></tr></thead>
   <tbody>
-    <tr><td><code>Execute</code></td><td>Reads <code>task</code>/<code>query</code>, calls <code>checkKnowledgeBase</code>, returns the cached verified playbook on hit, else <code>p.client.Execute()</code> (the Agent API path). Emits events on every branch.</td></tr>
-    <tr><td><code>checkKnowledgeBase</code></td><td>POSTs EA's <code>/api/v1/knowledge/check</code>. Honors <code>X_emergent_base_url</code>, falls back to <code>agentsService.EAHostFor(ctx)</code> (per-request X-EA-Host override), and passes <code>execCtx.TenantHeadersMap()</code> — identical to Perplexity.</td></tr>
+    <tr><td><code>Execute</code></td><td><code>playbook.ExtractQuery</code> → <code>playbook.CheckKnowledgeBase</code>, returns the cached verified playbook on hit, else <code>p.client.Execute()</code> (the Agent API path). Emits events on every branch.</td></tr>
+    <tr><td><code>playbook.CheckKnowledgeBase</code></td><td>POSTs EA's <code>/api/v1/knowledge/check</code>. Honors <code>X_emergent_base_url</code>, falls back to <code>agentsService.EAHostFor(ctx)</code> (per-request X-EA-Host override), and passes <code>execCtx.TenantHeadersMap()</code> — identical to Perplexity.</td></tr>
     <tr><td><code>IsEnabled</code></td><td><code>p.client != nil &amp;&amp; p.client.apiKey != ""</code> — tool hidden without a key.</td></tr>
-    <tr><td><code>Description</code></td><td>Verbatim Perplexity description — provider-blind LLM surface.</td></tr>
-    <tr><td><code>MCPExecute</code></td><td>Appends citations as a <code>Sources:</code> list, wraps as <code>{"content": ..., "cost": 1.5}</code>.</td></tr>
+    <tr><td><code>Description</code></td><td>Returns <code>playbook.ToolDescription</code> — byte-identical to Perplexity's (md5-verified), provider-blind LLM surface.</td></tr>
+    <tr><td><code>MCPExecute</code></td><td><code>playbook.ToMCPResult</code>: appends citations as a <code>Sources:</code> list, wraps as <code>{"content": ..., "cost": 1.5}</code>.</td></tr>
   </tbody>
 </table>
+
+<div class="callout good">
+  <strong>Why the shared package?</strong> The 2,000-char description, 577-char prompt template,
+  KB-lookup logic, and metadata shapes were copy-pasted ×3 — and the copies had already drifted once
+  (the tenant-headers/EAHostFor parity bugs caught in review). <code>pkg/tools/playbook</code> makes
+  drift structurally impossible for the twins. Perplexity (the live prod path) is deliberately left
+  untouched in this PR and migrates in a follow-up once the twins are validated.
+</div>
 
 <div class="callout">
   <strong>The <code>cost: 1.5</code> is intentional</strong> — it is an internal billing unit charged
@@ -340,10 +355,10 @@ consecutiveFailures = 0</code></pre>
 <section id="gemini-tool">
 <h2>7. <span class="filepath">pkg/tools/gemini_research/tool.go</span> — MCP wrapper</h2>
 <p>
-  Identical structure to <code>exa/tool.go</code>: same EA-first short-circuit (with tenant headers +
-  <code>EAHostFor</code>), same telemetry pattern, same verbatim description. The fallback calls
-  <code>gemini.Client.Search()</code> with the same system + user prompts and converts
-  <code>gemini.ResearchResponse</code> into the shared metadata shape.
+  Identical structure to <code>exa/tool.go</code>: same delegation to <code>playbook</code>
+  (query extraction, EA-first short-circuit, description, MCP schema, result wrapping). The fallback
+  calls <code>gemini.Client.Search()</code> with prompts from <code>playbook.BuildPrompts</code> and
+  converts <code>gemini.ResearchResponse</code> into <code>playbook.APIMetadata</code>.
 </p>
 </section>
 
@@ -433,6 +448,7 @@ func setupExaClient(httpClient *http.Client) *exa.Client {
     <tr><td><code>01fa1df</code></td><td><strong>Exa switched to the Agent API</strong> (<code>/agent/runs</code>, effort=medium, beta header). Haiku synthesis + ANTHROPIC_API_KEY dependency removed.</td><td>Exa team's recommended integration; flat $0.10/call, real grounding citations, single provider call.</td></tr>
     <tr><td><code>f5146ef</code></td><td>Hardening per Exa docs: 4 s poll interval, 3-consecutive-failure tolerance, empty-output guard, correct terminal-status set, unit tests.</td><td>Don't waste billed runs on transient blips; docs-verified behavior.</td></tr>
     <tr><td><code>f039354</code></td><td>DRY: one <code>doRunRequest</code> HTTP helper for create + poll (−31 lines); all comments single-line.</td><td>Smaller, modular, easier to read.</td></tr>
+    <tr><td><code>b7256cf</code></td><td><strong>Shared <code>pkg/tools/playbook</code> package extracted</strong>: description, prompt templates, KB lookup, metadata structs, MCP schema, result wrapping. exa/tool.go 263→147 lines, gemini_research/tool.go 286→152.</td><td>Three byte-identical copies had already drifted once; one source of truth for the twins. Perplexity migrates in a follow-up PR.</td></tr>
   </tbody>
 </table>
 
