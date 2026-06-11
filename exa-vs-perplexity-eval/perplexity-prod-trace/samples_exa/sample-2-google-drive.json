@@ -1,0 +1,146 @@
+{
+  "sample_id": "sample-2-google-drive",
+  "agent_input": "INTEGRATION: Google Drive API integration for Python FastAPI backend\nREQUIREMENTS:\n- Upload CSV files to a specific shared Google Drive folder\n- Auto-sync functionality for daily/weekly exports\n- Real-time sync of time entry data\n- User will provide OAuth tokens/credentials\n- Need to handle authentication and file upload to shared folder ID\nCONSTRAINTS:\n- Must work with FastAPI backend\n- Need to support automated scheduled uploads\n- Handle OAuth2 authentication flow",
+  "tech_stack": [
+    "expo react native",
+    "mongodb database",
+    "react native web"
+  ],
+  "request": {
+    "url": "https://api.exa.ai/agent/runs",
+    "method": "POST",
+    "headers": {
+      "x-api-key": "exa-REDACTED-MOCK-KEY",
+      "Exa-Beta": "agent-2026-05-07",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: Google Drive API integration for Python FastAPI backend\nREQUIREMENTS:\n- Upload CSV files to a specific shared Google Drive folder\n- Auto-sync functionality for daily/weekly exports\n- Real-time sync of time entry data\n- User will provide OAuth tokens/credentials\n- Need to handle authentication and file upload to shared folder ID\nCONSTRAINTS:\n- Must work with FastAPI backend\n- Need to support automated scheduled uploads\n- Handle OAuth2 authentication flow in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "polling": "GET https://api.exa.ai/agent/runs/{id} every 5s until status not in (queued, running)"
+  },
+  "latency_s": 65.0,
+  "polls": 12,
+  "response": {
+    "id": "agent_run_d5e9818783944ec88990336df73d6174",
+    "object": "agent_run",
+    "status": "completed",
+    "stopReason": "schema_satisfied",
+    "createdAt": "2026-06-11T09:04:39.820Z",
+    "completedAt": "2026-06-11T09:05:42.400Z",
+    "request": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: Google Drive API integration for Python FastAPI backend\nREQUIREMENTS:\n- Upload CSV files to a specific shared Google Drive folder\n- Auto-sync functionality for daily/weekly exports\n- Real-time sync of time entry data\n- User will provide OAuth tokens/credentials\n- Need to handle authentication and file upload to shared folder ID\nCONSTRAINTS:\n- Must work with FastAPI backend\n- Need to support automated scheduled uploads\n- Handle OAuth2 authentication flow in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "output": {
+      "text": "## Google Drive API + FastAPI + Expo/RN/Web + MongoDB Integration Playbook\n\n### 0) What you need from Google\n1. **Google Cloud project** \u2192 enable **Google Drive API**.\n2. **OAuth consent screen** \u2192 add scopes and test users.\n3. **OAuth client IDs**:\n   - **Web client ID** for React Native Web / browser OAuth.\n   - **iOS/Android client IDs** for Expo native builds.\n4. **Shared folder ID** in the target Shared Drive.\n\n> For this use case, use **OAuth 2.0** (not a simple API key). Drive uploads to shared drives require Drive OAuth scopes and `supportsAllDrives=true` on shared-drive calls [Google Drive API scopes, shared drives, OAuth web-server].\n\n---\n\n## 1) Installation\n\n### FastAPI backend\n```bash\npython -m venv .venv\nsource .venv/bin/activate\npip install fastapi uvicorn google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2 motor pymongo apscheduler python-dotenv pydantic\n```\n\n### Expo React Native / React Native Web\n```bash\nnpx create-expo-app myapp\ncd myapp\nnpx expo install expo-auth-session expo-web-browser expo-secure-store\nnpm install axios\n```\n\n### MongoDB\nUse MongoDB Atlas or self-hosted MongoDB. Store secrets in environment variables, never in source control [MongoDB/FastAPI docs].\n\n---\n\n## 2) OAuth setup & security best practices\n\n### Scopes\nUse the narrowest scope that still works for your flow. Recommended starting point:\n- `https://www.googleapis.com/auth/drive.file` for per-file access\n- Use broader `drive` only if you truly need full-drive management [Google Drive scopes]\n\n### OAuth flow\n- In Expo/Web, start OAuth with **AuthSession**.\n- Request **offline access** (`access_type=offline`) so the backend can refresh tokens without user interaction [Google OAuth web-server].\n- Use `state` and PKCE; do **not** embed client secrets in the app [Expo AuthSession, Google OAuth].\n- Store refresh tokens **encrypted** in MongoDB and rotate/revoke when disconnected [Google OAuth, MongoDB/FastAPI].\n\n### Expo-specific security notes\n- `WebBrowser.maybeCompleteAuthSession()` is required.\n- Use `AuthSession.makeRedirectUri()`.\n- **Expo Go is not suitable** for production-like OAuth redirect testing; use a Development Build [Expo AuthSession].\n- Store native tokens in `expo-secure-store`; on web use secure cookies or backend sessions [Expo auth docs].\n\n---\n\n## 3) Backend architecture\n\n### MongoDB models\nStore one integration record per user/account:\n```python\n# models.py\nfrom datetime import datetime\nfrom pydantic import BaseModel, Field\n\nclass GoogleDriveIntegration(BaseModel):\n    user_id: str\n    access_token_enc: str | None = None\n    refresh_token_enc: str | None = None\n    expiry: datetime | None = None\n    folder_id: str\n    shared_drive_id: str | None = None\n    updated_at: datetime = Field(default_factory=datetime.utcnow)\n```\n\n### Encryption helper\nUse your KMS or app-level encryption (Fernet example shown for brevity):\n```python\n# crypto.py\nfrom cryptography.fernet import Fernet\nimport os\n\nfernet = Fernet(os.environ[\"TOKEN_ENC_KEY\"].encode())\n\ndef encrypt(v: str) -> str: return fernet.encrypt(v.encode()).decode()\ndef decrypt(v: str) -> str: return fernet.decrypt(v.encode()).decode()\n```\n\n### FastAPI app: OAuth callback, upload, sync\n```python\n# main.py\nfrom fastapi import FastAPI, BackgroundTasks, HTTPException\nfrom fastapi.responses import RedirectResponse\nfrom pydantic import BaseModel\nfrom datetime import datetime, timedelta, timezone\nfrom apscheduler.schedulers.background import BackgroundScheduler\nfrom google.oauth2.credentials import Credentials\nfrom google.auth.transport.requests import Request as GoogleRequest\nfrom googleapiclient.discovery import build\nfrom googleapiclient.http import MediaFileUpload\nfrom googleapiclient.errors import HttpError\nfrom dotenv import load_dotenv\nimport os, csv, io\n\nfrom crypto import encrypt, decrypt\n\nload_dotenv()\napp = FastAPI()\nscheduler = BackgroundScheduler()\nscheduler.start()\n\nSCOPES = [\"https://www.googleapis.com/auth/drive.file\"]\nCLIENT_ID = os.environ[\"GOOGLE_CLIENT_ID\"]\nCLIENT_SECRET = os.environ[\"GOOGLE_CLIENT_SECRET\"]\nREDIRECT_URI = os.environ[\"GOOGLE_REDIRECT_URI\"]\nSHARED_FOLDER_ID = os.environ[\"GOOGLE_SHARED_FOLDER_ID\"]\n\n# Replace with real MongoDB access\nDB = {}\n\nclass OAuthTokenIn(BaseModel):\n    user_id: str\n    access_token: str\n    refresh_token: str | None = None\n    expires_in: int | None = None\n\nclass UploadRequest(BaseModel):\n    user_id: str\n    csv_path: str\n    filename: str\n\n\ndef drive_client(user_id: str):\n    doc = DB.get(user_id)\n    if not doc:\n        raise HTTPException(404, \"integration not connected\")\n    creds = Credentials(\n        token=decrypt(doc[\"access_token_enc\"]) if doc.get(\"access_token_enc\") else None,\n        refresh_token=decrypt(doc[\"refresh_token_enc\"]) if doc.get(\"refresh_token_enc\") else None,\n        token_uri=\"https://oauth2.googleapis.com/token\",\n        client_id=CLIENT_ID,\n        client_secret=CLIENT_SECRET,\n        scopes=SCOPES,\n    )\n    if creds.expired and creds.refresh_token:\n        creds.refresh(GoogleRequest())\n        doc[\"access_token_enc\"] = encrypt(creds.token)\n        if creds.refresh_token:\n            doc[\"refresh_token_enc\"] = encrypt(creds.refresh_token)\n        doc[\"expiry\"] = creds.expiry\n    return build(\"drive\", \"v3\", credentials=creds)\n\n@app.post(\"/oauth/store-token\")\ndef store_token(payload: OAuthTokenIn):\n    DB[payload.user_id] = {\n        \"user_id\": payload.user_id,\n        \"access_token_enc\": encrypt(payload.access_token),\n        \"refresh_token_enc\": encrypt(payload.refresh_token) if payload.refresh_token else None,\n        \"expiry\": datetime.now(timezone.utc) + timedelta(seconds=payload.expires_in or 3600),\n        \"folder_id\": SHARED_FOLDER_ID,\n        \"updated_at\": datetime.now(timezone.utc),\n    }\n    return {\"ok\": True}\n\n@app.post(\"/drive/upload-csv\")\ndef upload_csv(req: UploadRequest):\n    service = drive_client(req.user_id)\n    file_metadata = {\"name\": req.filename, \"parents\": [SHARED_FOLDER_ID]}\n    media = MediaFileUpload(req.csv_path, mimetype=\"text/csv\", resumable=True)\n    try:\n        file = service.files().create(\n            body=file_metadata,\n            media_body=media,\n            fields=\"id,name,parents\",\n            supportsAllDrives=True,\n        ).execute()\n        return file\n    except HttpError as e:\n        raise HTTPException(500, detail=str(e))\n\n@app.post(\"/drive/sync-now\")\ndef sync_now(user_id: str):\n    # Example: export latest time-entry CSV and upload it\n    csv_path = \"/tmp/time_entries.csv\"\n    with open(csv_path, \"w\", newline=\"\") as f:\n        writer = csv.writer(f)\n        writer.writerow([\"date\", \"project\", \"hours\"])\n        writer.writerow([\"2026-06-11\", \"Client A\", 1.5])\n    return upload_csv(UploadRequest(user_id=user_id, csv_path=csv_path, filename=\"time_entries.csv\"))\n```\n\n### Scheduled daily/weekly exports\nUse APScheduler for recurring jobs [APScheduler docs]:\n```python\nfrom apscheduler.triggers.cron import CronTrigger\n\ndef run_export_all_users():\n    for user_id in DB.keys():\n        try:\n            sync_now(user_id)\n        except Exception as e:\n            print(f\"sync failed for {user_id}: {e}\")\n\nscheduler.add_job(run_export_all_users, CronTrigger(day_of_week=\"mon\", hour=2, minute=0))\nscheduler.add_job(run_export_all_users, CronTrigger(hour=2, minute=0))  # daily example\n```\n\n### Real-time sync\nDrive supports webhook notifications via `changes.watch` / `files.watch`; for shared drives, use `supportsAllDrives=true`, and for incremental polling use `changes.getStartPageToken` + `changes.list` [Drive push notifications, changes API].\n\n```python\n@app.post(\"/drive/watch\")\ndef watch_changes(user_id: str):\n    service = drive_client(user_id)\n    channel = {\n        \"id\": f\"chan-{user_id}\",\n        \"type\": \"web_hook\",\n        \"address\": os.environ[\"DRIVE_WEBHOOK_URL\"],\n    }\n    return service.changes().watch(\n        pageToken=\"START_PAGE_TOKEN_FROM_DB\",\n        body=channel,\n        supportsAllDrives=True,\n        includeItemsFromAllDrives=True,\n    ).execute()\n```\n\n> For Shared Drive sync, replay the **shared drive change log**, not just the user log [Drive changes docs].\n\n---\n\n## 4) Expo React Native + React Native Web OAuth example\n\n### `app.config.ts`\n```ts\nexport default {\n  expo: {\n    scheme: \"myapp\",\n    web: { bundler: \"metro\" },\n  },\n};\n```\n\n### `auth.ts`\n```ts\nimport * as WebBrowser from \"expo-web-browser\";\nimport * as AuthSession from \"expo-auth-session\";\nWebBrowser.maybeCompleteAuthSession();\n\nconst discovery = {\n  authorizationEndpoint: \"https://accounts.google.com/o/oauth2/v2/auth\",\n  tokenEndpoint: \"https://oauth2.googleapis.com/token\",\n};\n\nexport async function connectGoogle() {\n  const redirectUri = AuthSession.makeRedirectUri({ scheme: \"myapp\" });\n  const authUrl = `${discovery.authorizationEndpoint}?` + new URLSearchParams({\n    client_id: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID!,\n    redirect_uri: redirectUri,\n    response_type: \"code\",\n    scope: \"https://www.googleapis.com/auth/drive.file\",\n    access_type: \"offline\",\n    prompt: \"consent\",\n    include_granted_scopes: \"true\",\n  }).toString();\n\n  const result = await AuthSession.startAsync({ authUrl, returnUrl: redirectUri });\n  if (result.type !== \"success\") throw new Error(\"OAuth failed\");\n  return result.params.code;\n}\n```\n\n### Exchange code on backend\n```ts\nimport axios from \"axios\";\n\nexport async function completeGoogleConnect(userId: string) {\n  const code = await connectGoogle();\n  await axios.post(`${process.env.EXPO_PUBLIC_API_BASE}/oauth/exchange`, {\n    user_id: userId,\n    code,\n    redirect_uri: AuthSession.makeRedirectUri({ scheme: \"myapp\" }),\n  });\n}\n```\n\n> On web, this works through the browser; on mobile, use a Development Build, not Expo Go [Expo AuthSession].\n\n---\n\n## 5) Testing procedures\n\n### Backend tests\n1. **OAuth token refresh**: mock expired credentials and confirm refresh occurs.\n2. **Shared drive upload**: verify `parents=[folderId]` and `supportsAllDrives=True`.\n3. **Scheduled job**: run APScheduler job manually and assert upload call.\n4. **Webhook handler**: send fake Drive `X-Goog-*` headers and verify sync queue entry.\n\n### Example pytest skeleton\n```python\ndef test_upload_csv(monkeypatch):\n    called = {}\n    class FakeFiles:\n        def create(self, **kwargs): called.update(kwargs); return self\n        def execute(self): return {\"id\": \"file123\"}\n    class FakeSvc:\n        def files(self): return FakeFiles()\n    monkeypatch.setattr(\"main.drive_client\", lambda user_id: FakeSvc())\n    res = upload_csv(UploadRequest(user_id=\"u1\", csv_path=\"/tmp/a.csv\", filename=\"a.csv\"))\n    assert res[\"id\"] == \"file123\"\n    assert called[\"supportsAllDrives\"] is True\n```\n\n### OAuth flow testing\n- Verify redirect URI matches console config exactly [Google OAuth web-server].\n- Test native + web separately.\n- Confirm refresh token is returned only with offline access and consent when needed [Google OAuth].\n\n### Manual Drive checks\n- Uploaded file appears in the **specific shared folder**.\n- File owner/permissions reflect the shared drive\u2019s model.\n- Daily/weekly job runs on schedule.\n- Real-time webhook receives `sync` then `change/update` notifications.\n\n---\n\n## 6) Common pitfalls\n\n1. **Forgetting `supportsAllDrives=true`** \u2192 shared-drive uploads/listing fail [Drive shared drives].\n2. **Wrong parent ID** \u2192 must use the folder\u2019s actual ID in `parents`.\n3. **No offline access** \u2192 no refresh token, so automation breaks [Google OAuth].\n4. **Storing tokens in the app** \u2192 keep refresh tokens on the backend, encrypted [Expo + Google OAuth].\n5. **Using Expo Go for OAuth** \u2192 use a Development Build instead [Expo AuthSession].\n6. **Assuming user log sync is enough** \u2192 for shared drives, use the shared drive change log [Drive changes docs].\n7. **No retry/backoff** \u2192 retry 403/429/5xx with exponential backoff [Drive limits/errors].\n8. **Not handling expired watch channels** \u2192 webhook subscriptions must be renewed periodically.\n\n---\n\n## 7) Minimal production checklist\n- [ ] Enable Drive API\n- [ ] Configure OAuth consent + test users\n- [ ] Create web + native OAuth clients\n- [ ] Implement Expo AuthSession login\n- [ ] Exchange code on FastAPI backend\n- [ ] Encrypt and store refresh tokens in MongoDB\n- [ ] Upload CSVs with `files.create(... supportsAllDrives=True, parents=[folderId])`\n- [ ] Schedule exports with APScheduler\n- [ ] Add Drive change notifications / polling\n- [ ] Add exponential backoff + logging + token revoke flow\n\nIf you want, I can turn this into a **single copy-paste repo skeleton** with FastAPI + Expo + MongoDB files laid out.",
+      "structured": null,
+      "grounding": [
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/manage-uploads",
+              "title": "Upload file data | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/drive/api/guides/enable-shareddrives",
+              "title": "Implement shared drive support | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/api-specific-auth",
+              "title": "Choose Google Drive API scopes | Google for Developers"
+            },
+            {
+              "url": "https://developers.google.com/identity/protocols/oauth2/web-server",
+              "title": "Using OAuth 2.0 for Web Server Applications | Authorization | Google for Developers"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://docs.expo.dev/guides/authentication",
+              "title": "Authentication with OAuth or OpenID providers - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/develop/authentication/",
+              "title": "Authentication in Expo and React Native apps - Expo Documentation"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://www.mongodb.com/docs/languages/python/pymongo-driver/current/integrations/fastapi-integration/",
+              "title": "Tutorial: FastAPI Integration - PyMongo Driver - MongoDB Docs"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/push",
+              "title": "Notifications for resource changes | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/workspace/drive/api/reference/rest/v3/changes/list",
+              "title": "Method: changes.list | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/manage-changes",
+              "title": "Retrieve changes | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/limits",
+              "title": "Usage limits | Google Drive"
+            },
+            {
+              "url": "https://developers.google.com/workspace/drive/api/guides/handle-errors",
+              "title": "Resolve errors | Google Drive"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://apscheduler.readthedocs.io/en/master/integrations.html",
+              "title": "Integrating with application frameworks \u2014 APScheduler documentation"
+            },
+            {
+              "url": "https://apscheduler.readthedocs.io/en/master/userguide.html",
+              "title": "User guide \u2014 APScheduler documentation"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/tutorial/background-tasks/",
+              "title": "Background Tasks - FastAPI"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ]
+    },
+    "usage": {
+      "agentComputeUnits": 0.55,
+      "searches": 9,
+      "emails": 0,
+      "phoneNumbers": 0
+    },
+    "costDollars": {
+      "total": 0.1,
+      "agentCompute": 0.055,
+      "search": 0.045,
+      "emails": 0,
+      "phoneNumbers": 0
+    }
+  }
+}

@@ -1,0 +1,90 @@
+{
+  "sample_id": "sample-3-jwt-auth-expo",
+  "agent_input": "INTEGRATION: Custom JWT-based email/password authentication for an Expo React Native (SDK 54) mobile app with FastAPI + MongoDB backend. Need: register, login, password hashing (bcrypt), JWT token issuance/validation, secure token persistence on mobile (expo-secure-store).\n\nCONSTRAINTS: \n- Expo SDK 54 React Native mobile app\n- FastAPI backend with /api prefix on all routes\n- MongoDB for user storage\n- Token storage via expo-secure-store",
+  "tech_stack": [
+    "expo react native",
+    "mongodb database",
+    "react native web"
+  ],
+  "request": {
+    "url": "https://api.exa.ai/agent/runs",
+    "method": "POST",
+    "headers": {
+      "x-api-key": "exa-REDACTED-MOCK-KEY",
+      "Exa-Beta": "agent-2026-05-07",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: Custom JWT-based email/password authentication for an Expo React Native (SDK 54) mobile app with FastAPI + MongoDB backend. Need: register, login, password hashing (bcrypt), JWT token issuance/validation, secure token persistence on mobile (expo-secure-store).\n\nCONSTRAINTS: \n- Expo SDK 54 React Native mobile app\n- FastAPI backend with /api prefix on all routes\n- MongoDB for user storage\n- Token storage via expo-secure-store in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "polling": "GET https://api.exa.ai/agent/runs/{id} every 5s until status not in (queued, running)"
+  },
+  "latency_s": 71.8,
+  "polls": 13,
+  "response": {
+    "id": "agent_run_68aeb126c9d246a6911a06ba48c1b046",
+    "object": "agent_run",
+    "status": "completed",
+    "stopReason": "schema_satisfied",
+    "createdAt": "2026-06-11T09:04:39.885Z",
+    "completedAt": "2026-06-11T09:05:48.928Z",
+    "request": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: Custom JWT-based email/password authentication for an Expo React Native (SDK 54) mobile app with FastAPI + MongoDB backend. Need: register, login, password hashing (bcrypt), JWT token issuance/validation, secure token persistence on mobile (expo-secure-store).\n\nCONSTRAINTS: \n- Expo SDK 54 React Native mobile app\n- FastAPI backend with /api prefix on all routes\n- MongoDB for user storage\n- Token storage via expo-secure-store in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "output": {
+      "text": "# Integration Playbook: Custom JWT Email/Password Auth\n**Stack:** Expo SDK 54 React Native + React Native Web, FastAPI (`/api` prefix), MongoDB, JWT, bcrypt, `expo-secure-store`.\n\n> Note: Expo SecureStore is native-only (iOS/Android/tvOS); for web, use a fallback like `localStorage` or switch to httpOnly cookies. Expo\u2019s auth guide shows a secure-store/localStorage split for web/native [Expo SecureStore][Expo Auth Guide].\n\n---\n\n## 1) Install\n\n### Backend\n```bash\npython -m venv .venv\nsource .venv/bin/activate\npip install fastapi uvicorn[standard] motor passlib[bcrypt] pyjwt python-dotenv email-validator\n```\n\n### Expo app (SDK 54)\n```bash\nnpx create-expo-app@latest mobile\ncd mobile\nnpx expo install expo-secure-store\nnpm i axios\n```\nExpo SDK 54 includes React Native Web support; no separate `react-native-web` install is needed [Expo SDK reference].\n\n### Expo config for SecureStore\n`app.json`:\n```json\n{\n  \"expo\": {\n    \"plugins\": [\n      [\"expo-secure-store\", {\n        \"configureAndroidBackup\": true,\n        \"faceIDPermission\": \"Allow $(PRODUCT_NAME) to access your Face ID biometric data.\"\n      }]\n    ]\n  }\n}\n```\nUse `EXPO_PUBLIC_` only for non-secret client vars like the API base URL [Expo Env Vars].\n\n---\n\n## 2) Secrets / environment setup\n\n### Backend `.env`\n```env\nSECRET_KEY=generate-with-openssl\nALGORITHM=HS256\nACCESS_TOKEN_EXPIRE_MINUTES=30\nMONGODB_URI=mongodb+srv://USER:PASS@cluster0.xxxxx.mongodb.net\nMONGODB_DB=myapp\n```\nGenerate the JWT secret locally:\n```bash\nopenssl rand -hex 32\n```\n**Do not** expose `SECRET_KEY` to Expo. Only the API URL should be public on the client.\n\n### Expo `.env`\n```env\nEXPO_PUBLIC_API_URL=http://localhost:8000\n```\nFor device testing, replace `localhost` with your LAN IP or deployed backend URL [Expo Env Vars].\n\nMongoDB URI comes from MongoDB Atlas \u201cConnect\u201d or your local MongoDB connection string.\n\n---\n\n## 3) FastAPI backend (`/api` prefix on all routes)\n\n### `main.py`\n```python\nimport os\nfrom datetime import datetime, timedelta, timezone\nfrom fastapi import FastAPI, APIRouter, Depends, HTTPException, status\nfrom fastapi.security import OAuth2PasswordBearer\nfrom motor.motor_asyncio import AsyncIOMotorClient\nfrom pydantic import BaseModel, EmailStr\nfrom passlib.context import CryptContext\nimport jwt\nfrom jwt import InvalidTokenError\n\nSECRET_KEY = os.getenv(\"SECRET_KEY\", \"\")\nALGORITHM = \"HS256\"\nACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv(\"ACCESS_TOKEN_EXPIRE_MINUTES\", \"30\"))\nMONGODB_URI = os.getenv(\"MONGODB_URI\", \"mongodb://localhost:27017\")\nMONGODB_DB = os.getenv(\"MONGODB_DB\", \"myapp\")\n\nclient = AsyncIOMotorClient(MONGODB_URI)\ndb = client[MONGODB_DB]\nusers = db.users\n\npwd_context = CryptContext(schemes=[\"bcrypt\"], deprecated=\"auto\")\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"/api/auth/login\")\n\napp = FastAPI()\nauth = APIRouter(prefix=\"/auth\", tags=[\"auth\"])\n\nclass RegisterIn(BaseModel):\n    email: EmailStr\n    password: str\n\nclass LoginIn(BaseModel):\n    email: EmailStr\n    password: str\n\nclass Token(BaseModel):\n    access_token: str\n    token_type: str = \"bearer\"\n\nclass UserOut(BaseModel):\n    email: EmailStr\n\n\ndef hash_password(password: str) -> str:\n    return pwd_context.hash(password)\n\n\ndef verify_password(plain: str, hashed: str) -> bool:\n    return pwd_context.verify(plain, hashed)\n\n\ndef create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:\n    payload = data.copy()\n    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))\n    payload[\"exp\"] = expire\n    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)\n\n\nasync def get_current_user(token: str = Depends(oauth2_scheme)):\n    exc = HTTPException(\n        status_code=status.HTTP_401_UNAUTHORIZED,\n        detail=\"Could not validate credentials\",\n        headers={\"WWW-Authenticate\": \"Bearer\"},\n    )\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n        email = payload.get(\"sub\")\n        if not email:\n            raise exc\n    except InvalidTokenError:\n        raise exc\n\n    user = await users.find_one({\"email\": email})\n    if not user:\n        raise exc\n    return user\n\n\n@app.on_event(\"startup\")\nasync def startup():\n    await users.create_index(\"email\", unique=True)  # unique email constraint [MongoDB]\n\n\n@auth.post(\"/register\", response_model=Token)\nasync def register(data: RegisterIn):\n    email = data.email.lower()\n    if await users.find_one({\"email\": email}):\n        raise HTTPException(400, \"Email already registered\")\n\n    await users.insert_one({\n        \"email\": email,\n        \"password_hash\": hash_password(data.password),\n        \"created_at\": datetime.now(timezone.utc),\n    })\n    return Token(access_token=create_access_token({\"sub\": email}))\n\n\n@auth.post(\"/login\", response_model=Token)\nasync def login(data: LoginIn):\n    user = await users.find_one({\"email\": data.email.lower()})\n    if not user or not verify_password(data.password, user[\"password_hash\"]):\n        raise HTTPException(401, \"Incorrect email or password\")\n    return Token(access_token=create_access_token({\"sub\": user[\"email\"]}))\n\n\n@app.get(\"/api/me\", response_model=UserOut)\nasync def me(user=Depends(get_current_user)):\n    return {\"email\": user[\"email\"]}\n\napp.include_router(auth, prefix=\"/api\")\n```\nFastAPI\u2019s JWT flow and bearer token validation pattern is the same one used in the official tutorial [FastAPI JWT]. FastAPI also documents `/api`-style router prefixes via `include_router(..., prefix=...)` [FastAPI APIRouter].\n\n> bcrypt note: FastAPI\u2019s latest tutorial recommends Argon2 for new apps, but bcrypt is still acceptable and supported via PassLib [FastAPI][pyca/bcrypt].\n\n---\n\n## 4) Expo React Native + React Native Web client\n\n### `lib/tokenStorage.ts`\n```ts\nimport * as SecureStore from 'expo-secure-store';\nimport { Platform } from 'react-native';\n\nconst KEY = 'auth_token';\n\nexport async function saveToken(token: string) {\n  if (Platform.OS === 'web') localStorage.setItem(KEY, token);\n  else await SecureStore.setItemAsync(KEY, token);\n}\n\nexport async function loadToken() {\n  if (Platform.OS === 'web') return typeof localStorage === 'undefined' ? null : localStorage.getItem(KEY);\n  return SecureStore.getItemAsync(KEY);\n}\n\nexport async function clearToken() {\n  if (Platform.OS === 'web') localStorage.removeItem(KEY);\n  else await SecureStore.deleteItemAsync(KEY);\n}\n```\n\n### `lib/api.ts`\n```ts\nimport axios from 'axios';\nimport { loadToken } from './tokenStorage';\n\nexport const api = axios.create({\n  baseURL: process.env.EXPO_PUBLIC_API_URL,\n});\n\napi.interceptors.request.use(async (config) => {\n  const token = await loadToken();\n  if (token) config.headers.Authorization = `Bearer ${token}`;\n  return config;\n});\n```\n\n### `lib/auth.ts`\n```ts\nimport { api } from './api';\nimport { saveToken, clearToken } from './tokenStorage';\n\nexport async function register(email: string, password: string) {\n  const { data } = await api.post('/api/auth/register', { email, password });\n  await saveToken(data.access_token);\n}\n\nexport async function login(email: string, password: string) {\n  const { data } = await api.post('/api/auth/login', { email, password });\n  await saveToken(data.access_token);\n}\n\nexport async function logout() {\n  await clearToken();\n}\n\nexport async function fetchMe() {\n  const { data } = await api.get('/api/me');\n  return data;\n}\n```\n\n### Example screen (`app/index.tsx` or similar)\n```tsx\nimport React, { useState } from 'react';\nimport { View, TextInput, Button, Text } from 'react-native';\nimport { login, register, fetchMe } from '../lib/auth';\n\nexport default function Screen() {\n  const [email, setEmail] = useState('');\n  const [password, setPassword] = useState('');\n  const [msg, setMsg] = useState('');\n\n  return (\n    <View style={{ padding: 24, gap: 12 }}>\n      <TextInput placeholder=\"Email\" value={email} onChangeText={setEmail} autoCapitalize=\"none\" />\n      <TextInput placeholder=\"Password\" secureTextEntry value={password} onChangeText={setPassword} />\n      <Button title=\"Register\" onPress={async () => setMsg(JSON.stringify(await register(email, password)))} />\n      <Button title=\"Login\" onPress={async () => { await login(email, password); setMsg('logged in'); }} />\n      <Button title=\"Me\" onPress={async () => setMsg(JSON.stringify(await fetchMe()))} />\n      <Text>{msg}</Text>\n    </View>\n  );\n}\n```\nFor web, Expo\u2019s auth guide uses `localStorage` as the fallback; SecureStore is native-only [Expo Auth Guide][Expo SecureStore].\n\n---\n\n## 5) Testing\n\n### Backend\n```bash\nuvicorn main:app --reload\n```\nTry:\n```bash\ncurl -X POST http://localhost:8000/api/auth/register \\\n  -H 'Content-Type: application/json' \\\n  -d '{\"email\":\"a@b.com\",\"password\":\"secret123\"}'\n```\nThen test protected route:\n```bash\ncurl http://localhost:8000/api/me \\\n  -H \"Authorization: Bearer YOUR_JWT\"\n```\nExpected: valid JWT returns user; invalid/expired JWT returns `401` with `WWW-Authenticate: Bearer` [FastAPI JWT].\n\n### Expo mobile/web\n```bash\nnpx expo start\n# press i / a / w, or use Expo Go/dev build\n```\n- Register/login once.\n- Restart app: token should persist.\n- Web: refresh page; token should still load from `localStorage`.\n- Mobile: verify token persists via SecureStore.\n\n### Database\n- Confirm `users` has a unique index on `email`.\n- Attempt duplicate registration; expect `400`.\n\n---\n\n## 6) Common pitfalls\n1. **Using SecureStore on web**: it won\u2019t work; use a web fallback or cookies [Expo SecureStore][Expo Auth Guide].\n2. **Storing JWT secret in Expo**: never put `SECRET_KEY` in `EXPO_PUBLIC_*`.\n3. **Missing `/api` prefix**: make client calls to `/api/auth/...` and `/api/me`.\n4. **Not hashing passwords**: store only `password_hash`, never plaintext [FastAPI JWT].\n5. **No unique email index**: duplicate accounts will slip in; enforce `create_index(\"email\", unique=True)` [MongoDB].\n6. **Using `localhost` on a device**: use your machine IP or deployed backend URL.\n7. **Long-lived tokens**: keep JWT expiry short and re-login on expiry.\n\nIf you want, I can turn this into a copy-paste project structure (`backend/` + `mobile/`) with full file tree.",
+      "structured": null,
+      "grounding": [
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://docs.expo.dev/versions/v54.0.0/sdk/securestore/",
+              "title": "SecureStore - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/router/advanced/authentication/",
+              "title": "Authentication in Expo Router - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/guides/environment-variables/",
+              "title": "Environment variables in Expo"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/",
+              "title": "OAuth2 with Password (and hashing), Bearer with JWT tokens - FastAPI"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/reference/apirouter/",
+              "title": "APIRouter class - FastAPI"
+            },
+            {
+              "url": "https://www.mongodb.com/docs/manual/core/index-unique/",
+              "title": "Unique Indexes - Database Manual - MongoDB Docs"
+            },
+            {
+              "url": "https://github.com/pyca/bcrypt",
+              "title": "pyca/bcrypt"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ]
+    },
+    "usage": {
+      "agentComputeUnits": 0.4,
+      "searches": 12,
+      "emails": 0,
+      "phoneNumbers": 0
+    },
+    "costDollars": {
+      "total": 0.1,
+      "agentCompute": 0.04,
+      "search": 0.06,
+      "emails": 0,
+      "phoneNumbers": 0
+    }
+  }
+}

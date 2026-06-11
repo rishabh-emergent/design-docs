@@ -1,0 +1,100 @@
+{
+  "sample_id": "sample-4-jwt-otp-roles-expo",
+  "agent_input": "INTEGRATION: JWT-based authentication for Expo React Native app with FastAPI backend. Need:\n1. Email + password registration & login (working JWT auth)\n2. Phone OTP mocked login (accept any 6-digit OTP for now, just generate JWT)\n3. Role-based auth (customer vs admin role)\n4. Token storage via expo-secure-store on client\n\nCONSTRAINTS: \n- Backend FastAPI with MongoDB (Motor)\n- Frontend Expo Router with React Native\n- Use bcrypt for password hashing\n- JWT tokens for session",
+  "tech_stack": [
+    "expo react native",
+    "mongodb database",
+    "react native web"
+  ],
+  "request": {
+    "url": "https://api.exa.ai/agent/runs",
+    "method": "POST",
+    "headers": {
+      "x-api-key": "exa-REDACTED-MOCK-KEY",
+      "Exa-Beta": "agent-2026-05-07",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: JWT-based authentication for Expo React Native app with FastAPI backend. Need:\n1. Email + password registration & login (working JWT auth)\n2. Phone OTP mocked login (accept any 6-digit OTP for now, just generate JWT)\n3. Role-based auth (customer vs admin role)\n4. Token storage via expo-secure-store on client\n\nCONSTRAINTS: \n- Backend FastAPI with MongoDB (Motor)\n- Frontend Expo Router with React Native\n- Use bcrypt for password hashing\n- JWT tokens for session in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "polling": "GET https://api.exa.ai/agent/runs/{id} every 5s until status not in (queued, running)"
+  },
+  "latency_s": 113.4,
+  "polls": 21,
+  "response": {
+    "id": "agent_run_ae5516ce332c4db2aa045b6046cd4b33",
+    "object": "agent_run",
+    "status": "completed",
+    "stopReason": "schema_satisfied",
+    "createdAt": "2026-06-11T09:04:39.958Z",
+    "completedAt": "2026-06-11T09:06:31.892Z",
+    "request": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: expo react native, mongodb database, react native web\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: JWT-based authentication for Expo React Native app with FastAPI backend. Need:\n1. Email + password registration & login (working JWT auth)\n2. Phone OTP mocked login (accept any 6-digit OTP for now, just generate JWT)\n3. Role-based auth (customer vs admin role)\n4. Token storage via expo-secure-store on client\n\nCONSTRAINTS: \n- Backend FastAPI with MongoDB (Motor)\n- Frontend Expo Router with React Native\n- Use bcrypt for password hashing\n- JWT tokens for session in expo react native, mongodb database, react native web application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "output": {
+      "text": "Below is a practical JWT auth playbook for **FastAPI + MongoDB (Motor) + Expo Router (React Native / Web)**. FastAPI\u2019s recommended pattern is bearer-token auth with JWT verification, Expo Router recommends a `SessionProvider` + `Stack.Protected`, SecureStore is native-only with a web fallback, and MongoDB now notes Motor is deprecated in favor of PyMongo Async (but Motor still works for this build) [FastAPI JWT][Expo Router Auth][SecureStore][Motor].\n\n## 1) Install\n\n### Backend\n```bash\npython -m venv .venv\nsource .venv/bin/activate  # Windows: .venv\\Scripts\\activate\npip install fastapi uvicorn[standard] motor pyjwt bcrypt email-validator\n```\n\n### Frontend (Expo Router)\n```bash\nnpx create-expo-app@latest myapp -t expo-router\ncd myapp\nnpx expo install expo-secure-store\n# if not already present:\n# npx expo install expo-router react-native-web react-dom\n```\n\n### Where to get secrets/keys\n- **MongoDB URI**: MongoDB Atlas \u2192 **Database** \u2192 **Connect** \u2192 **Drivers**.\n- **JWT secret**: generate locally, do **not** use Expo public env vars:\n```bash\nopenssl rand -hex 32\n```\n- **No external API key is needed** for the mocked OTP flow.\n\n## 2) Backend setup\n\n### `.env`\n```env\nMONGO_URI=mongodb+srv://...\nDB_NAME=app\nJWT_SECRET=your_long_random_secret\nACCESS_TOKEN_MINUTES=60\nCORS_ORIGINS=http://localhost:8081,http://localhost:19006\n```\n\n### `app/main.py`\n```python\nimport os, uuid, bcrypt, jwt\nfrom datetime import datetime, timedelta, timezone\nfrom typing import Annotated, Optional\nfrom fastapi import FastAPI, Depends, HTTPException, status\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom fastapi.security import OAuth2PasswordBearer\nfrom motor.motor_asyncio import AsyncIOMotorClient\nfrom pydantic import BaseModel, EmailStr, Field\n\nSECRET_KEY = os.environ[\"JWT_SECRET\"]\nALGORITHM = \"HS256\"\nACCESS_TOKEN_MINUTES = int(os.getenv(\"ACCESS_TOKEN_MINUTES\", \"60\"))\nclient = AsyncIOMotorClient(os.environ[\"MONGO_URI\"])\ndb = client[os.getenv(\"DB_NAME\", \"app\")]\nusers = db.users\n\napp = FastAPI()\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=[o.strip() for o in os.getenv(\"CORS_ORIGINS\", \"http://localhost:8081\").split(\",\")],\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\noauth2_scheme = OAuth2PasswordBearer(tokenUrl=\"/auth/login\")\n\nclass RegisterIn(BaseModel):\n    email: EmailStr\n    password: str\n\nclass LoginIn(BaseModel):\n    email: EmailStr\n    password: str\n\nclass OtpIn(BaseModel):\n    phone: str\n    otp: str = Field(pattern=r\"^\\d{6}$\")\n\nclass UserOut(BaseModel):\n    uid: str\n    email: Optional[EmailStr] = None\n    phone: Optional[str] = None\n    role: str\n\nclass TokenOut(BaseModel):\n    access_token: str\n    token_type: str = \"bearer\"\n    user: UserOut\n\n@app.on_event(\"startup\")\nasync def startup():\n    await users.create_index(\"uid\", unique=True)\n    await users.create_index(\"email\", unique=True, sparse=True)\n    await users.create_index(\"phone\", unique=True, sparse=True)\n\ndef hash_pw(p: str) -> str:\n    return bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()\n\ndef verify_pw(p: str, hashed: str) -> bool:\n    return bcrypt.checkpw(p.encode(), hashed.encode())\n\ndef make_token(user: dict) -> str:\n    payload = {\n        \"sub\": user[\"uid\"],\n        \"role\": user[\"role\"],\n        \"email\": user.get(\"email\"),\n        \"phone\": user.get(\"phone\"),\n        \"exp\": datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_MINUTES),\n    }\n    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)\n\nasync def current_user(token: Annotated[str, Depends(oauth2_scheme)]):\n    try:\n        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])\n    except jwt.PyJWTError:\n        raise HTTPException(status_code=401, detail=\"Invalid token\")\n    user = await users.find_one({\"uid\": payload[\"sub\"]})\n    if not user:\n        raise HTTPException(status_code=401, detail=\"User not found\")\n    return user\n\ndef require_roles(*roles):\n    async def dep(user: Annotated[dict, Depends(current_user)]):\n        if user[\"role\"] not in roles:\n            raise HTTPException(status_code=403, detail=\"Forbidden\")\n        return user\n    return dep\n\n@app.post(\"/auth/register\", response_model=TokenOut, status_code=201)\nasync def register(data: RegisterIn):\n    if await users.find_one({\"email\": data.email}):\n        raise HTTPException(status_code=409, detail=\"Email already in use\")\n    user = {\n        \"uid\": uuid.uuid4().hex,\n        \"email\": data.email,\n        \"password_hash\": hash_pw(data.password),\n        \"role\": \"customer\",\n        \"created_at\": datetime.now(timezone.utc),\n    }\n    await users.insert_one(user)\n    return {\"access_token\": make_token(user), \"user\": {k: user.get(k) for k in [\"uid\", \"email\", \"phone\", \"role\"]}}\n\n@app.post(\"/auth/login\", response_model=TokenOut)\nasync def login(data: LoginIn):\n    user = await users.find_one({\"email\": data.email})\n    if not user or not verify_pw(data.password, user[\"password_hash\"]):\n        raise HTTPException(status_code=401, detail=\"Incorrect email or password\")\n    return {\"access_token\": make_token(user), \"user\": {k: user.get(k) for k in [\"uid\", \"email\", \"phone\", \"role\"]}}\n\n@app.post(\"/auth/phone-otp\", response_model=TokenOut)\nasync def phone_otp(data: OtpIn):\n    # mocked OTP: accept any 6-digit code\n    user = await users.find_one({\"phone\": data.phone})\n    if not user:\n        user = {\n            \"uid\": uuid.uuid4().hex,\n            \"phone\": data.phone,\n            \"role\": \"customer\",\n            \"phone_verified\": True,\n            \"created_at\": datetime.now(timezone.utc),\n        }\n        await users.insert_one(user)\n    return {\"access_token\": make_token(user), \"user\": {k: user.get(k) for k in [\"uid\", \"email\", \"phone\", \"role\"]}}\n\n@app.get(\"/me\")\nasync def me(user: Annotated[dict, Depends(current_user)]):\n    return {\"uid\": user[\"uid\"], \"email\": user.get(\"email\"), \"phone\": user.get(\"phone\"), \"role\": user[\"role\"]}\n\n@app.get(\"/admin/panel\")\nasync def admin_panel(user: Annotated[dict, Depends(require_roles(\"admin\"))]):\n    return {\"ok\": True, \"admin\": user.get(\"email\") or user.get(\"phone\")}\n```\n\n### Admin role setup\nCreate admins manually in MongoDB (don\u2019t trust client-sent role):\n```js\ndb.users.updateOne({ email: \"admin@example.com\" }, { $set: { role: \"admin\" } })\n```\n\n## 3) Frontend setup (Expo Router + SecureStore)\n\n### `.env`\n```env\nEXPO_PUBLIC_API_URL=http://localhost:8000\n```\n> Expo only inlines `EXPO_PUBLIC_` vars into client code, so never put secrets there [Expo Env].\n\n### `lib/storage.ts`\n```ts\nimport * as SecureStore from 'expo-secure-store';\nimport { Platform } from 'react-native';\n\nconst KEY = 'auth_token';\n\nexport async function setToken(value: string | null) {\n  if (Platform.OS === 'web') {\n    if (value) localStorage.setItem(KEY, value);\n    else localStorage.removeItem(KEY);\n    return;\n  }\n  if (value) await SecureStore.setItemAsync(KEY, value);\n  else await SecureStore.deleteItemAsync(KEY);\n}\n\nexport async function getToken() {\n  if (Platform.OS === 'web') return localStorage.getItem(KEY);\n  return SecureStore.getItemAsync(KEY);\n}\n```\n\n### `context/session.tsx`\n```tsx\nimport React, { createContext, useContext, useEffect, useMemo, useState } from 'react';\nimport { getToken, setToken } from '../lib/storage';\n\nconst API = process.env.EXPO_PUBLIC_API_URL!;\n\ntype Session = { token: string; role: 'customer' | 'admin' } | null;\n\ntype Ctx = {\n  session: Session;\n  loading: boolean;\n  register: (email: string, password: string) => Promise<void>;\n  login: (email: string, password: string) => Promise<void>;\n  otpLogin: (phone: string, otp: string) => Promise<void>;\n  signOut: () => Promise<void>;\n};\n\nconst AuthContext = createContext<Ctx | null>(null);\n\nasync function api(path: string, body?: any, token?: string) {\n  const res = await fetch(`${API}${path}`, {\n    method: body ? 'POST' : 'GET',\n    headers: {\n      'Content-Type': 'application/json',\n      ...(token ? { Authorization: `Bearer ${token}` } : {}),\n    },\n    body: body ? JSON.stringify(body) : undefined,\n  });\n  const json = await res.json();\n  if (!res.ok) throw new Error(json.detail ?? 'Request failed');\n  return json;\n}\n\nexport function AuthProvider({ children }: { children: React.ReactNode }) {\n  const [session, setSession] = useState<Session>(null);\n  const [loading, setLoading] = useState(true);\n\n  useEffect(() => {\n    (async () => {\n      const token = await getToken();\n      if (token) {\n        const me = await api('/me', undefined, token);\n        setSession({ token, role: me.role });\n      }\n      setLoading(false);\n    })();\n  }, []);\n\n  async function save(auth: { access_token: string; user: { role: 'customer' | 'admin' } }) {\n    await setToken(auth.access_token);\n    setSession({ token: auth.access_token, role: auth.user.role });\n  }\n\n  const value = useMemo<Ctx>(() => ({\n    session,\n    loading,\n    register: async (email, password) => save(await api('/auth/register', { email, password })),\n    login: async (email, password) => save(await api('/auth/login', { email, password })),\n    otpLogin: async (phone, otp) => save(await api('/auth/phone-otp', { phone, otp })),\n    signOut: async () => { await setToken(null); setSession(null); },\n  }), [session, loading]);\n\n  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;\n}\n\nexport const useAuth = () => {\n  const ctx = useContext(AuthContext);\n  if (!ctx) throw new Error('useAuth must be used inside AuthProvider');\n  return ctx;\n};\n```\n\n### `app/_layout.tsx`\n```tsx\nimport { Stack } from 'expo-router';\nimport { AuthProvider, useAuth } from '../context/session';\n\nfunction RootNav() {\n  const { session, loading } = useAuth();\n  if (loading) return null;\n  return (\n    <Stack>\n      <Stack.Protected guard={!session}>\n        <Stack.Screen name=\"(auth)\" />\n      </Stack.Protected>\n      <Stack.Protected guard={!!session}>\n        <Stack.Screen name=\"(app)\" />\n      </Stack.Protected>\n    </Stack>\n  );\n}\n\nexport default function Layout() {\n  return (\n    <AuthProvider>\n      <RootNav />\n    </AuthProvider>\n  );\n}\n```\n\n### `app/(auth)/sign-in.tsx`\n```tsx\nimport { useState } from 'react';\nimport { View, TextInput, Button } from 'react-native';\nimport { useAuth } from '../../context/session';\nimport { useRouter } from 'expo-router';\n\nexport default function SignIn() {\n  const { login, register, otpLogin } = useAuth();\n  const router = useRouter();\n  const [email, setEmail] = useState('');\n  const [password, setPassword] = useState('');\n  const [phone, setPhone] = useState('');\n  const [otp, setOtp] = useState('123456');\n\n  return (\n    <View style={{ padding: 16, gap: 12 }}>\n      <TextInput placeholder=\"email\" value={email} onChangeText={setEmail} />\n      <TextInput placeholder=\"password\" secureTextEntry value={password} onChangeText={setPassword} />\n      <Button title=\"Register\" onPress={async () => { await register(email, password); router.replace('/'); }} />\n      <Button title=\"Login\" onPress={async () => { await login(email, password); router.replace('/'); }} />\n      <TextInput placeholder=\"phone\" value={phone} onChangeText={setPhone} />\n      <TextInput placeholder=\"6-digit otp\" value={otp} onChangeText={setOtp} />\n      <Button title=\"Mock OTP Login\" onPress={async () => { await otpLogin(phone, otp); router.replace('/'); }} />\n    </View>\n  );\n}\n```\n\n## 4) Testing\n\n### Backend\n```bash\nuvicorn app.main:app --reload\n```\nThen verify:\n```bash\ncurl -X POST http://localhost:8000/auth/register -H \"Content-Type: application/json\" -d '{\"email\":\"a@b.com\",\"password\":\"Pass123!\"}'\ncurl -X POST http://localhost:8000/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"a@b.com\",\"password\":\"Pass123!\"}'\ncurl -X POST http://localhost:8000/auth/phone-otp -H \"Content-Type: application/json\" -d '{\"phone\":\"+15550001111\",\"otp\":\"123456\"}'\ncurl http://localhost:8000/me -H \"Authorization: Bearer YOUR_TOKEN\"\ncurl http://localhost:8000/admin/panel -H \"Authorization: Bearer YOUR_ADMIN_TOKEN\"\n```\n\n### Frontend\n```bash\nnpx expo start\nnpx expo start --web\n```\nCheck:\n- registration/login works\n- OTP accepts any 6 digits\n- token survives app restart (SecureStore on native, localStorage on web)\n- admin route is blocked for `customer`\n\n## 5) Common pitfalls\n- **Sending JSON to OAuth2 password endpoints**: FastAPI\u2019s password flow expects form data if you use `OAuth2PasswordRequestForm`; this playbook uses custom JSON endpoints to keep Expo simple [FastAPI JWT].\n- **CORS misconfig**: don\u2019t use `*` with credentials; allow explicit origins for Expo web/native hosts [FastAPI CORS].\n- **Putting JWT secret in `EXPO_PUBLIC_` env vars**: Expo inlines those into client code, so keep secrets only on the backend [Expo Env].\n- **SecureStore on web**: SecureStore is native-first; use localStorage fallback for web [SecureStore][Expo Router Auth].\n- **bcrypt 72-byte limit**: very long passwords need a pre-hash strategy or a max-length policy [bcrypt].\n- **Motor deprecation**: it works, but MongoDB recommends PyMongo Async for new work; plan a future migration [Motor].\n- **Role changes not reflected**: if you change a user\u2019s role in MongoDB, reissue the JWT.\n\nThat\u2019s the full working integration: email/password signup/login, mocked phone OTP login, role-based access, and secure token persistence for Expo RN + web.",
+      "structured": null,
+      "grounding": [
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://fastapi.tiangolo.com/tutorial/security/oauth2-jwt/",
+              "title": "OAuth2 with Password (and hashing), Bearer with JWT tokens - FastAPI"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/tutorial/cors/",
+              "title": "CORS (Cross-Origin Resource Sharing) - FastAPI"
+            },
+            {
+              "url": "https://www.mongodb.com/docs/drivers/motor/",
+              "title": "Motor (Async Driver) - Client Libraries - MongoDB Docs"
+            },
+            {
+              "url": "https://pypi.org/project/bcrypt/",
+              "title": "bcrypt - PyPI"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://docs.expo.dev/router/advanced/authentication/",
+              "title": "Authentication in Expo Router - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/versions/latest/sdk/securestore/",
+              "title": "SecureStore - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/guides/environment-variables/",
+              "title": "Environment variables in Expo - Expo Documentation"
+            },
+            {
+              "url": "https://docs.expo.dev/versions/latest/sdk/router/",
+              "title": "Router - Expo Documentation"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ]
+    },
+    "usage": {
+      "agentComputeUnits": 0.7,
+      "searches": 6,
+      "emails": 0,
+      "phoneNumbers": 0
+    },
+    "costDollars": {
+      "total": 0.1,
+      "agentCompute": 0.07,
+      "search": 0.03,
+      "emails": 0,
+      "phoneNumbers": 0
+    }
+  }
+}

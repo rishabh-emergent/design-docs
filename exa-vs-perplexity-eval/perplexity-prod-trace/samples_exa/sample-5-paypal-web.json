@@ -1,0 +1,144 @@
+{
+  "sample_id": "sample-5-paypal-web",
+  "agent_input": "INTEGRATION: PayPal payment processing for e-commerce checkout\nCONSTRAINTS: Need to integrate PayPal checkout button and payment processing for a dropshipping store",
+  "tech_stack": [
+    "reactjs frontend with shadcn",
+    "fastapi backend",
+    "mongodb database"
+  ],
+  "request": {
+    "url": "https://api.exa.ai/agent/runs",
+    "method": "POST",
+    "headers": {
+      "x-api-key": "exa-REDACTED-MOCK-KEY",
+      "Exa-Beta": "agent-2026-05-07",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: reactjs frontend with shadcn, fastapi backend, mongodb database\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: PayPal payment processing for e-commerce checkout\nCONSTRAINTS: Need to integrate PayPal checkout button and payment processing for a dropshipping store in reactjs frontend with shadcn, fastapi backend, mongodb database application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "polling": "GET https://api.exa.ai/agent/runs/{id} every 5s until status not in (queued, running)"
+  },
+  "latency_s": 50.7,
+  "polls": 9,
+  "response": {
+    "id": "agent_run_022cb07dc842431c92306a3294d194d7",
+    "object": "agent_run",
+    "status": "completed",
+    "stopReason": "schema_satisfied",
+    "createdAt": "2026-06-11T09:04:39.848Z",
+    "completedAt": "2026-06-11T09:05:28.809Z",
+    "request": {
+      "query": "You are Integration_Playbook_Expert, responsible for creating detailed integration guides.\nResearch and provide a complete integration playbook for the requested technology that includes:\n\n1. Installation instructions\n2. API key setup & security best practices\n3. Complete code examples for this tech stack: reactjs frontend with shadcn, fastapi backend, mongodb database\n4. Testing procedures\n5. Common pitfalls and how to avoid them\n\nFormat your response in a structured, step-by-step guide that a developer can follow.\nInclude all necessary code samples.\nIf the integration involves API keys, include instructions on where to get them.\n\nCreate a detailed integration playbook for INTEGRATION: PayPal payment processing for e-commerce checkout\nCONSTRAINTS: Need to integrate PayPal checkout button and payment processing for a dropshipping store in reactjs frontend with shadcn, fastapi backend, mongodb database application. Include all necessary installation steps, code samples, and testing procedures. Keep it short and precise.",
+      "effort": "medium"
+    },
+    "output": {
+      "text": "# PayPal Checkout Integration Playbook\n\nPayPal Checkout should be wired so the **frontend only gets the PayPal Client ID**, while the **FastAPI backend creates/captures orders with the PayPal Client Secret** using OAuth 2.0 access tokens [PayPal Dev]. Use the PayPal JavaScript SDK/button flow for the buyer UI and the Orders v2 API on the server for create/capture [PayPal Orders API].\n\n## 1) Install\n\n### Frontend (React + shadcn)\n```bash\nnpm install @paypal/react-paypal-js\nnpx shadcn@latest add button card\n```\n\n### Backend (FastAPI + MongoDB)\n```bash\npip install fastapi uvicorn httpx motor pydantic-settings python-dotenv pytest anyio\n```\n\n### MongoDB\n- Use MongoDB Atlas or a local **replica set** if you plan to use transactions; MongoDB transactions require a replica set or sharded cluster [MongoDB Transactions].\n- Create an `orders` collection and a unique index on `paypalOrderId` to prevent duplicate captures [MongoDB Unique Index].\n\n```js\ndb.orders.createIndex({ paypalOrderId: 1 }, { unique: true })\n```\n\n## 2) API keys + security\n\n### Where to get PayPal keys\n1. Log in to the **PayPal Developer Dashboard**.\n2. Open **Apps & Credentials**.\n3. Create/select your app and copy the **Client ID** and **Client Secret** [PayPal Dev].\n4. Use **Sandbox** credentials while testing.\n\n### Security rules\n- **Frontend:** only use `PAYPAL_CLIENT_ID`.\n- **Backend:** store `PAYPAL_CLIENT_SECRET` in `.env` / secret manager; never commit it [FastAPI Settings].\n- Do **not** create/capture orders from the browser directly; call PayPal REST APIs from FastAPI [PayPal Orders API].\n- Reuse OAuth access tokens until expiry; refresh on 401/expiry [PayPal Auth].\n- Add webhook verification in production for payment status reconciliation [PayPal Webhooks].\n\n## 3) Backend (FastAPI + MongoDB)\n\n### `.env`\n```env\nPAYPAL_CLIENT_ID=your_client_id\nPAYPAL_CLIENT_SECRET=your_client_secret\nPAYPAL_BASE_URL=https://api-m.sandbox.paypal.com\nMONGODB_URI=mongodb+srv://...\nMONGO_DB=shop\nCORS_ORIGINS=http://localhost:5173\n```\n\n### `app/main.py`\n```python\nfrom datetime import datetime, timezone, timedelta\nfrom typing import Optional\nimport httpx\nfrom fastapi import FastAPI, HTTPException\nfrom fastapi.middleware.cors import CORSMiddleware\nfrom motor.motor_asyncio import AsyncIOMotorClient\nfrom pydantic import BaseModel, SecretStr\nfrom pydantic_settings import BaseSettings, SettingsConfigDict\n\nclass Settings(BaseSettings):\n    model_config = SettingsConfigDict(env_file=\".env\", extra=\"ignore\")\n    paypal_client_id: str\n    paypal_client_secret: SecretStr\n    paypal_base_url: str = \"https://api-m.sandbox.paypal.com\"\n    mongodb_uri: str\n    mongo_db: str = \"shop\"\n    cors_origins: str = \"http://localhost:5173\"\n\nsettings = Settings()\napp = FastAPI()\napp.add_middleware(\n    CORSMiddleware,\n    allow_origins=[o.strip() for o in settings.cors_origins.split(\",\")],\n    allow_credentials=True,\n    allow_methods=[\"*\"],\n    allow_headers=[\"*\"],\n)\n\nmongo = AsyncIOMotorClient(settings.mongodb_uri)\ndb = mongo[settings.mongo_db]\n\n_token: dict = {\"access_token\": None, \"expires_at\": datetime.min.replace(tzinfo=timezone.utc)}\n\nclass CreateOrderIn(BaseModel):\n    amount: float\n    currency: str = \"USD\"\n\nclass CaptureOrderIn(BaseModel):\n    orderID: str\n\nasync def paypal_access_token() -> str:\n    now = datetime.now(timezone.utc)\n    if _token[\"access_token\"] and now < _token[\"expires_at\"]:\n        return _token[\"access_token\"]\n    async with httpx.AsyncClient(timeout=30) as client:\n        r = await client.post(\n            f\"{settings.paypal_base_url}/v1/oauth2/token\",\n            auth=(settings.paypal_client_id, settings.paypal_client_secret.get_secret_value()),\n            headers={\"Content-Type\": \"application/x-www-form-urlencoded\"},\n            data={\"grant_type\": \"client_credentials\"},\n        )\n    r.raise_for_status()\n    data = r.json()\n    _token[\"access_token\"] = data[\"access_token\"]\n    _token[\"expires_at\"] = now + timedelta(seconds=int(data.get(\"expires_in\", 900)) - 60)\n    return _token[\"access_token\"]\n\n@app.post(\"/api/paypal/create-order\")\nasync def create_order(payload: CreateOrderIn):\n    token = await paypal_access_token()\n    body = {\n        \"intent\": \"CAPTURE\",\n        \"purchase_units\": [{\"amount\": {\"currency_code\": payload.currency, \"value\": f\"{payload.amount:.2f}\"}}],\n    }\n    async with httpx.AsyncClient(timeout=30) as client:\n        r = await client.post(\n            f\"{settings.paypal_base_url}/v2/checkout/orders\",\n            headers={\"Authorization\": f\"Bearer {token}\", \"Content-Type\": \"application/json\"},\n            json=body,\n        )\n    if r.status_code >= 400:\n        raise HTTPException(r.status_code, r.text)\n    order = r.json()\n    await db.orders.update_one(\n        {\"paypalOrderId\": order[\"id\"]},\n        {\"$set\": {\"paypalOrderId\": order[\"id\"], \"status\": \"CREATED\", \"amount\": payload.amount, \"currency\": payload.currency, \"updatedAt\": datetime.now(timezone.utc)}},\n        upsert=True,\n    )\n    return {\"id\": order[\"id\"]}\n\n@app.post(\"/api/paypal/capture-order\")\nasync def capture_order(payload: CaptureOrderIn):\n    token = await paypal_access_token()\n    async with httpx.AsyncClient(timeout=30) as client:\n        r = await client.post(\n            f\"{settings.paypal_base_url}/v2/checkout/orders/{payload.orderID}/capture\",\n            headers={\"Authorization\": f\"Bearer {token}\", \"Content-Type\": \"application/json\"},\n        )\n    if r.status_code >= 400:\n        raise HTTPException(r.status_code, r.text)\n    capture = r.json()\n    await db.orders.update_one(\n        {\"paypalOrderId\": payload.orderID},\n        {\"$set\": {\"status\": \"CAPTURED\", \"capture\": capture, \"updatedAt\": datetime.now(timezone.utc)}},\n        upsert=True,\n    )\n    return capture\n```\n\n## 4) Frontend (React + shadcn)\n\n### `src/components/PaypalCheckout.tsx`\n```tsx\nimport { PayPalButtons, PayPalScriptProvider } from \"@paypal/react-paypal-js\";\nimport { Card, CardContent, CardHeader, CardTitle } from \"@/components/ui/card\";\n\nexport function PaypalCheckout({ amount }: { amount: number }) {\n  const clientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;\n  const apiBase = import.meta.env.VITE_API_BASE_URL ?? \"http://localhost:8000\";\n\n  return (\n    <Card className=\"max-w-md\">\n      <CardHeader><CardTitle>Checkout with PayPal</CardTitle></CardHeader>\n      <CardContent>\n        <PayPalScriptProvider options={{ clientId, currency: \"USD\", intent: \"capture\" }}>\n          <PayPalButtons\n            style={{ layout: \"vertical\", label: \"paypal\" }}\n            createOrder={async () => {\n              const res = await fetch(`${apiBase}/api/paypal/create-order`, {\n                method: \"POST\",\n                headers: { \"Content-Type\": \"application/json\" },\n                body: JSON.stringify({ amount, currency: \"USD\" }),\n              });\n              const data = await res.json();\n              return data.id;\n            }}\n            onApprove={async (data) => {\n              await fetch(`${apiBase}/api/paypal/capture-order`, {\n                method: \"POST\",\n                headers: { \"Content-Type\": \"application/json\" },\n                body: JSON.stringify({ orderID: data.orderID }),\n              });\n              alert(\"Payment successful\");\n            }}\n            onError={(err) => console.error(err)}\n          />\n        </PayPalScriptProvider>\n      </CardContent>\n    </Card>\n  );\n}\n```\n\n### Use it on your checkout page\n```tsx\nimport { PaypalCheckout } from \"@/components/PaypalCheckout\";\nexport default function CheckoutPage() {\n  return <PaypalCheckout amount={49.99} />;\n}\n```\n\n## 5) Testing\n\n### Backend tests\nUse FastAPI\u2019s test tools; for async endpoints, `pytest.mark.anyio` + `httpx.AsyncClient` is the recommended pattern [FastAPI Testing].\n\n```python\nimport pytest\nfrom httpx import ASGITransport, AsyncClient\nfrom app.main import app\n\n@pytest.mark.anyio\nasync def test_create_order():\n    async with AsyncClient(transport=ASGITransport(app=app), base_url=\"http://test\") as ac:\n        res = await ac.post(\"/api/paypal/create-order\", json={\"amount\": 10.0})\n        assert res.status_code in (200, 201)\n```\n\n### Manual PayPal sandbox test\n1. Use a **sandbox buyer** account to click the button.\n2. Approve payment.\n3. Confirm the payment appears in the **sandbox business account** recent activity [PayPal Dev].\n4. Simulate webhooks in the PayPal dashboard to test fulfillment logic [PayPal Webhooks].\n\n## 6) Common pitfalls\n- **Putting the secret in React** \u2192 never do this; keep secret only in FastAPI [FastAPI Settings].\n- **Calling capture on the client** \u2192 always capture on the server [PayPal Orders API].\n- **Mixing sandbox and live credentials** \u2192 client ID, secret, and base URL must match environment [PayPal Auth].\n- **Duplicate orders** \u2192 enforce a unique index on `paypalOrderId` [MongoDB Unique Index].\n- **Using MongoDB standalone with transactions** \u2192 transactions need replica set/sharded cluster [MongoDB Transactions].\n- **Expired PayPal tokens** \u2192 cache until expiry, then fetch a new one [PayPal Auth].\n\nIf you want, I can turn this into a ready-to-paste repo structure (`frontend/`, `backend/`, `.env.example`, and tests).",
+      "structured": null,
+      "grounding": [
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://developer.paypal.com/docs/multiparty/checkout/standard/integrate/",
+              "title": "Integrate PayPal Checkout for Standard Payments"
+            },
+            {
+              "url": "https://developer.paypal.com/reference/get-an-access-token/",
+              "title": "Get an access token"
+            },
+            {
+              "url": "https://developer.paypal.com/api/rest/authentication/",
+              "title": "Authentication"
+            },
+            {
+              "url": "https://developer.paypal.com/api/orders/v2",
+              "title": "Orders"
+            },
+            {
+              "url": "https://developer.paypal.com/docs/api/webhooks/v1/",
+              "title": "Webhooks - PayPal Developer"
+            },
+            {
+              "url": "https://developer.paypal.com/docs/checkout/standard/customize/single-page-app/",
+              "title": "Standard Payments with Single-Page Applications"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://fastapi.tiangolo.com/advanced/settings/",
+              "title": "Settings and Environment Variables - FastAPI"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/tutorial/testing/",
+              "title": "Testing - FastAPI"
+            },
+            {
+              "url": "https://fastapi.tiangolo.com/advanced/async-tests/",
+              "title": "Async Tests - FastAPI"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://www.mongodb.com/docs/manual/core/transactions/",
+              "title": "Transactions - Database Manual - MongoDB Docs"
+            },
+            {
+              "url": "https://www.mongodb.com/docs/manual/core/index-unique/create/",
+              "title": "Create a Single-Field Unique Index - Database Manual - MongoDB"
+            },
+            {
+              "url": "https://www.mongodb.com/docs/manual/core/index-unique/",
+              "title": "Unique Indexes - Database Manual - MongoDB Docs"
+            },
+            {
+              "url": "https://www.mongodb.com/docs/manual/data-modeling/enforce-consistency/transactions/",
+              "title": "Enforce Data Consistency with Transactions - MongoDB Docs"
+            }
+          ],
+          "confidence": "medium"
+        },
+        {
+          "field": "text",
+          "citations": [
+            {
+              "url": "https://ui.shadcn.com/docs/installation/manual",
+              "title": "Manual Installation - shadcn/ui"
+            },
+            {
+              "url": "https://ui.shadcn.com/docs/components/base/button",
+              "title": "Button - Shadcn UI"
+            },
+            {
+              "url": "https://ui.shadcn.com/docs/new",
+              "title": "Your project is ready! - shadcn/ui"
+            }
+          ],
+          "confidence": "medium"
+        }
+      ]
+    },
+    "usage": {
+      "agentComputeUnits": 0.55,
+      "searches": 9,
+      "emails": 0,
+      "phoneNumbers": 0
+    },
+    "costDollars": {
+      "total": 0.1,
+      "agentCompute": 0.055,
+      "search": 0.045,
+      "emails": 0,
+      "phoneNumbers": 0
+    }
+  }
+}
