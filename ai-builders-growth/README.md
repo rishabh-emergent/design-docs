@@ -18,6 +18,10 @@ Increase adoption, experience, and retention of users building **AI products & a
 | [findings/06-voice-of-customer.md](findings/06-voice-of-customer.md) | Phase 6: demand-ranked backlog (12 asks), churn voice, ask-human problem | ✅ 2026-06-12 |
 | [findings/07-competitive-landscape.md](findings/07-competitive-landscape.md) | Phase 7: competitor matrix (managed LLM keys = table stakes; operate layer unclaimed), OpenClaw lesson, boilerplate WTP, **codebase feasibility sizing** (91 playbooks exist; templates are Small effort) | ✅ 2026-06-12 |
 | [findings/raw-phase37-sweep.md](findings/raw-phase37-sweep.md) | Raw outputs of the 13-agent Phase 3–7 wave | ✅ 2026-06-12 |
+| [findings/08-opportunity-scoring.md](findings/08-opportunity-scoring.md) | Phase 8: 22 candidates scored, counter-evidence stress-test, **portfolio decision: Ship Loop flagship + Starter Kits + Runtime Key (~$3.7–5.4M/yr conservative)** | ✅ 2026-06-12 |
+| [adr/0001-flagship-bet.md](adr/0001-flagship-bet.md) | ADR: Ship Loop as flagship (proposed, awaiting ratification) | ✅ 2026-06-12 |
+| [09-flagship-prd.md](09-flagship-prd.md) | Phase 9: PRD — Ship Loop (F1–F4 specs, experiment design, eng notes) + fast-follow specs | ✅ 2026-06-12 |
+| [10-gtm-plan.md](10-gtm-plan.md) | Phase 9: GTM — positioning, channels, launch sequencing, pricing moves, metrics | ✅ 2026-06-12 |
 | `findings/02-job-forensics.md` | Phase 2: seed + whale job deep-dives, gap longlist | pending |
 | `findings/03-cohorts-success.md` | Phase 3: cohort table, build funnel, success rates | pending |
 | `findings/04-friction-failures.md` | Phase 4: failure signatures, friction ranking | pending |

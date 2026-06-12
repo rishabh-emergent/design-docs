@@ -235,6 +235,6 @@ Emergent users describe apps in natural language; agents build and deploy them. 
 | 5 Economics | ✅ done 2026-06-12 (LTV segments, impact model, operate sizing, whale-margin finance flag) | `findings/05-builder-economics.md` |
 | 6 VoC | ✅ done 2026-06-12 (demand-ranked backlog; public-web VoC step 88 skipped — covered via competitor reviews) | `findings/06-voice-of-customer.md` |
 | 7 Competitive | ✅ done 2026-06-12 (builder matrix, agent platforms, OpenClaw, boilerplate WTP, feasibility sizing) | `findings/07-competitive-landscape.md` |
-| 8 Scoring | ⏸️ **paused — awaiting Rishabh's go-ahead** (all inputs ready) | |
-| 9 PRD + GTM | ⚪ | |
-| 10 Measurement | ⚪ | |
+| 8 Scoring | ✅ done 2026-06-12 (22 candidates, stress-tested, portfolio picked; ADR 0001 proposed) | `findings/08-opportunity-scoring.md` |
+| 9 PRD + GTM | ✅ done 2026-06-12 (draft v1 — Ship Loop PRD + GTM; eng design doc & full experiment briefs pending build kickoff) | `09-flagship-prd.md`, `10-gtm-plan.md` |
+| 10 Measurement | 🟡 spec'd in PRD §9 / GTM §5 (dashboard build pending) | |
