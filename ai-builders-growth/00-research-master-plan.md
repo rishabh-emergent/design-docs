@@ -228,8 +228,8 @@ Emergent users describe apps in natural language; agents build and deploy them. 
 | Phase | Status | Findings doc |
 |---|---|---|
 | 0 Foundations | ✅ done 2026-06-12 (steps 1–10; step 7 validated live on 3 apps) | `findings/00-foundations.md` |
-| 1 Segment sizing | 🟡 mostly done (steps 11,12,15,17²,20,21,22,24 done; 13–14 LLM calibration, 16 sub-category trend, 18–19, 23 remain) | `findings/01-segment-sizing.md` |
-| 2 Job forensics | ⚪ | |
+| 1 Segment sizing | ✅ done 2026-06-12 (calibrated share ~11–14.5%; steps 18–19, 23 folded into Phase 3) | `findings/01-segment-sizing.md` |
+| 2 Job forensics | ✅ done 2026-06-12 (steps 26–35, 37, 40 done; whale HITL deep-dives top-10 only; 36, 38–39 folded into Phases 3–4) | `findings/02-job-forensics.md` |
 | 3 Cohorts & success | ⚪ | |
 | 4 Friction | ⚪ | |
 | 5 Economics | ⚪ | |

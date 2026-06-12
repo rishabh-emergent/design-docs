@@ -6,6 +6,8 @@
 
 > **AI builders are ~16% of projects but ~28–54% of platform spend, convert to paid at 1.66× the rate of other builders, deploy 1.7× more often, and are 100% of the most expensive whale tail. The segment's *share* is flat for 12 months — the opportunity is not riding a wave, it's fixing a leaky, expensive funnel: only 3.0% of AI projects ever deploy, and the ones that do cost a median $111 (11.8× the median non-deployed AI project).**
 
+> **CALIBRATION UPDATE (2026-06-12, Phase 2):** hand-classification of 620 tasks puts keyword-filter precision at 55–60% and recall-miss at 3.2% → **true AI-product share ≈ 11–14.5% of root projects (~1 in 8)**; whale-AI spend in the top-100 = $1.13M/90d confirmed (was $1.55M flagged). Keyword-based numbers in this doc are upper bounds; see [02-job-forensics.md](02-job-forensics.md) §1.
+
 ## 1. Platform context (90d)
 
 - 4,693,212 jobs · 3,174,166 users · 4,545,588 projects · **$151.67M total attributed ECU-value consumption**.
