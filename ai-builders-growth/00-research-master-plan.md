@@ -230,11 +230,11 @@ Emergent users describe apps in natural language; agents build and deploy them. 
 | 0 Foundations | ✅ done 2026-06-12 (steps 1–10; step 7 validated live on 3 apps) | `findings/00-foundations.md` |
 | 1 Segment sizing | ✅ done 2026-06-12 (calibrated share ~11–14.5%; steps 18–19, 23 folded into Phase 3) | `findings/01-segment-sizing.md` |
 | 2 Job forensics | ✅ done 2026-06-12 (steps 26–35, 37, 40 done; whale HITL deep-dives top-10 only; 36, 38–39 folded into Phases 3–4) | `findings/02-job-forensics.md` |
-| 3 Cohorts & success | ⚪ | |
-| 4 Friction | ⚪ | |
-| 5 Economics | ⚪ | |
-| 6 VoC | ⚪ | |
-| 7 Competitive | ⚪ | |
-| 8 Scoring | ⚪ | |
+| 3 Cohorts & success | ✅ done 2026-06-12 (H5 ✅ retention/revenue, S4 measured, red-team verdicts; step 41 cohort table via temp_tables, dashboard spec pending) | `findings/03-cohorts-success.md` |
+| 4 Friction | ✅ done 2026-06-12 (credit-exhaustion mechanics, support/churn themes, ranked friction list) | `findings/04-friction-failures.md` |
+| 5 Economics | ✅ done 2026-06-12 (LTV segments, impact model, operate sizing, whale-margin finance flag) | `findings/05-builder-economics.md` |
+| 6 VoC | ✅ done 2026-06-12 (demand-ranked backlog; public-web VoC step 88 skipped — covered via competitor reviews) | `findings/06-voice-of-customer.md` |
+| 7 Competitive | ✅ done 2026-06-12 (builder matrix, agent platforms, OpenClaw, boilerplate WTP, feasibility sizing) | `findings/07-competitive-landscape.md` |
+| 8 Scoring | ⏸️ **paused — awaiting Rishabh's go-ahead** (all inputs ready) | |
 | 9 PRD + GTM | ⚪ | |
 | 10 Measurement | ⚪ | |
