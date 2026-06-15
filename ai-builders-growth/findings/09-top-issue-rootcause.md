@@ -1,4 +1,49 @@
-# Phase 4b — Top-Issue Audit & Root-Cause Validation (120 high-spend AI jobs)
+# Phase 4b — Top-Issue Audit & Root-Cause Validation (220 high-spend AI jobs)
+
+> **Scaled to 220 jobs (2026-06-15).** Two bands audited with the same taxonomy: **Batch 1** = 120 jobs >200 ECU (5,675→203 ECU), **Batch 2** = next 100 jobs at 108–200 ECU. Combined ranking + cross-band trend in §5. The single-batch detail below is Batch 1.
+
+## Combined 220-job ranking (headline)
+
+Only **4/220 (1.8%) shipped clean**; **209 partial**; the agent introduced its own error in **197/220 (89.5%)**; user frustration ≥ level 2 in **111/220 (50.5%)**.
+
+| Issue | B1/120 | B2/100 | **Total/220** | **%** |
+|---|---|---|---|---|
+| **AGENT_FALSE_COMPLETION** | 68 | 43 | **111** | **50.5%** |
+| **GEN_RELIABILITY** | 53 | 33 | **86** | **39.1%** |
+| INT_OTHER_FAILURE | 43 | 31 | 74 | 33.6% |
+| UI_UX_CHURN | 48 | 25 | 73 | 33.2% |
+| INSTRUCTION_BURDEN | 42 | 27 | 69 | 31.4% |
+| COST_FRUSTRATION | 30 | 21 | 51 | 23.2% |
+| AGENT_IGNORED_INSTRUCTION | 23 | 21 | 44 | 20.0% |
+| AGENT_REGRESSION | 29 | 11 | 40 | 18.2% |
+| AGENT_LOOP | 29 | 10 | 39 | 17.7% |
+| INT_UNIVERSAL_KEY_UNSUPPORTED | 20 | 19 | 39 | 17.7% |
+| TESTING_BLIND | 20 | 15 | 35 | 15.9% |
+| PLATFORM_CAPABILITY_MISMATCH | 18 | 17 | 35 | 15.9% |
+| AUTH_ISSUE | 20 | 15 | 35 | 15.9% |
+| DEPLOY_PROD_PARITY | 32 | 2 | 34 | 15.5% |
+| ENV_INFRA_ERROR | 23 | 7 | 30 | 13.6% |
+| LONGRUN_TIMEOUT | 24 | 4 | 28 | 12.7% |
+| AGENT_WRONG_SCOPE | 10 | 16 | 26 | 11.8% |
+| INT_RATELIMIT_SESSION_BUG | 23 | 0* | 23 | 10.5% |
+| INT_STRIPE_TESTLIVE | 13 | 9 | 22 | 10.0% |
+| INT_KEY_MISCONFIG_RUNTIME | 14 | 7 | 21 | 9.5% |
+| CONTEXT_LOSS | 11 | 4 | 15 | 6.8% |
+| DEPLOY_FAILURE | 12 | 2 | 14 | 6.4% |
+| DATA_PERSISTENCE | 6 | 5 | 11 | 5.0% |
+| AGENT_SLOW | 2 | 1 | 3 | 1.4% |
+
+**Combined _primary_ (biggest-per-job):** GEN_RELIABILITY 40, AGENT_FALSE_COMPLETION 25, INT_OTHER_FAILURE 19, UI_UX_CHURN 16, PLATFORM_CAPABILITY_MISMATCH 12, INT_UNIVERSAL_KEY_UNSUPPORTED 11, AGENT_LOOP 10, INT_STRIPE_TESTLIVE 10.
+
+### Cross-band trend (what changes as spend drops 200+ → 108–200 ECU)
+- **The top cluster holds in both bands.** False-completion + gen-reliability is #1/#2 at every spend level (B1 57%/44%, B2 43%/33%). The root cause is not a whale-only phenomenon.
+- **"Long-job" issues scale with spend and collapse in the cheaper band:** DEPLOY_PROD_PARITY 32→2, LONGRUN_TIMEOUT 24→4, ENV_INFRA_ERROR 23→7, AGENT_LOOP 29→10, AGENT_REGRESSION 29→11 — bigger jobs run longer, reach deploy, and accumulate these; cheaper jobs often die before deploy.
+- **Integration & capability-mismatch issues are _relatively more_ prominent in cheaper jobs:** INT_UNIVERSAL_KEY_UNSUPPORTED (17%→19%), PLATFORM_CAPABILITY_MISMATCH (15%→17%), AGENT_WRONG_SCOPE (8%→16%) — users hit "the platform can't serve this provider / can't build this" early and abandon cheaply.
+- **\*Measurement caveat:** Batch 2 was audited on intent + full HITL only (BigQuery's 60s adhoc cap rejected the error-log/integration-signal scans under load). So log-dependent codes read low in B2 — especially **INT_RATELIMIT_SESSION_BUG (0 in B2 is an artifact, not a real disappearance)**, and some INT_KEY/ENV. B2's agent-error rate (81%) and frustration are also depressed by the lighter evidence; treat B2 integration/infra counts as a floor. The HITL-driven codes (false completion, gen-reliability, instruction burden, UI churn, cost) are unaffected.
+
+---
+
+# (Batch 1 detail) — 120 high-spend AI jobs
 
 **Date:** 2026-06-15 · **Cohort:** 120 jobs classified "AI Products & Agents" (`icp_classification.verticals_classification_v2`, confidence >0.95, non-expo), each >200 ECU since 2026-06-09. · **Method:** bulk-fetched intent + 3,625 HITL messages + 1,907 error signals + integration counts → 120 parallel audit agents → deterministic aggregation → code-level root-cause against `app-builder` base template + `cortex/prompts`. · Raw: workflow `wf_1951cf39-da1`.
 
